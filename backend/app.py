@@ -3,9 +3,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
 
 # Tamamı paket içi relative olsun:
-from .settings import settings
-from .db import get_db, init_db
-from .schemas import (
+from settings import settings
+from db import get_db, init_db
+from schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
@@ -16,8 +16,8 @@ from .schemas import (
     IssuerIssueReq, IssuerIssueResp,
     IssuerRevokeReq, IssuerRevokeResp,
 )
-from .core.crypto_ed25519 import Ed25519Signer, b64u_d
-from .core.vc import verify_vc
+from core.crypto_ed25519 import Ed25519Signer, b64u_d
+from core.vc import verify_vc
 
 import time, secrets, base64
 import hashlib, os, json

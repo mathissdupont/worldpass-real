@@ -1,7 +1,7 @@
 import json, base64, time
 from typing import Dict, Tuple
-from .crypto_ed25519 import b64u, b64u_d
-from .crypto_base import Signer
+from crypto_ed25519 import b64u, b64u_d
+from crypto_base import Signer
 
 def jws_message(header: dict, payload: dict) -> bytes:
     return (b64u(json.dumps(header, separators=(",",":")).encode()) + "." +
