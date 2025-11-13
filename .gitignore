@@ -1,0 +1,21 @@
+# ENV files (çok kritik)
+.env
+.env.*
+*.env
+.venv
+# Node modules
+web/node_modules/
+web/.vite/
+web/dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# SQLite
+*.db
+/data
+
+# Keystore dosyaları
+*.json
+*.keystore

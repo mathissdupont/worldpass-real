@@ -1,0 +1,368 @@
+// src/pages/issuer/Register.jsx
+import { useMemo, useState } from "react";
+import { useIdentity } from "../../lib/identityContext";
+import { createOrg, verifyOrg, markVerified } from "@/lib/issuerStore.js";
+import IdentityLoad from "../../components/IdentityLoad";
+import IdentityCreate from "../../components/IdentityCreate";
+
+/* ---------- küçük yardımcılar ---------- */
+function Pill({ tone = "info", children }) {
+  const map = {
+    info: "border-gray-200 bg-gray-50 text-gray-700",
+    ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    warn: "border-amber-200 bg-amber-50 text-amber-800",
+    err: "border-rose-200 bg-rose-50 text-rose-800",
+  };
+  return (
+    <div className={`text-xs rounded-lg px-3 py-2 border ${map[tone] || map.info}`}>
+      {children}
+    </div>
+  );
+}
+const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const domainRx = /^(?!\-)(?:[a-z0-9\-]{1,63}\.)+[a-z]{2,}$/i; // basit ama sağlam
+
+function Label({ children }) {
+  return <div className="text-sm text-gray-700 mb-1">{children}</div>;
+}
+
+function Input({ value, onChange, type = "text", placeholder, error, ...rest }) {
+  return (
+    <input
+      value={value}
+      onChange={onChange}
+      type={type}
+      placeholder={placeholder}
+      className={[
+        "w-full px-3 py-2 rounded-xl",
+        "bg-white border outline-none focus:ring-2 focus:ring-indigo-500",
+        error ? "border-rose-300" : "border-black/10",
+      ].join(" ")}
+      {...rest}
+    />
+  );
+}
+
+function CopyBtn({ value, label = "Copy" }) {
+  return (
+    <button
+      type="button"
+      onClick={() => navigator.clipboard.writeText(value)}
+      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-black/10 bg-white hover:bg-white/90 text-xs"
+    >
+      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="9" y="9" width="13" height="13" rx="2" />
+        <rect x="2" y="2" width="13" height="13" rx="2" />
+      </svg>
+      {label}
+    </button>
+  );
+}
+
+/* ---------- SAYFA ---------- */
+export default function IssuerRegister() {
+  const { identity, setIdentity } = useIdentity(); // kuruluş DID'i
+  const [name, setName] = useState("");
+  const [domain, setDomain] = useState("");
+  const [email, setEmail] = useState("");
+
+  const [org, setOrg] = useState(null);
+  const [token, setToken] = useState("");
+
+  const [msg, setMsg] = useState(null); // {tone:'ok'|'err'|'info'|'warn', text:string}
+  const [busyCreate, setBusyCreate] = useState(false);
+  const [busyVerify, setBusyVerify] = useState(false);
+
+  const hasDid = !!identity?.did;
+
+  const normDomain = useMemo(() => (domain || "").trim().toLowerCase(), [domain]);
+  const validDomain = domainRx.test(normDomain);
+  const validEmail = emailRx.test((email || "").trim());
+  const validName = (name || "").trim().length >= 2;
+
+  const canCreate = !!(validName && validDomain && validEmail && hasDid);
+
+  const onCreate = () => {
+    setMsg(null);
+    if (!canCreate) {
+      setMsg({ tone: "err", text: "Eksik veya hatalı bilgi var. Alanları kontrol et." });
+      return;
+    }
+    try {
+      setBusyCreate(true);
+      const o = createOrg({
+        name: name.trim(),
+        domain: normDomain,
+        ownerEmail: email.trim(),
+        did: identity.did,
+        pk_b64u: identity.pk_b64u,
+      });
+      setOrg(o);
+      setMsg({
+        tone: "ok",
+        text:
+          "Kuruluş oluşturuldu. Aşağıdaki doğrulama token’ı ile domain doğrula (demo).",
+      });
+    } catch (e) {
+      setMsg({ tone: "err", text: "Kuruluş oluşturulamadı: " + (e?.message || String(e)) });
+    } finally {
+      setBusyCreate(false);
+    }
+  };
+
+  const onVerify = () => {
+    if (!org) return;
+    setMsg(null);
+    setBusyVerify(true);
+    try {
+      const ok = verifyOrg(org.id, (token || "").trim());
+      setMsg(ok ? { tone: "ok", text: "Domain doğrulandı 🎉" } : { tone: "warn", text: "Token yanlış." });
+      if (ok) setOrg({ ...org, status: "verified" });
+    } catch (e) {
+      setMsg({ tone: "err", text: "Doğrulama hatası: " + (e?.message || String(e)) });
+    } finally {
+      setBusyVerify(false);
+    }
+  };
+
+  const didShort =
+    identity?.did && identity.did.length > 44 ? identity.did.slice(0, 44) + "…" : identity?.did;
+
+  const dnsSnippet = org
+    ? `DNS TXT  @  _worldpass   "${org.verify_token}"`
+    : "";
+  const httpSnippet = org
+    ? `GET https://${normDomain || "example.edu.tr"}/.well-known/worldpass.txt\n\n${org.verify_token}`
+    : "";
+
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      {/* LEFT: Register form */}
+      <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Organization Register</h2>
+
+          <div
+            className={[
+              "text-xs px-2 py-1 rounded border",
+              hasDid
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-200 bg-amber-50 text-amber-700",
+            ].join(" ")}
+            title={hasDid ? identity.did : "Bu sayfada keystore yükleyebilirsin"}
+          >
+            {hasDid ? "DID Ready" : "No DID"}
+          </div>
+        </div>
+
+        {hasDid && (
+          <div className="mt-2 text-[11px] text-gray-600 flex items-center gap-2">
+            <span className="font-mono break-all">{didShort}</span>
+            {identity?.did && <CopyBtn value={identity.did} label="Copy DID" />}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500 mt-2">
+          Kuruluş DID olarak hesabındaki DID kullanılacak (demo).
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <Label>Organization Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="WorldPass University"
+              error={name && !validName}
+            />
+            {name && !validName && (
+              <div className="text-[11px] text-rose-600 mt-1">En az 2 karakter olmalı.</div>
+            )}
+          </div>
+
+          <div>
+            <Label>Domain</Label>
+            <Input
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="example.edu.tr"
+              error={domain && !validDomain}
+            />
+            {domain && !validDomain && (
+              <div className="text-[11px] text-rose-600 mt-1">
+                Geçerli bir domain gir (örn. <span className="font-mono">uni.edu.tr</span>).
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Admin Email</Label>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="admin@example.edu.tr"
+              error={email && !validEmail}
+            />
+            {email && !validEmail && (
+              <div className="text-[11px] text-rose-600 mt-1">Geçerli bir e-posta gir.</div>
+            )}
+          </div>
+
+          <button
+            disabled={!canCreate || busyCreate}
+            onClick={onCreate}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-black text-white hover:opacity-90 disabled:opacity-50"
+            title={!hasDid ? "Önce sağdan DID yükle/oluştur" : ""}
+          >
+            {busyCreate ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="9" opacity=".25" />
+                  <path d="M21 12a9 9 0 0 1-9 9" />
+                </svg>
+                Creating…
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 3v12" />
+                  <path d="M8 11l4 4 4-4" />
+                  <rect x="4" y="17" width="16" height="4" rx="1" />
+                </svg>
+                Create Organization
+              </>
+            )}
+          </button>
+        </div>
+
+        {msg && (
+          <div className="mt-3">
+            <Pill tone={msg.tone || "info"}>{msg.text}</Pill>
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT: Domain verify + DID loader */}
+      <div className="space-y-4">
+        {!hasDid && (
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <h3 className="font-semibold">Load / Create DID</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Keystore RAM’de tutulur. Sayfayı yenilersen tekrar yüklemen gerekir.
+            </p>
+            <IdentityLoad onLoaded={(ident) => setIdentity(ident)} />
+            <div className="my-3 h-px bg-gray-200" />
+            <IdentityCreate />
+          </div>
+        )}
+
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h3 className="font-semibold">Domain Verification</h3>
+
+          {!org ? (
+            <p className="text-sm text-gray-600 mt-2">Önce kuruluş oluştur.</p>
+          ) : (
+            <>
+              <div className="mt-2 text-sm">
+                <div>
+                  Status:{" "}
+                  <span
+                    className={
+                      org.status === "verified" ? "text-emerald-700 font-medium" : "text-amber-700"
+                    }
+                  >
+                    {org.status}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">DNS TXT (gerçekte):</div>
+                    <div className="rounded-lg border bg-gray-50 p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <pre className="whitespace-pre-wrap break-all">{dnsSnippet}</pre>
+                        <CopyBtn value={dnsSnippet} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      HTTP well-known (gerçekte):
+                    </div>
+                    <div className="rounded-lg border bg-gray-50 p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <pre className="whitespace-pre-wrap break-all">{httpSnippet}</pre>
+                        <CopyBtn value={httpSnippet} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* demo doğrulama alanı */}
+              <div className="mt-4">
+                <Label>Paste verification token (demo)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="org.verify_token değerini gir"
+                  />
+                  <button
+                    onClick={onVerify}
+                    disabled={busyVerify || !token.trim()}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-black text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {busyVerify ? (
+                      <>
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <circle cx="12" cy="12" r="9" opacity=".25" />
+                          <path d="M21 12a9 9 0 0 1-9 9" />
+                        </svg>
+                        Verifying…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                        Verify
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <details className="mt-2">
+                  <summary className="text-xs text-gray-600 cursor-pointer">
+                    Dev tools (only for development)
+                  </summary>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => {
+                        markVerified(org.id);
+                        setOrg({ ...org, status: "verified" });
+                        setMsg({ tone: "info", text: "Dev: Organization marked as verified." });
+                      }}
+                      className="px-3 py-2 rounded-xl border hover:bg-gray-50 text-xs"
+                      title="Sadece geliştirme için"
+                      type="button"
+                    >
+                      Dev: Mark Verified
+                    </button>
+                    {org?.verify_token && <CopyBtn value={org.verify_token} label="Copy token" />}
+                  </div>
+                </details>
+
+                <p className="mt-3 text-[11px] text-gray-500">
+                  Not: Bu demo. Gerçek doğrulama için backend’te DNS/HTTP kontrolü yapmalıyız.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
