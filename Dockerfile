@@ -1,16 +1,22 @@
 FROM python:3.12-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
 WORKDIR /app
 
-# 1) Requirements
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
-# 2) Uygulama kodu (backend klasörü paket olarak kalsın)
-COPY backend/ /app/backend
+# sistem bağımlılıkları (gerekirse ekleriz)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+ && rm -rf /var/lib/apt/lists/*
 
-# 3) Uvicorn başlat
-CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+COPY . .
+
+# FastAPI app: backend/app.py içinde app = FastAPI(...)
+ENV WORLD_PASS_DB=/data/worldpass.db
+ENV APP_ENV=production
+
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8080"]
