@@ -1,6 +1,6 @@
 import aiosqlite
 from typing import AsyncGenerator
-from .settings import settings
+from settings import settings
 
 SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
