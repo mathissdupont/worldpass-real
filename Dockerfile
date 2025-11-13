@@ -10,7 +10,7 @@ COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # 2) Uygulama kodu (backend klasörü paket olarak kalsın)
-COPY backend/ /app/backend
+COPY backend/ /backend
 
 # 3) Uvicorn başlat
 CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
