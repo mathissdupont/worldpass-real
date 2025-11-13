@@ -1,14 +1,12 @@
 # backend/app.py  (Railway'de /app/app.py olarak çalışıyor)
 
 from fastapi import FastAPI, Depends, HTTPException, Header
-from typing import Optional
-import time, secrets, base64, hashlib, os, json
 
-from settings import settings
-from db import get_db, init_db
-from schemas import (
-    HealthResp,
-    ChallengeReq, ChallengeResp,
+# Tamamı paket içi relative olsun:
+from .settings import settings
+from .db import get_db, init_db
+from .schemas import (
+    HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
     AdminLoginReq, AdminLoginResp,
@@ -18,8 +16,13 @@ from schemas import (
     IssuerIssueReq, IssuerIssueResp,
     IssuerRevokeReq, IssuerRevokeResp,
 )
-from core.crypto_ed25519 import Ed25519Signer, b64u_d
-from core.vc import verify_vc
+from .core.crypto_ed25519 import Ed25519Signer, b64u_d
+from .core.vc import verify_vc
+
+import time, secrets, base64
+import hashlib, os, json
+from typing import Optional
+
 
 app = FastAPI(title=settings.APP_NAME)
 API = settings.API_PREFIX
