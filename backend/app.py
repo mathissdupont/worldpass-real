@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException
-from .settings import settings
 from fastapi import FastAPI, Depends, HTTPException, Header
-from .db import get_db, init_db
-from .schemas import (
+
+from backend.settings import settings
+from backend.db import get_db, init_db
+from backend.schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
@@ -12,15 +12,14 @@ from .schemas import (
     IssuerListItem,
     IssuerIssueReq, IssuerIssueResp,
     IssuerRevokeReq, IssuerRevokeResp,
-    VerifyResp,
 )
-from .core.crypto_ed25519 import Ed25519Signer
-from .core.crypto_ed25519 import Ed25519Signer, b64u_d
-from .core.vc import verify_vc
+
+from backend.core.crypto_ed25519 import Ed25519Signer, b64u_d
+from backend.core.vc import verify_vc
+
 import time, secrets, base64
 import hashlib, os, json
 from typing import Optional
-from fastapi import Header
 
 
 app = FastAPI(title=settings.APP_NAME)
