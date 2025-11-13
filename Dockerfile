@@ -1,6 +1,5 @@
 FROM python:3.12-slim
-
-WORKDIR /app
+WORKDIR /app/backend
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
@@ -17,5 +16,6 @@ COPY . .
 ENV WORLD_PASS_DB=/data/worldpass.db
 ENV APP_ENV=production
 
-# PORT yoksa 8080 kullan
-CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+
