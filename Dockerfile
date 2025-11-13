@@ -5,12 +5,12 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Python bağımlılıkları
-COPY backend/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# 1) Requirements
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
-# Uygulama kodu
-COPY backend/ /app
+# 2) Uygulama kodu (backend klasörü paket olarak kalsın)
+COPY backend/ /app/backend
 
-# Railway PORT veriyor, yoksa localde 8080'e düş
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# 3) Uvicorn başlat
+CMD ["sh", "-c", "uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
