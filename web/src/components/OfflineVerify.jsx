@@ -1,5 +1,6 @@
 // src/pages/verify/OfflineVerify.jsx
 import { useMemo, useState, useCallback, useRef } from "react";
+import { t } from "../lib/i18n";
 import nacl from "tweetnacl";
 import { b64uToBytes } from "../lib/crypto";
 
@@ -36,7 +37,6 @@ export default function OfflineVerify() {
   const [drag, setDrag] = useState(false);
 
   const [showPreview, setShowPreview] = useState(false);
-  const [pasteMode, setPasteMode] = useState(false);
   const [rawJson, setRawJson] = useState("");
 
   const fileInputRef = useRef(null);
@@ -60,7 +60,6 @@ export default function OfflineVerify() {
       const obj = JSON.parse(txt);
       setVcText(txt);
       setVcObj(obj);
-      setPasteMode(false);
       setShowPreview(false);
       setMsg({ type: "ok", text: "VC yüklendi." });
       // dosya yüklenince otomatik doğrulama (istersen kapat)
@@ -84,20 +83,8 @@ export default function OfflineVerify() {
   };
 
   const parseFromInputs = () => {
-    if (pasteMode) {
-      if (!rawJson.trim()) throw new Error("Boş JSON.");
-      try {
-        const obj = JSON.parse(rawJson);
-        setVcText(rawJson);
-        setVcObj(obj);
-        return obj;
-      } catch {
-        throw new Error("Geçersiz JSON formatı.");
-      }
-    } else {
-      if (!vcObj) throw new Error("Önce VC yükle veya JSON yapıştır.");
-      return vcObj;
-    }
+    if (!vcObj) throw new Error(t("offline.json_loaded") + " " + t("first_load_or_paste") );
+    return vcObj;
   };
 
   /* ---- İmza Doğrulama ---- */
@@ -132,7 +119,7 @@ export default function OfflineVerify() {
       setMsg({ type: "err", text: reason });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pasteMode, rawJson, vcObj]);
+  }, [rawJson, vcObj]);
 
   /* ---- Online Status (opsiyonel) ---- */
   const checkStatus = async () => {
@@ -163,41 +150,23 @@ export default function OfflineVerify() {
     };
   }, [vcObj]);
 
-  const canVerify = pasteMode ? !!rawJson.trim() : !!vcObj;
+  const canVerify = !!vcObj;
 
   /* ---- UI ---- */
   return (
     <section className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)]/90 backdrop-blur p-5 shadow-sm space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Offline Verify (signature only)</h2>
-          <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
-            İmza doğruluğunu yerelde kontrol eder. Şema/kimlik çözümleme yapmaz.
-          </p>
+          <h2 className="text-base font-semibold">{t("offline.title")}</h2>
+          <p className="text-[12px] text-[color:var(--muted)] mt-0.5">{t("offline.desc")}</p>
         </div>
-        <Pill ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? "Invalid" : "Ready") : "VC yok"} />
+        <Pill ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? t("offline.invalid") : t("offline.ready")) : t("offline.no_vc")} />
       </div>
 
-      {/* Mode toggle */}
-      <div className="inline-flex rounded-full border border-[color:var(--border)] bg-[color:var(--panel)] overflow-hidden text-sm">
-        <button
-          type="button"
-          onClick={()=>{ setPasteMode(false); setMsg(null); }}
-          className={`px-3 py-1.5 ${!pasteMode ? "bg-[color:var(--brand)] text-white" : "hover:bg-[color:var(--panel-2)]"}`}
-        >
-          File
-        </button>
-        <button
-          type="button"
-          onClick={()=>{ setPasteMode(true); setMsg(null); }}
-          className={`px-3 py-1.5 ${pasteMode ? "bg-[color:var(--brand)] text-white" : "hover:bg-[color:var(--panel-2)]"}`}
-        >
-          Paste JSON
-        </button>
-      </div>
+      {/* File-only input (paste removed) */}
 
       {/* Input area */}
-      {!pasteMode ? (
+      
         <div
           onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
           onDragLeave={()=>setDrag(false)}
@@ -211,44 +180,25 @@ export default function OfflineVerify() {
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{vcShort}</div>
               <div className="text-xs text-[color:var(--muted)]">
-                {vcObj ? "JSON yüklendi" : "Sürükle & bırak veya dosya seç"}
+                {vcObj ? t("offline.json_loaded") : t("offline.hint_drag")}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {vcObj && (
                 <button onClick={clearFile} className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm">
-                  Clear
+                  {t("offline.clear")}
                 </button>
               )}
               <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-black/10 bg-white hover:bg-white/90 cursor-pointer shrink-0">
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
                 <span className="text-sm">Dosya seç</span>
-                <input type="file" accept=".json,application/json" onChange={onInputFile} className="hidden" />
+                <input type="file" accept=".wpvc,application/json" onChange={onInputFile} className="hidden" />
               </label>
 
             </div>
           </div>
         </div>
-      ) : (
-        <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] p-3">
-          <textarea
-            rows={8}
-            value={rawJson}
-            onChange={(e)=>setRawJson(e.target.value)}
-            placeholder='Paste VC JSON here…'
-            className="w-full bg-transparent outline-none resize-y font-mono text-xs"
-            spellCheck={false}
-          />
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-[11px] text-[color:var(--muted)]">Geçerli JSON gerekli.</span>
-            {rawJson && (
-              <button onClick={()=>setRawJson("")} className="h-8 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-xs">
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3">
@@ -260,12 +210,12 @@ export default function OfflineVerify() {
           {busy ? (
             <>
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M21 12a9 9 0 0 1-9 9"/></svg>
-              Verify Signature
+              {t("offline.verify_signature")}
             </>
           ) : (
             <>
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
-              Verify Signature
+              {t("offline.verify_signature")}
             </>
           )}
         </button>
@@ -276,7 +226,7 @@ export default function OfflineVerify() {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] disabled:opacity-50"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-          Check Status (online)
+          {t("offline.check_status")}
         </button>
 
         {jti && (
@@ -294,7 +244,7 @@ export default function OfflineVerify() {
             : "border-rose-300/60 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
         }`}>
           <div className="flex items-start justify-between gap-3">
-            <div className="font-medium">{res.valid ? "Signature valid" : "Signature invalid"}</div>
+            <div className="font-medium">{res.valid ? t("offline.signature_valid") : t("offline.signature_invalid")}</div>
             {vm && <code className="text-[11px] opacity-80">{vm}</code>}
           </div>
           {proofInfo && (

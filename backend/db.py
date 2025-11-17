@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS issued_vcs (
 );
 
 
+CREATE TABLE IF NOT EXISTS tmp_payloads (
+  id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+
 """
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:

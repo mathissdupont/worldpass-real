@@ -5,28 +5,30 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import { normalizeLite2 } from "@/lib/wpt_lite2";
 import { parseWPT, renderWPT } from "@/lib/wpt";
+import { t } from "@/lib/i18n";
 
 /* ------------ TEMPLATES ------------- */
 const TEMPLATES = {
   blank: `# Start typing your WPT here
-# Example:
+# Örnek WPT şablonunu buraya yazın
+# Örnek:
 # key myTemplate
-# name My Template
+# name Örnek Şablon
 # context https://www.w3.org/2018/credentials/v1
 # type+ VerifiableCredential
-# field subjectDid did * "Subject DID"
+# field subjectDid did * "Konu DID'i"
 `,
   studentCard: `key studentCard
-name Student Card
+name Öğrenci Kartı
 context https://www.w3.org/2018/credentials/v1
 type+ VerifiableCredential
 type+ StudentCard
 
-field subjectDid did * "Subject DID"
-field name text * "Full Name"
-field department select "Department" values=CENG|EEE|ME|CE
-field validUntil date * "Valid Until (YYYY-MM-DD)"
-field studentNo number "Student No"
+field subjectDid did * "Konu DID'i"
+field name text * "Tam İsim"
+field department select "Bölüm" values=CENG|EEE|ME|CE
+field validUntil date * "Geçerlilik Tarihi (YYYY-MM-DD)"
+field studentNo number "Öğrenci No"
 
 default issuerName WorldPass University
 
@@ -47,14 +49,14 @@ default issuerName WorldPass University
 }
 `,
   attendance: `key attendanceCert
-name Attendance Certificate
+name Katılım Sertifikası
 context https://www.w3.org/2018/credentials/v1
 type+ VerifiableCredential
 type+ Attendance
 
-field subjectDid did * "Subject DID"
-field event text * "Event Name"
-field date date * "Event Date (YYYY-MM-DD)"
+field subjectDid did * "Konu DID'i"
+field event text * "Etkinlik Adı"
+field date date * "Etkinlik Tarihi (YYYY-MM-DD)"
 
 default issuerName WorldPass Events
 
@@ -100,7 +102,7 @@ WPT (WorldPass Template) — Hızlı Rehber
 • select için seçenekleri a|b|c biçiminde yaz (virgül değil).
 • date => etikete (YYYY-MM-DD) yazmak iyi pratik.
 • did => "did:" ile başlamalı.
-• Hatalar sağ panelde “Checks” listesinde ve editörde kırmızı işaretlenir.
+ • Hatalar sağ panelde "Kontroller" listesinde ve editörde kırmızı işaretlenir.
 `;
 
 /* ------------ LINT & AUTOFIX ------------- */
@@ -327,15 +329,15 @@ export default function WPTEditorPro() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Tabs */}
           <div className="inline-flex rounded-full border bg-white overflow-hidden">
-            {["build","help","preview"].map(t => (
+            {["build","help","preview"].map((tb) => (
               <button
-                key={t}
-                onClick={()=>setTab(t)}
+                key={tb}
+                onClick={()=>setTab(tb)}
                 className={`px-3 py-1.5 text-sm transition ${
-                  tab===t ? "bg-black text-white" : "hover:bg-zinc-100"
+                  tab===tb ? "bg-black text-white" : "hover:bg-zinc-100"
                 }`}
               >
-                {t==="build"?"Build":t==="help"?"Help":"Preview"}
+                {tb==="build"? t("wpt.tab_build") : tb==="help"? t("wpt.tab_help") : t("wpt.tab_preview")}
               </button>
             ))}
           </div>
@@ -348,17 +350,17 @@ export default function WPTEditorPro() {
               onChange={(e)=>loadTemplate(e.target.value)}
               title="Start with a template"
             >
-              <option value="blank">📝 Blank</option>
-              <option value="studentCard">🎓 Student Card</option>
-              <option value="attendance">🪪 Attendance Certificate</option>
+              <option value="blank">📝 {t("wpt.template_blank")}</option>
+              <option value="studentCard">🎓 {t("wpt.template_student_card")}</option>
+              <option value="attendance">🪪 {t("wpt.template_attendance")}</option>
             </select>
-            <button onClick={onPreviewClick} className="px-3 py-1.5 rounded-lg bg-black text-white text-sm">Preview</button>
-            <button onClick={onDownload} className="px-3 py-1.5 rounded-lg border text-sm">Download .wpt</button>
+            <button onClick={onPreviewClick} className="px-3 py-1.5 rounded-lg bg-black text-white text-sm">{t("wpt.preview_button")}</button>
+            <button onClick={onDownload} className="px-3 py-1.5 rounded-lg border text-sm">{t("wpt.download_wpt")}</button>
             <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer">
-              Load .wpt
+              {t("wpt.load_wpt")}
               <input type="file" accept=".wpt,text/plain" className="hidden" onChange={onUpload} />
             </label>
-            <button onClick={fixAll} className="px-3 py-1.5 rounded-lg border text-sm">Fix commas</button>
+            <button onClick={fixAll} className="px-3 py-1.5 rounded-lg border text-sm">{t("wpt.fix_commas")}</button>
           </div>
 
           <div className="ml-auto text-xs text-gray-500">WPT · Monaco</div>
@@ -371,15 +373,15 @@ export default function WPTEditorPro() {
           {tab!=="help" && (
             <>
               <div className="px-3 py-2 border-b bg-white text-sm text-gray-600">
-                {templateKey==="blank" ? "Start typing your template…" : "Edit template"}
+                {templateKey==="blank" ? t("wpt.start_typing") : t("wpt.edit_template")}
               </div>
               <div ref={edRef} className="flex-1 bg-[#0b0b0c]" />
             </>
           )}
           {tab==="help" && (
             <div className="p-5 overflow-auto">
-              <h2 className="text-lg font-semibold">Help</h2>
-              <p className="text-sm text-gray-600 mb-3">Kısa özet, sözdizimi ve ipuçları</p>
+                <h2 className="text-lg font-semibold">{t("wpt.help_title")}</h2>
+                <p className="text-sm text-gray-600 mb-3">{t("wpt.help_subtitle")}</p>
               <pre className="text-xs whitespace-pre-wrap bg-zinc-50 border rounded p-3">{HELP_TEXT}</pre>
 
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
@@ -387,29 +389,28 @@ export default function WPTEditorPro() {
                   onClick={()=>loadTemplate("studentCard")}
                   className="rounded-xl border p-3 text-left hover:bg-zinc-50"
                 >
-                  <div className="font-medium">🎓 Student Card</div>
-                  <div className="text-xs text-gray-600">Hazır alanlar + gövde JSON</div>
+                  <div className="font-medium">🎓 {t("wpt.template_student_card")}</div>
+                  <div className="text-xs text-gray-600">{t("wpt.template_student_card_desc")}</div>
                 </button>
                 <button
                   onClick={()=>loadTemplate("attendance")}
                   className="rounded-xl border p-3 text-left hover:bg-zinc-50"
                 >
-                  <div className="font-medium">🪪 Attendance Certificate</div>
-                  <div className="text-xs text-gray-600">Etkinlik katılım şablonu</div>
+                  <div className="font-medium">🪪 {t("wpt.template_attendance")}</div>
+                  <div className="text-xs text-gray-600">{t("wpt.template_attendance_desc")}</div>
                 </button>
               </div>
             </div>
           )}
-          <div className="px-3 py-2 border-t bg-white text-xs text-gray-500">
-            {tab==="help" ? "Read the guide and pick a template, or switch back to Build."
-                           : "Tip: Use 'field id select \"Label\" values=a|b|c' for dropdowns (we auto-fix commas)."}
+            <div className="px-3 py-2 border-t bg-white text-xs text-gray-500">
+            {tab==="help" ? t("wpt.tip_help") : t("wpt.tip_build")}
           </div>
         </section>
 
         {/* RIGHT: Checks + Preview */}
         <aside className="rounded-2xl border overflow-hidden flex flex-col shadow-sm">
           <div className="p-3 border-b bg-white">
-            <div className="font-semibold">Checks</div>
+            <div className="font-semibold">{t("wpt.checks")}</div>
             <ul className="mt-2 space-y-1 text-sm">
               {checks.map((c, i) => (
                 <li key={i}
@@ -425,7 +426,7 @@ export default function WPTEditorPro() {
             </ul>
           </div>
           <div className="p-3 bg-[#0b0b0c] text-gray-100 overflow-auto">
-            <div className="text-xs text-gray-400 mb-2">Preview JSON</div>
+            <div className="text-xs text-gray-400 mb-2">{t("wpt.preview_json")}</div>
             <pre className="text-xs whitespace-pre-wrap">{preview}</pre>
           </div>
         </aside>

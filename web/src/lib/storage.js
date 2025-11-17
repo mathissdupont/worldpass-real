@@ -4,6 +4,8 @@
 const VC_KEY       = "wp.vcs";         // Tek doğru key
 const OLD_VC_KEYS  = ["wp_vcs"];       // Eski anahtarlar (taşınacak)
 const PROFILE_KEY  = "wp_profile";     // {displayName, did} (private key yok)
+const IDENTITY_KEY = "worldpass_identity"; // Kimlik için key (identityContext ile uyumlu)
+const DISPLAY_NAME_KEY = "worldpass_displayName"; // Görünen ad için key
 
 
 // --- MIGRATION (eski anahtardan yenisine taşı) ---

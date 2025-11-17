@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 
 class HealthResp(BaseModel):
     ok: bool = True
@@ -78,3 +78,45 @@ class IssuerRevokeReq(BaseModel):
 
 class IssuerRevokeResp(BaseModel):
     status: str
+
+# OAuth benzeri sistem için yeni modeller
+class OAuthClientRegisterReq(BaseModel):
+    name: str
+    domain: str
+    redirect_uris: List[str]
+
+class OAuthClientRegisterResp(BaseModel):
+    client_id: str
+    client_secret: str  # sadece 1 kez gösterilir
+    name: str
+    domain: str
+
+class OAuthAuthorizeReq(BaseModel):
+    response_type: str = Field(..., pattern="^code$")  # sadece 'code' destekliyoruz
+    client_id: str
+    redirect_uri: str
+    scope: str = "openid profile"
+    state: Optional[str] = None
+
+class OAuthAuthorizeResp(BaseModel):
+    code: str
+    state: Optional[str] = None
+
+class OAuthTokenReq(BaseModel):
+    grant_type: str = Field(..., pattern="^authorization_code$")
+    code: str
+    redirect_uri: str
+    client_id: str
+    client_secret: str
+
+class OAuthTokenResp(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+    scope: str
+
+class OAuthUserInfo(BaseModel):
+    sub: str  # DID
+    name: Optional[str] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None

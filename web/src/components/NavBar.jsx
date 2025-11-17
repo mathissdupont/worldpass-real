@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { isAuthed, clearSession } from "../lib/auth";
 import { useIdentity } from "../lib/identityContext";
+import { t } from "../lib/i18n";
 
 function cx(...xs){ return xs.filter(Boolean).join(" "); }
 
@@ -40,10 +41,10 @@ function HealthBadge({ health }) {
           ? "border-emerald-400/40 text-emerald-400 bg-emerald-500/10"
           : "border-rose-400/40 text-rose-400 bg-rose-500/10"
       )}
-      title={ok ? "Sunucu çalışıyor" : "Sunucu kapalı"}
+      title={ok ? t('server_up') : t('server_down')}
     >
       <span className={cx("inline-block h-1.5 w-1.5 rounded-full", ok ? "bg-emerald-400" : "bg-rose-400")} />
-      {ok ? "çalışıyor" : "kapalı"}
+      {ok ? t('working') : t('down')}
     </span>
   );
 }
@@ -54,16 +55,15 @@ export default function NavBar({ health, user, features }) {
   const navg = useNavigate();
 
   const navItems = [
-    { to: "/account",           label: "Hesabım",         icon: "account" },
-    { to: "/issue",             label: "Sertifika Ver",   icon: "issue",   roles: ["issuer"] },
-    { to: "/verify",            label: "Doğrula",         icon: "verify" },
-    { to: "/verifier",          label: "Doğrulayıcı",     icon: "shield" }, // ARTIK HERKESE AÇIK (login olanlar için)
-    { to: "/credentials",       label: "Sertifikalarım",  icon: "list" },
-    { to: "/present",           label: "Göster",          icon: "present" },
-    { to: "/settings",          label: "Ayarlar",         icon: "settings" },
-    { to: "/issuer/register",   label: "Yayıncı Kaydı",   icon: "shield",  roles: ["issuer"] },
-    { to: "/issuer/console",    label: "Yayıncı Konsolu", icon: "issue",   roles: ["issuer"] },
-    { to: "/admin/issuers",     label: "Yönetim",         icon: "admin",   roles: ["admin"] },
+    { to: "/account",           label: t('my_account'),         icon: "account" },
+    { to: "/issue",             label: "Yayıncı (Oluştur)",      icon: "issue",   roles: ["issuer"] },
+    { to: "/verify",            label: "Doğrula",                icon: "verify" },
+    { to: "/credentials",       label: t('my_credentials'),     icon: "list" },
+    { to: "/present",           label: "Göster",                 icon: "present" },
+    { to: "/settings",          label: t('settings'),           icon: "settings" },
+    { to: "/issuer/register",   label: t('issuer_register'),    icon: "shield",  roles: ["issuer"] },
+    { to: "/issuer/console",    label: t('issuer_console'),     icon: "issue",   roles: ["issuer"] },
+    { to: "/admin/issuers",     label: t('admin'),              icon: "admin",   roles: ["admin"] },
   ];
 
   const leftMenu = authed
@@ -72,7 +72,6 @@ export default function NavBar({ health, user, features }) {
         {to:"/login",    label:"Giriş",       icon:"login"},
         {to:"/register", label:"Kayıt",       icon:"register"},
         {to:"/verify",   label:"Doğrula",     icon:"verify"},
-        {to:"/verifier", label:"Doğrulayıcı", icon:"shield"}, // LOGIN OLMAYANLAR İÇİN DE GÖRÜNÜR
       ];
 
   const logout = ()=>{
@@ -87,6 +86,7 @@ export default function NavBar({ health, user, features }) {
   bg-[color:var(--panel)]/90 backdrop-blur
   border-b border-[color:var(--edge)]
   text-[color:var(--text)]
+  transition-all duration-300
 ">
   <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-black text-white text-xs px-3 py-2 rounded-lg">
     İçeriğe atla
@@ -95,7 +95,7 @@ export default function NavBar({ health, user, features }) {
   <div className="max-w-5xl mx-auto px-3 md:px-6 py-2.5 flex items-center justify-between">
     {/* Sol: logo + masaüstü nav */}
     <div className="flex items-center gap-3 md:gap-4">
-      <Link to="/" className="flex items-center gap-2 font-semibold">
+      <Link to="/" className="flex items-center gap-2 font-semibold hover:opacity-80 transition-opacity">
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-sm">W</span>
         <span className="tracking-tight">WorldPass</span>
       </Link>
@@ -108,10 +108,9 @@ export default function NavBar({ health, user, features }) {
             to={item.to}
             className={({ isActive }) =>
               cx(
-                "px-2.5 py-1.5 rounded-md text-[13px] transition relative inline-flex items-center gap-1.5",
-                "text-[color:var(--text)]/80 hover:text-[color:var(--text)]",
-                "hover:bg-[color:var(--panel-2)]/70",
-                isActive && "bg-[color:var(--panel-2)] text-[color:var(--text)]"
+                "px-3 py-2 rounded-lg text-sm transition-all duration-200 relative inline-flex items-center gap-2",
+                "text-[color:var(--text)]/80 hover:text-[color:var(--text)] hover:bg-[color:var(--panel-2)]/70",
+                isActive && "bg-[color:var(--panel-2)] text-[color:var(--text)] shadow-sm"
               )
             }
           >
@@ -121,14 +120,14 @@ export default function NavBar({ health, user, features }) {
                   <Icon
                     name={item.icon}
                     className={cx(
-                      "h-3.5 w-3.5",
-                      isActive ? "opacity-100" : "opacity-60"
+                      "h-4 w-4 transition-opacity",
+                      isActive ? "opacity-100" : "opacity-70"
                     )}
                   />
                 ) : null}
                 <span className="truncate">{item.label}</span>
                 {isActive && (
-                  <span className="absolute left-2 right-2 -top-[6px] h-[2px] rounded-full bg-white/60" />
+                  <span className="absolute left-3 right-3 -top-[8px] h-[3px] rounded-full bg-[color:var(--brand-2)] animate-pulse" />
                 )}
               </>
             )}
@@ -138,31 +137,34 @@ export default function NavBar({ health, user, features }) {
     </div>
 
     {/* Sağ: health + aksiyonlar */}
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-3">
       <HealthBadge health={health} />
 
       {authed && (
         <button
           onClick={logout}
-          className="px-2.5 py-1.5 text-[13px] rounded-md border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] inline-flex items-center gap-1.5"
-          title="Oturumu kapat"
+          className="wp-btn wp-btn-ghost text-sm"
+          title={t('logout')}
         >
           <Icon name="logout" />
-          Çıkış
+          {t('logout')}
         </button>
       )}
 
       {/* Mobil menü */}
-      <details className="md:hidden relative">
+      <details className="md:hidden relative group">
         <summary
-          className="list-none px-2.5 py-1.5 rounded-md border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] cursor-pointer text-[13px]"
+          className="list-none wp-btn wp-btn-ghost cursor-pointer text-sm"
           aria-haspopup="menu"
-          aria-label="Menü"
+          aria-label={t('menu')}
         >
-          Menü
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 12h18M3 6h18M3 18h18" />
+          </svg>
+          {t('menu')}
         </summary>
         <div
-          className="absolute right-0 mt-2 w-56 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] shadow-xl p-1"
+          className="absolute right-0 mt-2 w-64 wp-panel shadow-xl p-2 opacity-0 scale-95 group-open:opacity-100 group-open:scale-100 transition-all duration-200 origin-top-right"
           role="menu"
           aria-label="Mobil"
         >
@@ -171,9 +173,9 @@ export default function NavBar({ health, user, features }) {
               key={item.to}
               to={item.to}
               role="menuitem"
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-[color:var(--panel-2)] text-sm text-[color:var(--text)]"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[color:var(--panel-2)] text-sm text-[color:var(--text)] transition-colors"
             >
-              {item.icon ? <Icon name={item.icon} className="h-3.5 w-3.5 opacity-70" /> : null}
+              {item.icon ? <Icon name={item.icon} className="h-4 w-4 opacity-80" /> : null}
               <span className="truncate">{item.label}</span>
             </Link>
           ))}
@@ -181,9 +183,9 @@ export default function NavBar({ health, user, features }) {
             <button
               onClick={logout}
               role="menuitem"
-              className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-md hover:bg-[color:var(--panel-2)] text-sm text-[color:var(--text)]"
+              className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-[color:var(--panel-2)] text-sm text-[color:var(--text)] transition-colors"
             >
-              <Icon name="logout" className="h-3.5 w-3.5 opacity-70" />
+              <Icon name="logout" className="h-4 w-4 opacity-80" />
               Çıkış
             </button>
           )}

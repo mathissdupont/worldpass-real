@@ -1,6 +1,7 @@
 # backend/app.py  (Railway'de /app/app.py olarak çalışıyor)
 
 from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 
 # Tamamı paket içi relative olsun:
 from .settings import settings
@@ -27,6 +28,15 @@ from typing import Optional
 app = FastAPI(title=settings.APP_NAME)
 API = settings.API_PREFIX
 signer = Ed25519Signer()
+
+# Development CORS: allow frontend dev server origins (relax for prod)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
@@ -365,3 +375,40 @@ async def present_verify(payload: dict, db=Depends(get_db)):
         return VerifyResp(valid=False, reason="revoked", issuer=issuer, subject=subject, revoked=True)
 
     return VerifyResp(valid=True, reason="ok", issuer=issuer, subject=subject, revoked=False)
+
+
+# ---------- temporary presentation hosting (for QR / NFC) ----------
+@app.post(f"{API}/present/upload")
+async def present_upload(payload: dict, db=Depends(get_db)):
+    """Store a short-lived presentation payload and return a path that can be embedded into QR / NFC.
+    Frontend should compose full URL as window.location.origin + returned path.
+    """
+    now = int(time.time())
+    ttl = 300
+    exp = now + ttl
+    pid = base64.urlsafe_b64encode(secrets.token_bytes(8)).decode().rstrip("=")
+    await db.execute(
+        "INSERT INTO tmp_payloads(id, payload, created_at, expires_at) VALUES(?,?,?,?)",
+        (pid, json.dumps(payload), now, exp),
+    )
+    await db.commit()
+    return {"path": f"{API}/present/tmp/{pid}", "id": pid, "expires_at": exp}
+
+
+@app.get(f"{API}/present/tmp/{{pid}}")
+async def present_get_tmp(pid: str, db=Depends(get_db)):
+    now = int(time.time())
+    row = await db.execute_fetchone(
+        "SELECT payload, expires_at FROM tmp_payloads WHERE id=?", (pid,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="not_found")
+    if row["expires_at"] < now:
+        # cleanup
+        await db.execute("DELETE FROM tmp_payloads WHERE id=?", (pid,))
+        await db.commit()
+        raise HTTPException(status_code=404, detail="expired")
+    try:
+        return json.loads(row["payload"])
+    except Exception:
+        raise HTTPException(status_code=500, detail="bad_payload")

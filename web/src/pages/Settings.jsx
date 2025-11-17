@@ -1,21 +1,27 @@
 // src/pages/Settings.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useIdentity } from "../lib/identityContext";
+import { t } from "../lib/i18n";
 import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 
 /* ---------------- UI helpers (token-friendly) ---------------- */
 
-function Section({ title, children, desc }) {
+function Section({ title, children, desc, icon }) {
   return (
-    <section className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/80 backdrop-blur-sm shadow-sm p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section className="wp-panel p-6 animate-in fade-in slide-in-from-bottom-2 duration-300 hover:shadow-lg transition-shadow duration-300">
+      <div className="flex items-start gap-4 mb-4">
+        {icon && (
+          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[color:var(--panel-2)] border border-[color:var(--border)] flex items-center justify-center transition-transform duration-300 hover:scale-110">
+            {icon}
+          </div>
+        )}
+        <div className="flex-1">
           <h3 className="text-lg font-semibold text-[color:var(--text)]">{title}</h3>
           {desc && <p className="text-sm text-[color:var(--muted)] mt-1">{desc}</p>}
         </div>
       </div>
-      <div className="mt-4">{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
@@ -105,44 +111,44 @@ export default function Settings() {
       a.download = identity.did.replace(/:/g, "_") + ".wpkeystore";
       a.click();
       URL.revokeObjectURL(a.href);
-      setToast({ type: "ok", text: "Anahtar deposu indirildi." });
+      setToast({ type: "ok", text: t('keystore_downloaded') });
     } catch {
-      setToast({ type: "err", text: "İndirme işlemi başarısız oldu." });
+      setToast({ type: "err", text: t('keystore_download_failed') });
     }
   };
 
   const forget = () => {
-   if (confirm("Bu oturumdaki kimliği unut (RAM’dan kaldır)?")) {
-      setIdentity(null);
-      setToast({ type: "ok", text: "Kimlik oturumdan kaldırıldı." });
+  if (confirm(t('confirm_forget_identity'))) {
+    setIdentity(null);
+    setToast({ type: "ok", text: t('identity_forget_ok') });
     }
   };
 
  const clearVCs = () => {
-   if (confirm("Clear cached VCs from this browser?")) {
+   if (confirm(t('confirm_clear_vcs'))) {
      clearVCsStore(); // storage.js içindeki gerçek temizleme
-     setToast({ type: "ok", text: "Local VC cache cleared." });
+     setToast({ type: "ok", text: t('vcs_cleared') });
    }
  };
 
   const copyDid = async () => {
     try {
       await navigator.clipboard.writeText(identity?.did || "");
-      setToast({ type: "ok", text: "DID copied." });
+      setToast({ type: "ok", text: t('did_copied') });
     } catch {
-      setToast({ type: "err", text: "Copy failed." });
+      setToast({ type: "err", text: t('copy_failed') });
     }
   };
 
-  const downloadIdentityJson = () => {
+  const downloadIdentityKeystore = () => {
     if (!identity) return;
-    const file = new Blob([JSON.stringify(identity, null, 2)], { type: "application/json" });
+    const file = new Blob([JSON.stringify(identity, null, 2)], { type: "application/octet-stream" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(file);
-    a.download = "worldpass_identity.json";
+    a.download = "worldpass_identity.wpkeystore";
     a.click();
     URL.revokeObjectURL(a.href);
-    setToast({ type: "ok", text: "Identity JSON downloaded." });
+    setToast({ type: "ok", text: t('identity_keystore_downloaded') });
   };
 
   // Avatar upload → dataURL
@@ -153,9 +159,9 @@ export default function Settings() {
       const url = await fToDataUrl(f);
       setAvatar(url);
       saveProfileLocal({ avatar: url });
-      setToast({ type: "ok", text: "Avatar updated." });
+      setToast({ type: "ok", text: t('avatar_updated') });
     } catch {
-      setToast({ type: "err", text: "Avatar load failed." });
+      setToast({ type: "err", text: t('avatar_load_failed') });
     }
   };
 
@@ -169,10 +175,16 @@ export default function Settings() {
   }
 
   const saveAccount = () => {
-    if (!emailOk) return setToast({ type: "err", text: "Invalid email format." });
-    if (!phoneOk) return setToast({ type: "err", text: "Invalid phone number." });
+    if (!emailOk) return setToast({ type: "err", text: t('invalid_email') });
+    if (!phoneOk) return setToast({ type: "err", text: t('invalid_phone') });
     saveProfileLocal({ displayName, email, phone, lang });
-    setToast({ type: "ok", text: "Profile saved." });
+    setToast({ type: "ok", text: t('profile_saved') });
+    // Add confirmation animation
+    const button = document.querySelector('button[onclick*="saveAccount"]');
+    if (button) {
+      button.classList.add('animate-pulse');
+      setTimeout(() => button.classList.remove('animate-pulse'), 1000);
+    }
   };
 
   const toggleOtp = () => {
@@ -184,16 +196,24 @@ export default function Settings() {
 
   const changePassword = () => {
     alert(
-      "Password change is a demo placeholder here.\n\n" +
-        "Gerçek uygulamada: eski şifre doğrulanır → yeni şifre backend’de güvenli biçimde güncellenir."
+      t('password_change_demo')
     );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Account */}
-      <Section title="Hesabım" desc="Bu bilgiler yalnızca bu tarayıcıda saklanır.">
-        <div className="grid md:grid-cols-[auto,1fr] gap-6 items-start">
+      <Section
+        title={t('my_account')}
+        desc={t('my_account_desc')}
+        icon={
+          <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        }
+      >
+        <div className="grid lg:grid-cols-[auto,1fr] gap-8 items-start">
           {/* Avatar */}
           <div className="flex flex-col items-center gap-3">
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden ring-1 ring-[color:var(--border)] bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-2xl font-semibold">
@@ -207,7 +227,7 @@ export default function Settings() {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Upload
+              {t('upload')}
               <input type="file" accept="image/*" className="hidden" onChange={onAvatar} />
             </label>
             {avatar && (
@@ -227,7 +247,7 @@ export default function Settings() {
           <div className="space-y-3">
             <div className="grid md:grid-cols-2 gap-3">
               <div>
-                <div className="text-sm text-[color:var(--muted)] mb-1">Display name</div>
+                <div className="text-sm text-[color:var(--muted)] mb-1">{t('display_name')}</div>
                 <input
                   className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]"
                   value={displayName}
@@ -236,7 +256,7 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <div className="text-sm text-[color:var(--muted)] mb-1">Email</div>
+                <div className="text-sm text-[color:var(--muted)] mb-1">{t('email')}</div>
                 <input
                   className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border ${
                     emailOk ? "border-[color:var(--border)]" : "border-rose-400/50"
@@ -247,7 +267,7 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <div className="text-sm text-[color:var(--muted)] mb-1">Phone</div>
+                <div className="text-sm text-[color:var(--muted)] mb-1">{t('phone')}</div>
                 <input
                   className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border ${
                     phoneOk ? "border-[color:var(--border)]" : "border-rose-400/50"
@@ -258,14 +278,14 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <div className="text-sm text-[color:var(--muted)] mb-1">Language</div>
+                <div className="text-sm text-[color:var(--muted)] mb-1">{t('language')}</div>
                 <select
                   className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)]"
                   value={lang}
                   onChange={(e) => setLang(e.target.value)}
                 >
-                  <option value="en">English</option>
-                  <option value="tr">Türkçe</option>
+                  <option value="en">{t('language.english')}</option>
+                  <option value="tr">{t('language.turkish')}</option>
                 </select>
               </div>
             </div>
@@ -273,16 +293,16 @@ export default function Settings() {
             <div className="flex flex-wrap gap-2 pt-2">
               <button
                 onClick={saveAccount}
-                className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90"
+                className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 transition-all duration-300 hover:scale-105"
               >
-                Save profile
+                {t('save_profile')}
               </button>
               <button
                 onClick={changePassword}
-                className="px-4 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
+                className="px-4 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] transition-all duration-300 hover:scale-105"
                 title="Demo placeholder"
               >
-                Change password (demo)
+                {t('change_password_demo')}
               </button>
             </div>
           </div>
@@ -290,10 +310,20 @@ export default function Settings() {
       </Section>
 
       {/* Security */}
-      <Section title="Güvenlik" desc="Keystore yalnızca cihazında şifrelenmiş olarak saklanır.">
+      <Section
+        title={t('security')}
+        desc={t('security_desc')}
+        icon={
+          <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <circle cx="12" cy="16" r="1"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        }
+      >
         <div className="grid md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-[color:var(--border)] p-4">
-            <div className="text-sm text-[color:var(--muted)] mb-2">Active DID</div>
+              <div className="text-sm text-[color:var(--muted)] mb-2">{t('active_did')}</div>
             <div className="font-mono text-xs break-all bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg p-2">
               {identity?.did || "—"}
             </div>
@@ -303,21 +333,21 @@ export default function Settings() {
                 disabled={!identity?.did}
                 className="px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] disabled:opacity-50"
               >
-                Copy DID
+                {t('copy_did')}
               </button>
               <button
-                onClick={downloadIdentityJson}
+                onClick={downloadIdentityKeystore}
                 disabled={!identity}
                 className="px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] disabled:opacity-50"
               >
-                Download identity JSON
+                {t('download_identity_keystore')}
               </button>
               <button
                 onClick={exportKs}
                 disabled={!identity}
                 className="px-3 py-2 rounded-lg bg-[color:var(--brand)] text-white disabled:opacity-50"
               >
-                Export keystore
+                {t('export_keystore')}
               </button>
             </div>
           </div>
@@ -325,8 +355,8 @@ export default function Settings() {
           <div className="rounded-xl border border-[color:var(--border)] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-[color:var(--text)]">Two-Factor Auth (demo)</div>
-                <div className="text-xs text-[color:var(--muted)]">Kod üretici ile ikinci adım doğrulama.</div>
+                <div className="text-sm font-medium text-[color:var(--text)]">{t('two_factor_demo')}</div>
+                <div className="text-xs text-[color:var(--muted)]">{t('two_factor_desc')}</div>
               </div>
               <label className="inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={otpEnabled} onChange={toggleOtp} />
@@ -341,13 +371,13 @@ export default function Settings() {
                 onClick={clearVCs}
                 className="px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)]"
               >
-                Clear cached VCs
+                {t('clear_cached_vcs')}
               </button>
               <button
                 onClick={forget}
                 className="ml-2 px-3 py-2 rounded-lg border border-rose-400/30 text-rose-300 bg-[color:var(--panel-2)]"
               >
-                Forget identity from RAM
+                {t('forget_identity_ram')}
               </button>
             </div>
           </div>
@@ -355,53 +385,61 @@ export default function Settings() {
       </Section>
 
       {/* Preferences */}
-      <Section title="Genel Ayarlar">
+      <Section
+        title={t('general_settings')}
+        icon={
+          <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        }
+      >
         <div className="grid md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-[color:var(--border)] p-4 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-[color:var(--text)]">Theme</div>
-              <div className="text-xs text-[color:var(--muted)]">Açık / Koyu ya da Sistem teması.</div>
+              <div className="text-sm font-medium text-[color:var(--text)]">{t('theme')}</div>
+              <div className="text-xs text-[color:var(--muted)]">{t('theme_desc')}</div>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setTheme("light")}
-                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] ${
-                  theme === "light" ? "bg-[color:var(--brand)] text-white" : "bg-[color:var(--panel)]"
+                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] transition-all duration-300 ${
+                  theme === "light" ? "bg-[color:var(--brand)] text-white scale-105" : "bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
                 }`}
-              >
-                Light
+                >
+                {t('theme_light')}
               </button>
               <button
                 onClick={() => setTheme("dark")}
-                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] ${
-                  theme === "dark" ? "bg-[color:var(--brand)] text-white" : "bg-[color:var(--panel)]"
+                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] transition-all duration-300 ${
+                  theme === "dark" ? "bg-[color:var(--brand)] text-white scale-105" : "bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
                 }`}
-              >
-                Dark
+                >
+                {t('theme_dark')}
               </button>
               <button
                 onClick={() => setTheme("system")}
-                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] ${
-                  theme === "system" ? "bg-[color:var(--brand)] text-white" : "bg-[color:var(--panel)]"
+                className={`px-3 py-2 rounded-lg border border-[color:var(--border)] transition-all duration-300 ${
+                  theme === "system" ? "bg-[color:var(--brand)] text-white scale-105" : "bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
                 }`}
                 title="System preference"
-              >
-                System
+                >
+                {t('theme_system')}
               </button>
             </div>
           </div>
 
           <div className="rounded-xl border border-[color:var(--border)] p-4">
-            <div className="text-sm font-medium text-[color:var(--text)]">Notifications (local)</div>
-            <div className="text-xs text-[color:var(--muted)] mb-3">Tarayıcı içi bildirimler (demo).</div>
+            <div className="text-sm font-medium text-[color:var(--text)]">{t('notifications_local')}</div>
+            <div className="text-xs text-[color:var(--muted)] mb-3">{t('notifications_local_desc')}</div>
             <div className="flex items-center gap-3">
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="rounded" defaultChecked />
-                Issuer updates
+                {t('issuer_updates')}
               </label>
               <label className="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" className="rounded" />
-                Verification results
+                {t('verification_results')}
               </label>
             </div>
           </div>
@@ -409,29 +447,36 @@ export default function Settings() {
       </Section>
 
       {/* Danger zone */}
-      <Section title="Danger Zone">
+      <Section
+        title={t('danger_zone')}
+        icon={
+          <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        }
+      >
         <div className="grid md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-rose-400/30 bg-[color:var(--panel-2)] p-4">
-            <div className="text-sm font-medium text-rose-300">Remove identity from RAM</div>
-            <p className="text-xs text-rose-300/80 mt-1">
-              Keystore’u silmez; yalnızca bu oturumdaki private key’i unutur.
-            </p>
+            <div className="text-sm font-medium text-rose-300">{t('remove_identity_ram')}</div>
+            <p className="text-xs text-rose-300/80 mt-1">{t('remove_identity_ram_desc')}</p>
             <button
               onClick={forget}
               className="mt-3 px-3 py-2 rounded-lg border border-rose-400/30 text-rose-300"
             >
-              Forget Identity
+              {t('forget_identity')}
             </button>
           </div>
 
           <div className="rounded-xl border border-amber-400/30 bg-[color:var(--panel-2)] p-4">
-            <div className="text-sm font-medium text-amber-300">Clear local VC cache</div>
-            <p className="text-xs text-amber-300/80 mt-1">Bu tarayıcıdaki VC önbelleğini temizler.</p>
+            <div className="text-sm font-medium text-amber-300">{t('clear_local_vc_cache')}</div>
+            <p className="text-xs text-amber-300/80 mt-1">{t('clear_local_vc_cache_desc')}</p>
             <button
               onClick={clearVCs}
               className="mt-3 px-3 py-2 rounded-lg border border-amber-400/30 text-amber-300"
             >
-              Clear My VCs
+              {t('clear_my_vcs')}
             </button>
           </div>
         </div>

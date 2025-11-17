@@ -1,5 +1,6 @@
 // src/pages/Register.jsx
 import { useEffect, useState } from "react";
+import { t } from "../lib/i18n";
 import { registerUser, setSession } from "../lib/auth";
 import { loadProfile, saveProfile } from "../lib/storage";
 import { useIdentity } from "../lib/identityContext";
@@ -175,22 +176,20 @@ export default function Register(){
       {/* Üst başlık + stepper */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[color:var(--text)]">Yeni Hesap</h1>
-          <p className="text-sm text-[color:var(--muted)] mt-1">
-            Önce bu cihaza ait kimliğini ve anahtar dosyanı hazırlıyorsun, sonra giriş yapacağın hesabı oluşturuyorsun.
-          </p>
+          <h1 className="text-xl font-semibold text-[color:var(--text)]">{t('new_account')}</h1>
+          <p className="text-sm text-[color:var(--muted)] mt-1">{t('new_account_intro')}</p>
         </div>
         <div className="flex items-center gap-4">
           <StepChip
             step={1}
-            label="Kimlik & Anahtar Deposu"
+            label={t('step_identity_keystore')}
             active={step === 1}
             done={hasIdentity}
           />
           <div className="h-px w-8 bg-[color:var(--border)] hidden md:block" />
           <StepChip
             step={2}
-            label="Kullanıcı Hesabı"
+            label={t('step_user_account')}
             active={step === 2}
             done={valid}
           />
@@ -203,13 +202,8 @@ export default function Register(){
           <div className="md:col-span-2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-6 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-[color:var(--text)]">
-                  Adım 1 — Kimlik ve Anahtar Deposu
-                </h2>
-                <p className="text-xs text-[color:var(--muted)] mt-1">
-                  Bu adımda bu cihaza özel bir kimlik ve şifreli bir anahtar deposu dosyası oluşturuluyor.
-                  Bu dosya cihazında kalıyor ve başkasıyla paylaşmaman gerekiyor.
-                </p>
+                <h2 className="text-base font-semibold text-[color:var(--text)]">{t('step1_title')}</h2>
+                <p className="text-xs text-[color:var(--muted)] mt-1">{t('step1_desc')}</p>
               </div>
               <span
                 className={[
@@ -226,18 +220,14 @@ export default function Register(){
 
             <div className="grid md:grid-cols-2 gap-4 mt-2">
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-4 space-y-3">
-                <h3 className="font-semibold text-[color:var(--text)] text-sm">Yeni Kimlik Oluştur</h3>
-                <p className="text-xs text-[color:var(--muted)]">
-                  Yeni bir kimlik ve şifreli anahtar deposu dosyası oluşturup indir. Bu dosya bu cihaza ait olacak.
-                </p>
+                <h3 className="font-semibold text-[color:var(--text)] text-sm">{t('create_new_identity')}</h3>
+                <p className="text-xs text-[color:var(--muted)]">{t('create_new_identity_desc')}</p>
                 <IdentityCreate />
               </div>
 
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-4 space-y-3">
-                <h3 className="font-semibold text-[color:var(--text)] text-sm">Mevcut Anahtar Deposunu Yükle</h3>
-                <p className="text-xs text-[color:var(--muted)]">
-                  Daha önce indirdiğin şifreli anahtar deposu dosyan varsa buradan yükleyip aynı kimliği tekrar kullanabilirsin.
-                </p>
+                <h3 className="font-semibold text-[color:var(--text)] text-sm">{t('load_existing_keystore')}</h3>
+                <p className="text-xs text-[color:var(--muted)]">{t('load_existing_keystore_desc')}</p>
                 <IdentityLoad />
               </div>
             </div>
@@ -252,7 +242,7 @@ export default function Register(){
                 disabled={!hasIdentity}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                2. Adıma Geç
+                {t('goto_step2')}
               </button>
             </div>
           </div>
@@ -266,19 +256,15 @@ export default function Register(){
           <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-[color:var(--text)]">
-                  Adım 2 — Kullanıcı Hesabı
-                </h2>
-                <p className="text-xs text-[color:var(--muted)]">
-                  Bu adımda giriş yaparken kullanacağın normal hesabı oluşturuyorsun.
-                </p>
+                <h2 className="text-base font-semibold text-[color:var(--text)]">{t('step2_title')}</h2>
+                <p className="text-xs text-[color:var(--muted)]">{t('step2_desc')}</p>
               </div>
               <button
                 type="button"
                 onClick={()=>setStep(1)}
                 className="text-[11px] px-2.5 py-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--muted)] hover:bg-[color:var(--panel-2)]"
               >
-                ← Kimlik adımına dön
+                ← {t('back_to_identity')}
               </button>
             </div>
 
@@ -318,15 +304,15 @@ export default function Register(){
               {/* Email */}
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-3 space-y-2">
                 <Field
-                  label="Email"
+                  label={t('email')}
                   htmlFor="email"
-                  help="Giriş yaparken kullanacağın adres. Doğru yazdığından emin ol."
+                  help={t('email_help')}
                 >
                   <input
                     id="email"
                     type="email"
                     autoComplete="email"
-                    placeholder="email@ornek.com"
+                    placeholder={t('example_email')}
                     value={email}
                     onChange={e=>setEmail(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]"
@@ -343,13 +329,13 @@ export default function Register(){
               {/* Şifre */}
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[color:var(--muted)]">Şifre</span>
+                  <span className="text-xs font-medium text-[color:var(--muted)]">{t('password')}</span>
                   <span className="text-[10px] text-[color:var(--muted)]">
-                    {passOk ? "Şifre hazır" : "Güçlü ve eşleşen bir şifre gir"}
+                    {passOk ? t('password_ready') : t('password_requirements')}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Şifre" help="Min 8 karakter. Büyük/küçük harf, sayı ve sembol önerilir.">
+                  <Field label={t('password')} help={t('password_help')}>
                     <div className="relative">
                       <input
                         id="pass"
@@ -364,7 +350,7 @@ export default function Register(){
                     <Strength p={s} />
                   </Field>
 
-                  <Field label="Şifre (Tekrar)">
+                  <Field label={t('password_confirm')}>
                     <div className="relative">
                       <input
                         id="pass2"
@@ -392,7 +378,7 @@ export default function Register(){
                   disabled={!valid}
                   className="w-full mt-1 px-3 py-2.5 rounded-xl bg-[color:var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Hesap Oluştur
+                  {t('create_account')}
                 </button>
 
                 {!hasIdentity && (

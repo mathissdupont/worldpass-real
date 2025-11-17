@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { apiHealth } from "./lib/api";
 import NavBar from "./components/NavBar";
+import { t } from "./lib/i18n";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -24,6 +25,7 @@ import { listOrgs } from "./lib/issuerStore.js";
 
 export default function App(){
   const [health, setHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(()=>{
     apiHealth().then(setHealth).catch(()=>setHealth({ok:false}))
@@ -52,10 +54,24 @@ export default function App(){
     return { email, roles };
   }, []);
 
+  // Simulate initial loading for global transitions
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[color:var(--brand)]"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)]">
+    <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <NavBar health={health} user={user} />
-      <div className="max-w-5xl mx-auto p-6" id="main">
+      <div className="max-w-5xl mx-auto p-6 transition-all duration-300" id="main">
         <Routes>
           <Route path="/" element={<Navigate to="/account" replace />} />
 
@@ -144,7 +160,7 @@ export default function App(){
             }
           />
 
-          <Route path="*" element={<div className="p-4">Not found</div>} />
+          <Route path="*" element={<div className="p-4">{t("app.not_found")}</div>} />
         </Routes>
       </div>
     </div>

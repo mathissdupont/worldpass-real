@@ -1,6 +1,7 @@
 // src/pages/credentials/VCList.jsx
 import { useEffect, useMemo, useState } from "react";
 import { loadVCs, removeVC } from "../lib/storage";
+import { t } from "../lib/i18n";
 import QRCode from "qrcode";
 
 function cx(...xs){ return xs.filter(Boolean).join(" "); }
@@ -71,7 +72,7 @@ export default function VCList({ onRevoke }) {
     const blob = new Blob([JSON.stringify(vc, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${vc?.jti || "credential"}.json`;
+    a.download = `${vc?.jti || "credential"}.wpvc`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -95,14 +96,14 @@ export default function VCList({ onRevoke }) {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">My Credentials</h2>
-          <p className="text-[12px] text-[color:var(--muted)]">Yerelde saklanan VC’lerin. İndir, QR göster, revoke isteği gönder.</p>
+          <h2 className="text-base font-semibold">{t('my_credentials')}</h2>
+          <p className="text-[12px] text-[color:var(--muted)]">{t('credentials_intro')}</p>
         </div>
         <div className="flex items-center gap-2">
           <input
             value={filter}
             onChange={(e)=>setFilter(e.target.value)}
-            placeholder="Search (type, subject, issuer, jti)"
+            placeholder={t('search_placeholder')}
             className="h-9 w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm"
           />
         </div>
@@ -111,7 +112,7 @@ export default function VCList({ onRevoke }) {
       {/* Empty state */}
       {filtered.length === 0 && (
         <div className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel-2)] p-6 text-center">
-          <div className="text-sm text-[color:var(--muted)]">No credentials yet.</div>
+          <div className="text-sm text-[color:var(--muted)]">{t('no_credentials_yet')}</div>
         </div>
       )}
 
@@ -130,11 +131,11 @@ export default function VCList({ onRevoke }) {
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[color:var(--text)]">{title}{subjectLabel ? ` — ${subjectLabel}` : ""}</div>
                   <div className="text-[11px] text-[color:var(--muted)] mt-0.5">
-                    {issued ? <>Issued: <time dateTime={vc?.issuanceDate}>{issued}</time> · </> : null}
-                    Issuer: <code className="font-mono">{short(vc?.issuer)}</code>
+                    {issued ? <>{t('issued')}: <time dateTime={vc?.issuanceDate}>{issued}</time> · </> : null}
+                    {t('issuer_label')}: <code className="font-mono">{short(vc?.issuer)}</code>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <Badge tone="neutral">jti: <code className="font-mono">{short(vc?.jti)}</code></Badge>
+                    <Badge tone="neutral">{t('jti_label')}: <code className="font-mono">{short(vc?.jti)}</code></Badge>
                     {Array.isArray(types) && types.length>0 && <Badge tone="ok">{types.join(", ")}</Badge>}
                   </div>
                 </div>
@@ -145,13 +146,13 @@ export default function VCList({ onRevoke }) {
                     onClick={() => showQR(vc)}
                     className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
                   >
-                    Show QR
+                    {t('show_qr')}
                   </button>
                   <button
                     onClick={() => downloadVC(vc)}
                     className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
                   >
-                    Download
+                    {t('download')}
                   </button>
                   {vc?.jti && onRevoke && (
                     <button
@@ -159,7 +160,7 @@ export default function VCList({ onRevoke }) {
                      className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
 
                     >
-                      Revoke
+                      {t('revoke')}
                     </button>
                   )}
                   <button
@@ -167,7 +168,7 @@ export default function VCList({ onRevoke }) {
                     className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
 
                   >
-                    Remove
+                    {t('remove')}
                   </button>
                 </div>
               </div>
@@ -176,25 +177,25 @@ export default function VCList({ onRevoke }) {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {vc?.jti && (
                   <button
-                    onClick={()=>copy(vc.jti, "JTI kopyalandı.")}
+                    onClick={()=>copy(vc.jti, t('jti_copied'))}
                     className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
                   >
-                    Copy JTI
+                    {t('copy_jti')}
                   </button>
                 )}
                 {vc?.issuer && (
                   <button
-                    onClick={()=>copy(vc.issuer, "Issuer DID kopyalandı.")}
+                    onClick={()=>copy(vc.issuer, t('issuer_copied'))}
                     className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
                   >
-                    Copy Issuer
+                    {t('copy_issuer')}
                   </button>
                 )}
                 <button
                   onClick={()=>setPreviewJti(p => p === vc?.jti ? null : vc?.jti)}
                   className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
                 >
-                  {previewJti === vc?.jti ? "Hide JSON" : "Show JSON"}
+                  {previewJti === vc?.jti ? t('hide_json') : t('show_json')}
                 </button>
               </div>
 
@@ -228,7 +229,7 @@ export default function VCList({ onRevoke }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={()=>setQrOf(null)}>
           <div className="w-full max-w-sm rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 shadow-xl" onClick={(e)=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-semibold">VC QR</div>
+              <div className="text-sm font-semibold">{t('vc_qr_title')}</div>
               <button onClick={()=>setQrOf(null)} className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-[color:var(--panel-2)]">✕</button>
             </div>
             <div className="flex flex-col items-center gap-2">
@@ -236,21 +237,21 @@ export default function VCList({ onRevoke }) {
      className="rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] p-2" />
 
               <div className="text-[11px] text-[color:var(--muted)] break-all w-full">
-                jti: <code className="font-mono">{qrOf.jti || "-"}</code><br/>
-                issuer: <code className="font-mono">{qrOf.issuer || "-"}</code>
+                {t('jti_label')}: <code className="font-mono">{qrOf.jti || "-"}</code><br/>
+                {t('issuer_label')}: <code className="font-mono">{qrOf.issuer || "-"}</code>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={()=>downloadDataUrl(qrOf.dataUrl, `${qrOf.jti || "vc"}.png`)}
                   className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
                 >
-                  Download PNG
+                  {t('download_png')}
                 </button>
                 <button
-                  onClick={()=>copy(qrOf.dataUrl, "QR data URL kopyalandı.")}
+                  onClick={()=>copy(qrOf.dataUrl, t('qr_data_url_copied'))}
                   className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
                 >
-                  Copy Data URL
+                  {t('copy_data_url')}
                 </button>
               </div>
             </div>

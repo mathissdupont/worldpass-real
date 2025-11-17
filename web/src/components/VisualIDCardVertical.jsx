@@ -1,5 +1,5 @@
 // components/VisualIDCardVertical.jsx
-import { forwardRef, useEffect, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 
 /** QR kanvası (sadece görsel, dışarıya control vermiyoruz) */
 const QRCanvas = forwardRef(function QRCanvas({ value, size = 148 }, canvasRef) {
@@ -65,6 +65,12 @@ const QRCanvas = forwardRef(function QRCanvas({ value, size = 148 }, canvasRef) 
 export default function VisualIDCardVertical({ did, name }) {
   if (!did) return null;
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const initials =
     (name || "Unnamed")
       .split(/\s+/)
@@ -90,15 +96,19 @@ export default function VisualIDCardVertical({ did, name }) {
 
   return (
     <div
-      className="relative w-full max-w-[380px] rounded-[28px] overflow-hidden shadow-2xl border border-black/40 mx-auto"
+      className={`relative w-full max-w-[380px] rounded-[28px] overflow-hidden shadow-2xl border border-black/40 mx-auto transition-all duration-700 ease-out ${
+        mounted ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+      } hover:scale-105 hover:shadow-3xl hover:rotate-1`}
       style={{
         background: `
-          radial-gradient(120% 90% at -20% -10%, rgba(125,211,252,.25) 0%, transparent 60%),
-          radial-gradient(120% 100% at 120% 0%, rgba(168,85,247,.30) 0%, transparent 65%),
-          radial-gradient(90%  90%  at 50% 120%, rgba(244,114,182,.22) 0%, transparent 60%),
+          radial-gradient(120% 90% at -20% -10%, rgba(125,211,252,.35) 0%, transparent 60%),
+          radial-gradient(120% 100% at 120% 0%, rgba(168,85,247,.40) 0%, transparent 65%),
+          radial-gradient(90%  90%  at 50% 120%, rgba(244,114,182,.30) 0%, transparent 60%),
+          radial-gradient(140% 120% at 80% -20%, rgba(34,197,94,.25) 0%, transparent 70%),
           linear-gradient(165deg, #020617 0%, #020617 30%, #020617 100%)
         `,
         color: "#fff",
+        boxShadow: mounted ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)' : '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
       }}
       aria-label="WorldPass Visual ID Card"
     >
@@ -115,36 +125,39 @@ export default function VisualIDCardVertical({ did, name }) {
         }}
       />
 
-      <div className="relative z-10 flex flex-col gap-4 px-5 pt-5 pb-4">
+      <div className="relative z-10 flex flex-col gap-5 px-6 pt-6 pb-5">
         {/* ÜST: isim + status badge */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center font-semibold text-white shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center font-bold text-white shadow-xl hover:scale-110 transition-transform duration-300">
               {initials}
             </div>
             <div>
-              <div className="text-sm font-semibold leading-tight">
+              <div className="text-base font-bold leading-tight">
                 {name || "Unnamed"}
               </div>
-              <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <div className="mt-1 inline-flex items-center gap-1 text-[12px] text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Kimlik hazır
               </div>
             </div>
           </div>
-          <span className="text-[10px] uppercase tracking-[0.18em] text-slate-200/80">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-200/80 font-medium">
             WorldPass ID
           </span>
         </div>
 
         {/* ORTA: QR */}
-        <div className="flex flex-col items-center gap-3 pt-1">
-          <QRCanvas value={did} size={164} ref={qrRef} />
-          <div className="text-center space-y-1">
-            <div className="text-xs uppercase tracking-[0.18em] text-slate-300/80">
+        <div className="flex flex-col items-center gap-4 pt-2">
+          <div className="relative">
+            <QRCanvas value={did} size={164} ref={qrRef} />
+            <div className="absolute inset-0 rounded-2xl border-2 border-white/20 shadow-lg pointer-events-none" />
+          </div>
+          <div className="text-center space-y-2">
+            <div className="text-sm uppercase tracking-[0.2em] text-slate-300/80 font-medium">
               Digital Identity
             </div>
-            <div className="mt-0.5 text-[11px] font-mono px-3 py-1 rounded-full bg-black/40 border border-white/10 text-white/80 max-w-[310px] mx-auto truncate">
+            <div className="mt-1 text-[12px] font-mono px-4 py-2 rounded-full bg-black/50 border border-white/20 text-white/90 max-w-[320px] mx-auto truncate shadow-md">
               {shortDid}
             </div>
           </div>
@@ -154,11 +167,11 @@ export default function VisualIDCardVertical({ did, name }) {
         <div className="mt-1 h-[3px] w-full rounded-full bg-gradient-to-r from-sky-400 via-fuchsia-500 to-amber-300" />
 
         {/* ALT: MRZ şeridi */}
-      <div className="w-full rounded-lg bg-black/80 text-white px-3 py-2 border border-slate-700/80 shadow-inner">
-        <p className="font-mono text-[10px] leading-snug break-all whitespace-pre-wrap">
-          {mrz}
-        </p>
-      </div>
+        <div className="w-full rounded-xl bg-black/90 text-white px-4 py-3 border border-slate-600/60 shadow-lg">
+          <p className="font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap font-semibold">
+            {mrz}
+          </p>
+        </div>
 
         {/* FOOTER */}
         <div className="pt-1 text-[10px] text-slate-200/80 text-center leading-snug">

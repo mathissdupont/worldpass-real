@@ -1,6 +1,7 @@
 // src/pages/Issue.jsx
 import IssueVC from "../components/IssueVC";
 import { useIdentity } from "../lib/identityContext";
+import { t } from "../lib/i18n";
 
 export default function Issue() {
   const { identity } = useIdentity();
@@ -10,7 +11,7 @@ export default function Issue() {
     <div className="space-y-4">
       {/* Kimlik kartı */}
       <div className="p-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]">
-        <div className="text-sm text-[color:var(--muted)]">Aktif kimlik kodun:</div>
+        <div className="text-sm text-[color:var(--muted)]">{t('active_identity_code')}</div>
         <div className="mt-1 font-mono text-xs break-all text-[color:var(--text)]">
           {did || "—"}
         </div>
@@ -19,8 +20,7 @@ export default function Issue() {
       {/* Kimlik yoksa bilgi */}
       {!did && (
         <div className="p-3 rounded-xl border border-amber-400/30 bg-[color:var(--panel-2)] text-amber-300 text-xs">
-          Bu cihaz için henüz bir kimlik oluşturmadın. Önce <strong>Account</strong> sayfasından
-          kimlik anahtarını oluştur ya da içe aktar.
+          {t('no_identity_prompt')} <strong>{t('account_page')}</strong> {t('no_identity_prompt_tail')}
         </div>
       )}
 

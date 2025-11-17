@@ -5,6 +5,7 @@ import { useIdentity } from "@/lib/identityContext";
 import { b64u, ed25519Sign, b64uToBytes } from "@/lib/crypto";
 
 import { parseWPML, renderWPML } from "@/lib/wpml";
+import { t } from "@/lib/i18n";
 import { listPresetTexts } from "@/lib/issuerPresets";
 
 import { parseWPT, renderWPT } from "@/lib/wpt";
@@ -55,7 +56,7 @@ function Label({ text, required }) {
   );
 }
 
-function Select({ value, onChange, options=[], error, placeholder="— select —" }) {
+function Select({ value, onChange, options=[], error, placeholder=t("issuer.console.select_placeholder") }) {
   return (
     <div className="relative">
       <select
@@ -322,7 +323,7 @@ export default function IssuerConsole(){
       const blob = new Blob([pretty], {type:"application/json"});
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `${jti}.json`;
+      a.download = `${jti}.wpvc`;
       a.click();
       URL.revokeObjectURL(a.href);
 
@@ -480,7 +481,7 @@ export default function IssuerConsole(){
                           const blob = new Blob([preview], {type:"application/json"});
                           const a = document.createElement("a");
                           a.href = URL.createObjectURL(blob);
-                          a.download = `preview-${tplKey||"vc"}.json`;
+                          a.download = `preview-${tplKey||"vc"}.wpvc`;
                           a.click();
                           URL.revokeObjectURL(a.href);
                         }}
@@ -609,7 +610,7 @@ export default function IssuerConsole(){
                       const blob = new Blob([out], {type:"application/json"});
                       const a = document.createElement("a");
                       a.href = URL.createObjectURL(blob);
-                      a.download = `${(safeJ(out)?.jti) || "credential"}.json`;
+                      a.download = `${(safeJ(out)?.jti) || "credential"}.wpvc`;
                       a.click();
                       URL.revokeObjectURL(a.href);
                     }}

@@ -1,6 +1,7 @@
 // src/pages/issuer/Register.jsx
 import { useMemo, useState } from "react";
 import { useIdentity } from "../../lib/identityContext";
+import { t } from "../../lib/i18n";
 import { createOrg, verifyOrg, markVerified } from "@/lib/issuerStore.js";
 import IdentityLoad from "../../components/IdentityLoad";
 import IdentityCreate from "../../components/IdentityCreate";
@@ -43,7 +44,7 @@ function Input({ value, onChange, type = "text", placeholder, error, ...rest }) 
   );
 }
 
-function CopyBtn({ value, label = "Copy" }) {
+function CopyBtn({ value, label = t('copy') }) {
   return (
     <button
       type="button"
@@ -140,7 +141,7 @@ export default function IssuerRegister() {
       {/* LEFT: Register form */}
       <div className="rounded-2xl border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Organization Register</h2>
+          <h2 className="text-lg font-semibold">{t("issuer.register.title")}</h2>
 
           <div
             className={[
@@ -149,16 +150,16 @@ export default function IssuerRegister() {
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                 : "border-amber-200 bg-amber-50 text-amber-700",
             ].join(" ")}
-            title={hasDid ? identity.did : "Bu sayfada keystore yükleyebilirsin"}
+            title={hasDid ? identity.did : t("issuer.register.no_did_hint")}
           >
-            {hasDid ? "DID Ready" : "No DID"}
+            {hasDid ? t("issuer.register.did_ready") : t("issuer.register.no_did")}
           </div>
         </div>
 
         {hasDid && (
           <div className="mt-2 text-[11px] text-gray-600 flex items-center gap-2">
             <span className="font-mono break-all">{didShort}</span>
-            {identity?.did && <CopyBtn value={identity.did} label="Copy DID" />}
+            {identity?.did && <CopyBtn value={identity.did} label={t('copy_did')} />}
           </div>
         )}
 
@@ -168,11 +169,11 @@ export default function IssuerRegister() {
 
         <div className="mt-4 space-y-3">
           <div>
-            <Label>Organization Name</Label>
+            <Label>{t("issuer.register.org_name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="WorldPass University"
+              placeholder={t("issuer.register.example_org")}
               error={name && !validName}
             />
             {name && !validName && (
@@ -181,11 +182,11 @@ export default function IssuerRegister() {
           </div>
 
           <div>
-            <Label>Domain</Label>
+            <Label>{t("issuer.register.domain")}</Label>
             <Input
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="example.edu.tr"
+              placeholder={t("issuer.register.example_domain")}
               error={domain && !validDomain}
             />
             {domain && !validDomain && (
@@ -196,12 +197,12 @@ export default function IssuerRegister() {
           </div>
 
           <div>
-            <Label>Admin Email</Label>
+            <Label>{t("issuer.register.admin_email")}</Label>
             <Input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
-              placeholder="admin@example.edu.tr"
+              placeholder={t("issuer.register.example_admin_email")}
               error={email && !validEmail}
             />
             {email && !validEmail && (
@@ -221,7 +222,7 @@ export default function IssuerRegister() {
                   <circle cx="12" cy="12" r="9" opacity=".25" />
                   <path d="M21 12a9 9 0 0 1-9 9" />
                 </svg>
-                Creating…
+                {t("issuer.register.creating")}
               </>
             ) : (
               <>
@@ -230,7 +231,7 @@ export default function IssuerRegister() {
                   <path d="M8 11l4 4 4-4" />
                   <rect x="4" y="17" width="16" height="4" rx="1" />
                 </svg>
-                Create Organization
+                {t("issuer.register.create_org")}
               </>
             )}
           </button>
@@ -247,7 +248,7 @@ export default function IssuerRegister() {
       <div className="space-y-4">
         {!hasDid && (
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold">Load / Create DID</h3>
+            <h3 className="font-semibold">{t('issuer.register.load_create_did')}</h3>
             <p className="text-xs text-gray-500 mb-3">
               Keystore RAM’de tutulur. Sayfayı yenilersen tekrar yüklemen gerekir.
             </p>
@@ -257,8 +258,8 @@ export default function IssuerRegister() {
           </div>
         )}
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h3 className="font-semibold">Domain Verification</h3>
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h3 className="font-semibold">{t('issuer.register.domain_verification')}</h3>
 
           {!org ? (
             <p className="text-sm text-gray-600 mt-2">Önce kuruluş oluştur.</p>
@@ -266,7 +267,7 @@ export default function IssuerRegister() {
             <>
               <div className="mt-2 text-sm">
                 <div>
-                  Status:{" "}
+                  {t('issuer.register.status_label')}{" "}
                   <span
                     className={
                       org.status === "verified" ? "text-emerald-700 font-medium" : "text-amber-700"
@@ -302,8 +303,8 @@ export default function IssuerRegister() {
               </div>
 
               {/* demo doğrulama alanı */}
-              <div className="mt-4">
-                <Label>Paste verification token (demo)</Label>
+                <div className="mt-4">
+                <Label>{t('issuer.register.paste_token')}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     value={token}
@@ -321,14 +322,14 @@ export default function IssuerRegister() {
                           <circle cx="12" cy="12" r="9" opacity=".25" />
                           <path d="M21 12a9 9 0 0 1-9 9" />
                         </svg>
-                        Verifying…
+                        {t('issuer.register.verifying')}
                       </>
                     ) : (
                       <>
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M20 6L9 17l-5-5" />
                         </svg>
-                        Verify
+                        {t('issuer.register.verify_button')}
                       </>
                     )}
                   </button>
@@ -336,14 +337,14 @@ export default function IssuerRegister() {
 
                 <details className="mt-2">
                   <summary className="text-xs text-gray-600 cursor-pointer">
-                    Dev tools (only for development)
+                    {t('issuer.register.dev_tools')}
                   </summary>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => {
                         markVerified(org.id);
                         setOrg({ ...org, status: "verified" });
-                        setMsg({ tone: "info", text: "Dev: Organization marked as verified." });
+                        setMsg({ tone: "info", text: t('issuer.register.dev_marked_verified') });
                       }}
                       className="px-3 py-2 rounded-xl border hover:bg-gray-50 text-xs"
                       title="Sadece geliştirme için"
@@ -351,7 +352,7 @@ export default function IssuerRegister() {
                     >
                       Dev: Mark Verified
                     </button>
-                    {org?.verify_token && <CopyBtn value={org.verify_token} label="Copy token" />}
+                    {org?.verify_token && <CopyBtn value={org.verify_token} label={t('issuer.register.copy_token')} />}
                   </div>
                 </details>
 

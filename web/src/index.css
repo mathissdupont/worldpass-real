@@ -32,20 +32,27 @@ input:-webkit-autofill:focus{
   --bg:        #f7f7f8;
   --panel:     #ffffff;
   --panel-2:   #f3f4f6;
+  --panel-3:   #e5e7eb;
   --editor-bg: #0b0b0c;
 
   /* Text */
   --text:      #0b0b12;
   --muted:     #667085;
+  --muted-2:   #9ca3af;
 
   /* Borders & shadows */
   --border:    #e5e7eb;
+  --border-2:  #d1d5db;
   --shadow:    0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
 
   /* Brand & accents */
   --brand:     #111827;  /* koyu */
   --brand-2:   #0ea5e9;  /* mavi vurgu */
+  --brand-3:   #0284c7;  /* koyu mavi */
   --accent:    #22c55e;  /* yeşil vurgu */
+  --accent-2:  #16a34a;  /* koyu yeşil */
 
   /* States */
   --success:   #10b981;
@@ -60,6 +67,13 @@ input:-webkit-autofill:focus{
   /* Misc */
   --radius:    14px;
   --radius-sm: 10px;
+  --radius-lg: 20px;
+  --transition: 0.2s ease;
+  --transition-fast: 0.15s ease;
+
+  /* Animations */
+  --transition-normal: 0.25s ease-in-out;
+  --transition-slow: 0.35s ease-in-out;
 }
 
 /* Manual Dark (Settings → Dark) */
@@ -140,10 +154,12 @@ html.dark{
     @apply rounded-2xl border shadow-sm;
     background: color-mix(in oklab, var(--panel) 96%, transparent);
     border-color: var(--border);
+    transition: var(--transition);
   }
 
   .wp-btn{
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 transition;
+    transition: var(--transition);
   }
   .wp-btn-ghost{
     @apply wp-btn border;
@@ -155,6 +171,60 @@ html.dark{
     @apply wp-btn text-white;
     background: var(--brand);
   }
+
+  /* New utility classes */
+  .wp-input{
+    @apply rounded-xl border bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] transition;
+    border-color: var(--border);
+    transition: var(--transition);
+  }
+  .wp-input:focus{
+    border-color: color-mix(in srgb, var(--brand-2) 60%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-2) 20%, transparent);
+  }
+
+  .wp-panel{
+    @apply rounded-2xl border bg-[color:var(--panel)] shadow-sm;
+    border-color: var(--border);
+    transition: var(--transition);
+  }
+
+  .wp-pill{
+    @apply inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs;
+    background: var(--panel-2);
+    border-color: var(--border);
+    transition: var(--transition);
+  }
+
+  .wp-gradient-bg{
+    background: linear-gradient(135deg, var(--brand-2) 0%, var(--accent) 100%);
+  }
+
+  .wp-hover-lift{
+    transition: transform var(--transition), box-shadow var(--transition);
+  }
+  .wp-hover-lift:hover{
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* =======================================================================
+   ANIMATIONS
+   ======================================================================= */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Theme transition */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* =======================================================================

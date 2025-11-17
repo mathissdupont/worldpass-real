@@ -1,10 +1,11 @@
 // src/pages/identity/IdentityCreate.jsx
 import { useState, useMemo, useCallback } from "react";
 import { ed25519Generate, encryptKeystore, didFromPk, b64u } from "../lib/crypto";
+import { t } from "../lib/i18n";
 
-/* ——— Password Strength bar ——— */
+/* ——— Enhanced Password Strength bar ——— */
 function SegStrength({ p }) { // 0..4
-  const labels = ["Very weak", "Weak", "OK", "Good", "Strong"];
+  const labels = [t("identity.create.strength_very_weak"), t("identity.create.strength_weak"), t("identity.create.strength_ok"), t("identity.create.strength_good"), t("identity.create.strength_strong")];
   const colors = [
     "bg-rose-500",
     "bg-orange-500",
@@ -15,16 +16,42 @@ function SegStrength({ p }) { // 0..4
   const color = colors[p] || colors[0];
 
   return (
-    <div className="mt-2" aria-live="polite">
-      <div className="grid grid-cols-5 gap-1" role="meter" aria-valuemin={0} aria-valuemax={4} aria-valuenow={p} aria-label="Password strength">
-        {[0,1,2,3,4].map(i=>(
-          <div
-            key={i}
-            className={`h-1.5 rounded-full transition-colors ${i<=p? color : "bg-[color:var(--border)] dark:bg-white/10"}`}
-          />
-        ))}
+    <div className="mt-3" aria-live="polite">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="grid grid-cols-5 gap-1 flex-1" role="meter" aria-valuemin={0} aria-valuemax={4} aria-valuenow={p} aria-label="Password strength">
+          {[0,1,2,3,4].map(i=>(
+            <div
+              key={i}
+              className={`h-2 rounded-full transition-all duration-300 ${i<=p? color : "bg-[color:var(--border)] dark:bg-white/10"}`}
+            />
+          ))}
+        </div>
+        <span className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
+          p >= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' :
+          p >= 2 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300' :
+          'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+        }`}>
+          {labels[p]}
+        </span>
       </div>
-      <div className="mt-1 text-[10px] text-[color:var(--muted)]">{labels[p]}</div>
+        <div className="text-[11px] text-[color:var(--muted)] space-y-1">
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2 h-2 rounded-full ${p1.length >= 8 ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          {t("identity.create.chk_min8")}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2 h-2 rounded-full ${/[A-Z]/.test(p1) && /[a-z]/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          {t("identity.create.chk_mixed_case")}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2 h-2 rounded-full ${/\d/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          {t("identity.create.chk_number")}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2 h-2 rounded-full ${/[^A-Za-z0-9]/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          {t("identity.create.chk_special")}
+        </div>
+      </div>
     </div>
   );
 }
@@ -99,15 +126,15 @@ export default function IdentityCreate() {
   return (
     <section className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)]/90 backdrop-blur p-5 shadow-sm">
       <header className="mb-4">
-        <h3 className="text-base font-semibold">Create Identity</h3>
+        <h3 className="text-base font-semibold">{t("identity.create.title")}</h3>
         <p className="text-[12px] text-[color:var(--muted)] mt-1">
-          Yeni bir DID üret ve şifre ile korunan keystore’u cihazına indir.
+          {t("identity.create.paragraph")}
         </p>
       </header>
 
       {/* Password */}
       <div className="mb-3">
-        <label htmlFor="pwd1" className="block text-sm text-[color:var(--muted)] mb-1.5">Password</label>
+        <label htmlFor="pwd1" className="block text-sm text-[color:var(--muted)] mb-1.5">{t("identity.create.password_label")}</label>
         <div className="relative">
           <input
             id="pwd1"
@@ -116,7 +143,7 @@ export default function IdentityCreate() {
             onChange={(e) => setP1(e.target.value)}
             onKeyUp={onCaps}
             onKeyDown={onCaps}
-            placeholder="Min 8 chars, mixed case, digit, symbol"
+            placeholder={t("identity.create.placeholder_strength")}
             aria-invalid={p1.length>0 && s<2}
             aria-describedby="pwd1-help"
             className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] pr-10"
@@ -126,8 +153,8 @@ export default function IdentityCreate() {
             type="button"
             onClick={() => setShow1(v=>!v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
-            aria-label={show1 ? "Hide password" : "Show password"}
-            title={show1 ? "Hide" : "Show"}
+            aria-label={show1 ? t("identity.create.hide_password") : t("identity.create.show_password")}
+            title={show1 ? t("identity.create.hide") : t("identity.create.show")}
           >
             {show1 ? (
               // eye-off
@@ -147,7 +174,7 @@ export default function IdentityCreate() {
 
       {/* Repeat */}
       <div className="mb-1">
-        <label htmlFor="pwd2" className="block text-sm text-[color:var(--muted)] mb-1.5">Repeat password</label>
+        <label htmlFor="pwd2" className="block text-sm text-[color:var(--muted)] mb-1.5">{t("identity.create.repeat_label")}</label>
         <div className="relative">
           <input
             id="pwd2"
@@ -156,7 +183,7 @@ export default function IdentityCreate() {
             onChange={(e) => setP2(e.target.value)}
             onKeyUp={onCaps}
             onKeyDown={onCaps}
-            placeholder="Repeat password"
+            placeholder={t("identity.create.placeholder_repeat")}
             aria-invalid={!!p2 && p1!==p2}
             className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] pr-10"
             autoComplete="new-password"
@@ -165,8 +192,8 @@ export default function IdentityCreate() {
             type="button"
             onClick={() => setShow2(v=>!v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
-            aria-label={show2 ? "Hide password" : "Show password"}
-            title={show2 ? "Hide" : "Show"}
+            aria-label={show2 ? t("identity.create.hide_password") : t("identity.create.show_password")}
+            title={show2 ? t("identity.create.hide") : t("identity.create.show")}
           >
             {show2 ? (
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3l18 18"/><path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path d="M16.24 16.24C14.92 17.02 13.5 17.5 12 17.5 6.5 17.5 3 12 3 12s1.4-2.22 3.76-3.76"/><path d="M9.9 4.24C10.57 4.08 11.28 4 12 4c5.5 0 9 8 9 8s-.62 1.24-1.76 2.48"/></svg>
@@ -176,29 +203,11 @@ export default function IdentityCreate() {
           </button>
         </div>
         {p2 && p1 !== p2 && (
-          <p className="mt-1 text-[11px] text-rose-600">Şifreler eşleşmiyor.</p>
+          <p className="mt-1 text-[11px] text-rose-600">{t("identity.create.err_mismatch")}</p>
         )}
       </div>
 
-      {/* Checklist */}
-      <ul className="mt-3 text-[12px] text-[color:var(--muted)] grid sm:grid-cols-2 gap-x-4">
-        <li className={`flex items-center gap-2 ${p1.length>=8 ? "text-emerald-600" : ""}`}>
-          <span className="inline-block h-1.5 w-1.5 rounded-full border border-[color:var(--border)] bg-current opacity-60"></span>
-          Min 8 karakter
-        </li>
-        <li className={`flex items-center gap-2 ${/[A-Z]/.test(p1)&&/[a-z]/.test(p1) ? "text-emerald-600" : ""}`}>
-          <span className="inline-block h-1.5 w-1.5 rounded-full border border-[color:var(--border)] bg-current opacity-60"></span>
-          Büyük + küçük harf
-        </li>
-        <li className={`flex items-center gap-2 ${/\d/.test(p1) ? "text-emerald-600" : ""}`}>
-          <span className="inline-block h-1.5 w-1.5 rounded-full border border-[color:var(--border)] bg-current opacity-60"></span>
-          Rakam
-        </li>
-        <li className={`flex items-center gap-2 ${/[^A-Za-z0-9]/.test(p1) ? "text-emerald-600" : ""}`}>
-          <span className="inline-block h-1.5 w-1.5 rounded-full border border-[color:var(--border)] bg-current opacity-60"></span>
-          Sembol
-        </li>
-      </ul>
+
 
       {/* CTA */}
       <button
@@ -209,12 +218,12 @@ export default function IdentityCreate() {
         {busy ? (
           <>
             <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M21 12a9 9 0 0 1-9 9"/></svg>
-            <span>Generating…</span>
+            <span>{t("identity.create.generating")}</span>
           </>
         ) : (
           <>
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><rect x="4" y="17" width="16" height="4" rx="1"/></svg>
-            <span>Generate & Download Keystore</span>
+            <span>{t("identity.create.generate_download")}</span>
           </>
         )}
       </button>

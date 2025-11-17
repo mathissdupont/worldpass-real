@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from "../../lib/i18n";
 
 export default function AdminIssuers(){
   const [token, setToken] = useState(localStorage.getItem('wp_admin_token')||"");
@@ -17,7 +18,7 @@ export default function AdminIssuers(){
       setToken(data.token); setLoginErr("");
       fetchList(data.token);
     }else{
-      setLoginErr("Login failed");
+      setLoginErr(t("admin.issuers.login_failed"));
     }
   };
 
@@ -42,11 +43,11 @@ export default function AdminIssuers(){
   if(!token){
     return (
       <div className="max-w-md mx-auto bg-white p-4 rounded border space-y-3">
-        <h2 className="font-semibold">Admin Login</h2>
+        <h2 className="font-semibold">{t("admin.issuers.title")}</h2>
         <form onSubmit={login} className="space-y-2">
-          <input name="user" className="w-full border rounded p-2" placeholder="username (dev: admin)"/>
-          <input name="pass" type="password" className="w-full border rounded p-2" placeholder="password (dev: admin123)"/>
-          <button className="px-3 py-2 rounded bg-black text-white">Login</button>
+          <input name="user" className="w-full border rounded p-2" placeholder={t("admin.issuers.placeholder_username")}/>
+          <input name="pass" type="password" className="w-full border rounded p-2" placeholder={t("admin.issuers.placeholder_password")}/>
+          <button className="px-3 py-2 rounded bg-black text-white">{t("admin.issuers.login")}</button>
         </form>
         {loginErr && <div className="text-xs text-rose-700">{loginErr}</div>}
       </div>
@@ -55,7 +56,7 @@ export default function AdminIssuers(){
 
   return (
     <div className="space-y-3">
-      <h2 className="font-semibold">Issuers</h2>
+      <h2 className="font-semibold">{t("admin.issuers.list_title")}</h2>
       {list.map(it=>(
         <div key={it.id} className="bg-white border rounded p-3 flex items-center justify-between">
           <div>

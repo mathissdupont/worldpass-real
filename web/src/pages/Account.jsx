@@ -3,12 +3,35 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useIdentity } from "../lib/identityContext";
 import { loadProfile, saveProfile } from "../lib/storage";
 import VisualIDCardVertical from "../components/VisualIDCardVertical";
+import { t } from "../lib/i18n";
+
+/* --- Animasyonlu mesaj --- */
+function Toast({ msg, onClose }) {
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(onClose, 2500);
+    return () => clearTimeout(t);
+  }, [msg, onClose]);
+
+  if (!msg) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-xl shadow-lg border bg-[color:var(--panel)] animate-in slide-in-from-bottom-2 fade-in duration-300 hover:scale-105 transition-transform">
+        <div className="flex items-center gap-2 text-sm">
+        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+        {msg}
+      </div>
+    </div>
+  );
+}
 
 /* --- MiniQR (dinamik import) --- */
 function MiniQR({ value, size = 112 }) {
   const ref = useRef(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     (async () => {
       const QR = await import("qrcode");
       if (!alive || !ref.current) return;
@@ -19,10 +42,21 @@ function MiniQR({ value, size = 112 }) {
         color: { dark: "#111111", light: "#00000000" },
         errorCorrectionLevel: "M",
       });
+      if (alive) setLoading(false);
     })();
     return () => { alive = false; };
   }, [value, size]);
-  return <canvas ref={ref} width={size} height={size} className="mx-auto rounded-lg shadow-sm" aria-label="DID QR" />;
+
+  return (
+    <div className="relative">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[color:var(--panel-2)] rounded-lg">
+          <div className="w-6 h-6 border-2 border-[color:var(--brand-2)] border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+      <canvas ref={ref} width={size} height={size} className="mx-auto rounded-lg shadow-sm" aria-label="DID QR" />
+    </div>
+  );
 }
 
 /* --- yardımcılar --- */
@@ -33,14 +67,9 @@ function initials(name){
 }
 
 function Pill({ ok, text }) {
-  // Zemin sabit panel-2; ton sadece kenar+metin → dark’ta patlamaz
-  const base = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs bg-[color:var(--panel-2)]";
-  const tone = ok
-    ? "border-emerald-400/30 text-emerald-300"
-    : "border-amber-400/30 text-amber-300";
   return (
-    <span className={`${base} ${tone}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+    <span className="wp-pill">
+      <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'} opacity-80`} />
       {text}
     </span>
   );
@@ -81,7 +110,7 @@ export default function Account(){
     const name = nameInput.trim();
     setDisplayName(name);
     saveProfile({ ...(loadProfile() || {}), displayName: name });
-    setMsg("Ad güncellendi");
+    setMsg(t('name_updated'));
   };
 
   const handleCopyDid = async () => {
@@ -95,9 +124,9 @@ export default function Account(){
     const blob = new Blob([JSON.stringify(identity, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "worldpass_identity.json"; a.click();
+    a.href = url; a.download = "worldpass_identity.wpkeystore"; a.click();
     URL.revokeObjectURL(url);
-    setMsg("JSON indirildi");
+    setMsg(t('identity_json_downloaded'));
   };
 
   return (
@@ -115,10 +144,10 @@ export default function Account(){
               </div>
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold tracking-tight truncate text-[color:var(--text)]">
-                  {displayName || "Kullanıcı Adı Yok"}
+                  {displayName || t('no_display_name')}
                 </h2>
                 <div className="mt-1 inline-flex items-center gap-2 text-xs">
-                  <Pill ok={hasDid} text={hasDid ? "Kimlik hazır" : "Kimlik yok"} />
+                  <Pill ok={hasDid} text={hasDid ? t('identity_ready') : t('identity_missing')} />
                 </div>
               </div>
             </div>
@@ -128,7 +157,7 @@ export default function Account(){
                 onClick={() => setShowDid(v => !v)}
                 disabled={!hasDid}
                 className="group inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] transition text-[color:var(--text)] disabled:opacity-50"
-                title={showDid ? "Gizle" : "Göster"}
+                title={showDid ? t('hide_identity') : t('show_identity')}
               >
                 {/* iconlar aynı */}
                 {showDid ? (
@@ -143,7 +172,7 @@ export default function Account(){
                     <circle cx="12" cy="12" r="3" />
                   </svg>
                 )}
-                <span className="text-sm">{showDid ? "Kimliği gizle" : "Kimliği göster"}</span>
+                <span className="text-sm">{showDid ? t('hide_identity') : t('show_identity')}</span>
               </button>
 
               <button
@@ -154,7 +183,7 @@ export default function Account(){
                 <svg className="h-4 w-4 opacity-70 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <rect x="9" y="9" width="13" height="13" rx="2" /><rect x="2" y="2" width="13" height="13" rx="2" />
                 </svg>
-                <span className="text-sm">Kopyala</span>
+                <span className="text-sm">{t('copy')}</span>
               </button>
 
               <button
@@ -165,7 +194,7 @@ export default function Account(){
                 <svg className="h-4 w-4 opacity-70 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path d="M12 3v12" /><path d="M8 11l4 4 4-4" /><rect x="4" y="17" width="16" height="4" rx="1" />
                 </svg>
-                <span className="text-sm">JSON indir</span>
+                <span className="text-sm">{t('download_json')}</span>
               </button>
             </div>
           </div>
@@ -174,20 +203,20 @@ export default function Account(){
         {/* Body */}
         <div className="p-6 grid lg:grid-cols-[1fr,22rem] gap-8 items-start">
           {/* Sol: Kart */}
-          <div className="min-w-0">
-            <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel-2)] p-4 flex flex-col items-center">
-              {hasDid ? (
-                <>
-                  <VisualIDCardVertical did={identity.did} name={displayName} />
-                  <p className="text-xs text-gray-500 mt-2">Bu QR, kimliğini (DID) hızlı paylaşmak içindir.</p>
-                </>
-              ) : (
-                <p className="text-sm text-[color:var(--muted)] text-center">
-                  Henüz kimlik oluşturmadın veya yüklemedin.
-                </p>
-              )}
+            <div className="min-w-0">
+              <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel-2)] p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow duration-200">
+                {hasDid ? (
+                  <>
+                    <VisualIDCardVertical did={identity.did} name={displayName} />
+                    <p className="text-xs text-gray-500 mt-2">{t('qr_description')}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-[color:var(--muted)] text-center">
+                    {t('no_identity_yet')}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
 
           {/* Sağ: Form + DID + mini QR */}
           <div className="space-y-6">
@@ -200,7 +229,7 @@ export default function Account(){
                     value={nameInput}
                     onChange={e => setNameInput(e.target.value)}
                     placeholder="Örn. Ada Yılmaz"
-                    className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] transition"
+                    className="wp-input"
                   />
                   <svg className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" /><path d="M14.06 4.94l3.75 3.75" />
@@ -208,7 +237,7 @@ export default function Account(){
                 </div>
                 <button
                   onClick={handleSaveName}
-                  className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 active:opacity-80 transition"
+                  className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 active:opacity-80 transition hover:scale-105"
                 >
                   Kaydet
                 </button>
@@ -249,7 +278,7 @@ export default function Account(){
                 <div className="mt-3 grid grid-cols-[auto,1fr] items-center gap-3">
                   <MiniQR value={identity.did} />
                   <div className="text-xs text-[color:var(--muted)]">
-                    <div>Hızlı paylaşım için mini-QR.</div>
+                    <div>{t('mini_qr_hint')}</div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         onClick={handleDownload}
@@ -258,7 +287,7 @@ export default function Account(){
                         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M12 3v12" /><path d="M8 11l4 4 4-4" /><rect x="4" y="17" width="16" height="4" rx="1" />
                         </svg>
-                        JSON indir
+                        {t('download_json')}
                       </button>
                     </div>
                   </div>
@@ -268,13 +297,16 @@ export default function Account(){
 
             {/* mesaj */}
             {msg && (
-              <div className="text-xs border rounded-xl px-3 py-2 bg-[color:var(--panel-2)] border-emerald-400/30 text-emerald-300">
+                <div className="text-xs border rounded-xl px-3 py-2 bg-[color:var(--panel-2)] border-emerald-400/30 text-emerald-300">
                 {msg}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Toast mesaj */}
+      <Toast msg={msg} onClose={() => setMsg(null)} />
     </section>
   );
 }
