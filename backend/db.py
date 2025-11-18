@@ -31,6 +31,36 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   meta TEXT
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,  -- bcrypt hash
+  did TEXT,                     -- user's DID
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive' | 'suspended'
+  display_name TEXT,            -- user's display name
+  theme TEXT DEFAULT 'light'    -- UI theme preference
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS user_vcs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  vc_id TEXT NOT NULL,          -- jti from VC
+  vc_payload TEXT NOT NULL,     -- full VC JSON
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, vc_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_vcs_user_id ON user_vcs(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_vcs_vc_id ON user_vcs(vc_id);
+
 CREATE TABLE IF NOT EXISTS issuers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -97,6 +127,15 @@ CREATE TABLE IF NOT EXISTS oauth_access_tokens (
 
 
 """
+
+# Monkey patch aiosqlite.Connection to add execute_fetchone helper
+async def _execute_fetchone(self, sql: str, parameters=None):
+    """Helper method to execute a query and fetch one result"""
+    cursor = await self.execute(sql, parameters or ())
+    return await cursor.fetchone()
+
+# Add the method to the Connection class
+aiosqlite.Connection.execute_fetchone = _execute_fetchone
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     conn = await aiosqlite.connect(settings.SQLITE_PATH)

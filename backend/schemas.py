@@ -120,3 +120,58 @@ class OAuthUserInfo(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     picture: Optional[str] = None
+
+# User registration and authentication
+class UserRegisterReq(BaseModel):
+    email: str
+    first_name: str = Field(..., alias="firstName")
+    last_name: str = Field(..., alias="lastName")
+    password: str
+    did: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+class UserRegisterResp(BaseModel):
+    token: str
+    user: Dict[str, Any]
+
+class UserLoginReq(BaseModel):
+    email: str
+    password: str
+
+class UserLoginResp(BaseModel):
+    token: str
+    user: Dict[str, Any]
+
+# User VCs management
+class UserVCAddReq(BaseModel):
+    vc: Dict[str, Any]  # Full VC JSON
+
+class UserVCAddResp(BaseModel):
+    ok: bool
+    vc_id: str
+
+class UserVCItem(BaseModel):
+    id: int
+    vc_id: str
+    vc_payload: Dict[str, Any]
+    created_at: int
+    updated_at: int
+
+class UserVCListResp(BaseModel):
+    vcs: List[UserVCItem]
+
+class UserVCDeleteReq(BaseModel):
+    vc_id: str
+
+class UserVCDeleteResp(BaseModel):
+    ok: bool
+
+# User profile management
+class UserProfileUpdateReq(BaseModel):
+    display_name: Optional[str] = None
+    theme: Optional[str] = None
+
+class UserProfileResp(BaseModel):
+    user: Dict[str, Any]
