@@ -40,10 +40,26 @@ CREATE TABLE IF NOT EXISTS users (
   did TEXT,                     -- user's DID
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active'  -- 'active' | 'inactive' | 'suspended'
+  status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive' | 'suspended'
+  display_name TEXT,            -- user's display name
+  theme TEXT DEFAULT 'light'    -- UI theme preference
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS user_vcs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  vc_id TEXT NOT NULL,          -- jti from VC
+  vc_payload TEXT NOT NULL,     -- full VC JSON
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, vc_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_vcs_user_id ON user_vcs(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_vcs_vc_id ON user_vcs(vc_id);
 
 CREATE TABLE IF NOT EXISTS issuers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

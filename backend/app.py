@@ -24,6 +24,10 @@ from schemas import (
     IssuerRevokeReq, IssuerRevokeResp,
     UserRegisterReq, UserRegisterResp,
     UserLoginReq, UserLoginResp,
+    UserVCAddReq, UserVCAddResp,
+    UserVCListResp, UserVCItem,
+    UserVCDeleteReq, UserVCDeleteResp,
+    UserProfileUpdateReq, UserProfileResp,
 )
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
@@ -308,13 +312,14 @@ async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_
     
     now = int(time.time())
     
-    # Create user
+    # Create user with display_name
+    display_name = f"{body.first_name} {body.last_name}".strip()
     cur = await db.execute(
         """
-        INSERT INTO users(email, first_name, last_name, password_hash, did, created_at, updated_at, status)
-        VALUES(?, ?, ?, ?, ?, ?, ?, 'active')
+        INSERT INTO users(email, first_name, last_name, password_hash, did, display_name, theme, created_at, updated_at, status)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """,
-        (email, body.first_name, body.last_name, password_hash, body.did or "", now, now),
+        (email, body.first_name, body.last_name, password_hash, body.did or "", display_name, "light", now, now),
     )
     await db.commit()
     user_id = cur.lastrowid
@@ -389,6 +394,159 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
             "did": user["did"] or "",
         }
     )
+
+
+# ---------- helper to get current user from token ----------
+async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(get_db)):
+    """Get current authenticated user from JWT token"""
+    if not x_token:
+        raise HTTPException(status_code=401, detail="missing_token")
+    
+    try:
+        payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        user_id: int = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="invalid_token")
+        
+        user = await db.execute_fetchone(
+            "SELECT id, email, first_name, last_name, did, display_name, theme FROM users WHERE id=?",
+            (user_id,)
+        )
+        if not user:
+            raise HTTPException(status_code=401, detail="user_not_found")
+        
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+
+# ---------- user VCs management ----------
+@app.post(f"{API}/user/vcs/add", response_model=UserVCAddResp)
+@limiter.limit("20/minute")
+async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Add a VC to user's collection"""
+    now = int(time.time())
+    vc = body.vc
+    vc_id = vc.get("jti") or vc.get("id") or f"vc-{now}"
+    
+    # Check if VC already exists for this user
+    existing = await db.execute_fetchone(
+        "SELECT id FROM user_vcs WHERE user_id=? AND vc_id=?",
+        (user["id"], vc_id)
+    )
+    
+    if existing:
+        # Update existing VC
+        await db.execute(
+            "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE user_id=? AND vc_id=?",
+            (json.dumps(vc), now, user["id"], vc_id)
+        )
+    else:
+        # Insert new VC
+        await db.execute(
+            "INSERT INTO user_vcs(user_id, vc_id, vc_payload, created_at, updated_at) VALUES(?,?,?,?,?)",
+            (user["id"], vc_id, json.dumps(vc), now, now)
+        )
+    
+    await db.commit()
+    return UserVCAddResp(ok=True, vc_id=vc_id)
+
+
+@app.get(f"{API}/user/vcs", response_model=UserVCListResp)
+@limiter.limit("30/minute")
+async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Get all VCs for current user"""
+    rows = await db.execute_fetchall(
+        "SELECT id, vc_id, vc_payload, created_at, updated_at FROM user_vcs WHERE user_id=? ORDER BY created_at DESC",
+        (user["id"],)
+    )
+    
+    vcs = []
+    for row in rows:
+        try:
+            vc_payload = json.loads(row["vc_payload"])
+            vcs.append(UserVCItem(
+                id=row["id"],
+                vc_id=row["vc_id"],
+                vc_payload=vc_payload,
+                created_at=row["created_at"],
+                updated_at=row["updated_at"]
+            ))
+        except Exception:
+            continue
+    
+    return UserVCListResp(vcs=vcs)
+
+
+@app.post(f"{API}/user/vcs/delete", response_model=UserVCDeleteResp)
+@limiter.limit("20/minute")
+async def user_vc_delete(request: Request, body: UserVCDeleteReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Delete a VC from user's collection"""
+    await db.execute(
+        "DELETE FROM user_vcs WHERE user_id=? AND vc_id=?",
+        (user["id"], body.vc_id)
+    )
+    await db.commit()
+    return UserVCDeleteResp(ok=True)
+
+
+# ---------- user profile management ----------
+@app.get(f"{API}/user/profile", response_model=UserProfileResp)
+@limiter.limit("30/minute")
+async def user_profile_get(request: Request, user=Depends(_get_current_user)):
+    """Get current user profile"""
+    return UserProfileResp(user={
+        "id": user["id"],
+        "email": user["email"],
+        "first_name": user["first_name"],
+        "last_name": user["last_name"],
+        "did": user["did"] or "",
+        "display_name": user["display_name"] or "",
+        "theme": user["theme"] or "light",
+    })
+
+
+@app.post(f"{API}/user/profile", response_model=UserProfileResp)
+@limiter.limit("20/minute")
+async def user_profile_update(request: Request, body: UserProfileUpdateReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Update current user profile"""
+    now = int(time.time())
+    
+    updates = []
+    params = []
+    
+    if body.display_name is not None:
+        updates.append("display_name=?")
+        params.append(body.display_name)
+    
+    if body.theme is not None:
+        updates.append("theme=?")
+        params.append(body.theme)
+    
+    if updates:
+        updates.append("updated_at=?")
+        params.append(now)
+        params.append(user["id"])
+        
+        sql = f"UPDATE users SET {', '.join(updates)} WHERE id=?"
+        await db.execute(sql, tuple(params))
+        await db.commit()
+    
+    # Fetch updated user
+    updated_user = await db.execute_fetchone(
+        "SELECT id, email, first_name, last_name, did, display_name, theme FROM users WHERE id=?",
+        (user["id"],)
+    )
+    
+    return UserProfileResp(user={
+        "id": updated_user["id"],
+        "email": updated_user["email"],
+        "first_name": updated_user["first_name"],
+        "last_name": updated_user["last_name"],
+        "did": updated_user["did"] or "",
+        "display_name": updated_user["display_name"] or "",
+        "theme": updated_user["theme"] or "light",
+    })
 
 
 # ---------- issuer register / list / approve ----------
