@@ -1,12 +1,8 @@
-worldpass.heptapusgroup.com {
+worldpass-beta.heptapusgroup.com {
     encode gzip
 
-    @api path /api/* /docs* /redoc*
-    handle @api {
-        reverse_proxy backend:8000
-    }
+    @api path /api/* /docs* /openapi.json
+    reverse_proxy @api backend:8080
 
-    handle {
-        reverse_proxy frontend:4173
-    }
+    reverse_proxy * frontend:4173
 }
