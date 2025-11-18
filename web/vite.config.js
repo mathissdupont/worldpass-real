@@ -32,7 +32,7 @@ export default defineConfig({
   preview: {
     port: 4173,
     host: true,
-    allowedHosts: ['worldpass.heptapusgroup.com'],
+    allowedHosts: ['worldpass.heptapusgroup.com','worldpass-beta.heptapusgroup.com'],
   },
 
   resolve: {
