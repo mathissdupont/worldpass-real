@@ -308,24 +308,63 @@ export default function IssueVC({ identity }) {
                 <canvas ref={canvasRef} className="hidden" />
 
                 {/* Manual Inputs */}
-                <div className="grid md:grid-cols-2 gap-5">
-                   <div className="space-y-3">
-                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Ad Soyad (Name)</label>
-                      <input 
-                         value={subjectName} onChange={(e) => setSubjectName(e.target.value)} 
-                         className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none"
-                         placeholder="Örn: Ahmet Yılmaz"
-                      />
-                   </div>
-                   <div className="space-y-3">
-                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">DID (Subject ID)</label>
-                      <input 
-                         value={subjectDid} onChange={(e) => setSubjectDid(e.target.value)} 
-                         className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:ring-2 outline-none font-mono text-xs ${didOk ? "border-[color:var(--border)] bg-[color:var(--panel)] focus:ring-[color:var(--brand)]/20" : "border-rose-300 bg-rose-50 focus:ring-rose-200"}`}
-                         placeholder="did:..."
-                      />
-                      {!didOk && subjectDid && <p className="text-xs text-rose-500">Geçersiz DID formatı.</p>}
-                   </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <h4 className="text-sm font-semibold text-[color:var(--fg)]">Alıcı Bilgileri</h4>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                          </svg>
+                          Ad Soyad *
+                        </label>
+                        <input 
+                           value={subjectName} onChange={(e) => setSubjectName(e.target.value)} 
+                           className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all"
+                           placeholder="Örn: Ahmet Yılmaz"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                          </svg>
+                          DID (Kimlik Kodu) *
+                        </label>
+                        <input 
+                           value={subjectDid} onChange={(e) => setSubjectDid(e.target.value)} 
+                           className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:ring-2 outline-none font-mono text-xs transition-all ${didOk ? "border-[color:var(--border)] bg-[color:var(--panel)] focus:ring-[color:var(--brand)]/20" : "border-rose-400 bg-rose-50 dark:bg-rose-900/20 focus:ring-rose-200"}`}
+                           placeholder="did:key:z..."
+                        />
+                        {!didOk && subjectDid && (
+                          <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <circle cx="12" cy="12" r="10"/>
+                              <line x1="12" y1="8" x2="12" y2="12"/>
+                              <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            Geçersiz DID formatı
+                          </p>
+                        )}
+                        {didOk && subjectDid && (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                              <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            Geçerli DID formatı
+                          </p>
+                        )}
+                     </div>
+                  </div>
                 </div>
                 
                 {/* Templates Section - Make it more prominent */}
@@ -380,15 +419,23 @@ export default function IssueVC({ identity }) {
                 
                 <div className="border-t border-dashed border-[color:var(--border)]"></div>
                 
-                <div className="space-y-3">
-                   <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Kart Tipi</label>
+                <div className="space-y-2">
+                   <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                       <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                     </svg>
+                     Kimlik Kartı Tipi *
+                   </label>
                    <select 
                       value={vcType} onChange={(e) => setVcType(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none appearance-none"
+                      className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all cursor-pointer"
                    >
-                      <option value="StudentCard">Öğrenci Kartı (StudentCard)</option>
-                      <option value="Membership">Üyelik Kartı (Membership)</option>
-                      <option value="KYC">Kimlik Doğrulama (KYC)</option>
+                      <option value="StudentCard">🎓 Öğrenci Kartı</option>
+                      <option value="Membership">🎫 Üyelik Kartı</option>
+                      <option value="KYC">🔐 Kimlik Doğrulama</option>
+                      <option value="EmployeeCard">👔 Çalışan Kartı</option>
+                      <option value="AccessCard">🚪 Erişim Kartı</option>
                    </select>
                 </div>
              </div>
