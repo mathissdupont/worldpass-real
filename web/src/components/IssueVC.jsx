@@ -1,9 +1,10 @@
 // src/pages/identity/IssueVC.jsx
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { b64u, ed25519Sign, b64uToBytes } from "../lib/crypto";
 import { addVC as addVCToStore } from "../lib/storage";
 import { t } from "../lib/i18n";
 import MiniQR from "./MiniQR";
+import { listOrgs } from "../lib/issuerStore"; // veya "@/lib/issuerStore" kullanıyorsan ona göre
 
 const enc = new TextEncoder();
 const b64uJson = (obj) => b64u(enc.encode(JSON.stringify(obj)));
@@ -15,7 +16,7 @@ export default function IssueVC({ identity }) {
   const [busy, setBusy]               = useState(false);
   const [msg, setMsg]                 = useState(null); // {type:'ok'|'err'|'info', text}
   const [out, setOut]                 = useState(null);
-
+  const [orgTemplates, setOrgTemplates] = useState([]); 
   // sabit jti (sayfa ilk yükleniş anı)
   const jti = useMemo(() => `vc-${Math.floor(Date.now() / 1000)}`, []);
 
@@ -23,6 +24,40 @@ export default function IssueVC({ identity }) {
   const issuerReady = Boolean(identity?.did);
   const didOk = useMemo(() => /^did:[a-z0-9]+:/i.test((subjectDid||"").trim()), [subjectDid]);
   const canIssue = issuerReady && subjectName.trim() && didOk;
+  useEffect(() => {
+    // identity yoksa temizle
+    if (!identity?.did) {
+      setOrgTemplates([]);
+      return;
+    }
+
+    try {
+      // issuerStore'daki org'ları çek
+      const orgs = listOrgs() || [];
+
+      // Bu DID'e sahip ve verified olan org'ları filtrele
+      const myOrgs = orgs.filter(
+        (o) => o.did === identity.did && o.status === "verified"
+      );
+
+      if (!myOrgs.length) {
+        setOrgTemplates([]);
+        return;
+      }
+
+      // Şimdilik ilk org'u al (ileride çoklu destek istersen genişletiriz)
+      const org = myOrgs[0];
+      const tpls = Object.entries(org.templates || {}).map(([key, v]) => ({
+        key,
+        name: v?.name || key,
+      }));
+
+      setOrgTemplates(tpls);
+    } catch (e) {
+      console.warn("orgTemplates yüklenemedi:", e);
+      setOrgTemplates([]);
+    }
+  }, [identity?.did]);
 
   const copy = (txt, ok=t('copied'), fail=t('copy_failed')) =>
     navigator.clipboard.writeText(txt)
@@ -151,15 +186,28 @@ export default function IssueVC({ identity }) {
 
         <div>
           <label className="block text-sm text-[color:var(--muted)] mb-1">{t('vc_type_label')}</label>
-          <select
-            value={vcType}
-            onChange={(e) => setVcType(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]"
-          >
-            <option value="StudentCard">{t('vc.template.student_card')}</option>
-            <option value="Membership">{t('vc.template.membership')}</option>
-            <option value="KYC">{t('vc.template.kyc')}</option>
-          </select>
+            <select
+              value={vcType}
+              onChange={(e) => setVcType(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]"
+            >
+              {/* Default built-in tipler */}
+              <option value="StudentCard">{t("vc.template.student_card")}</option>
+              <option value="Membership">{t("vc.template.membership")}</option>
+              <option value="KYC">{t("vc.template.kyc")}</option>
+
+              {/* Kuruma özel template'ler varsa ayrı grup */}
+              {orgTemplates.length > 0 && (
+                <optgroup label="Kurum Taslakları">
+                  {orgTemplates.map((tpl) => (
+                    <option key={tpl.key} value={tpl.key}>
+                      {tpl.name} ({tpl.key})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+
           <p className="mt-1 text-[11px] text-[color:var(--muted)]">{t('vc_type_hint')}</p>
         </div>
 
