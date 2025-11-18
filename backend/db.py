@@ -112,6 +112,15 @@ CREATE TABLE IF NOT EXISTS oauth_access_tokens (
 
 """
 
+# Monkey patch aiosqlite.Connection to add execute_fetchone helper
+async def _execute_fetchone(self, sql: str, parameters=None):
+    """Helper method to execute a query and fetch one result"""
+    cursor = await self.execute(sql, parameters or ())
+    return await cursor.fetchone()
+
+# Add the method to the Connection class
+aiosqlite.Connection.execute_fetchone = _execute_fetchone
+
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     conn = await aiosqlite.connect(settings.SQLITE_PATH)
     conn.row_factory = aiosqlite.Row
