@@ -28,6 +28,11 @@ from schemas import (
     UserVCListResp, UserVCItem,
     UserVCDeleteReq, UserVCDeleteResp,
     UserProfileUpdateReq, UserProfileResp,
+    VCTemplateCreateReq, VCTemplateCreateResp,
+    VCTemplateListResp, VCTemplateItem,
+    VCTemplateUpdateReq, VCTemplateUpdateResp,
+    VCTemplateDeleteResp,
+    RecipientLookupResp,
 )
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
@@ -630,14 +635,18 @@ async def issuer_issue(body: IssuerIssueReq, db=Depends(get_db)):
 
     jti = vc.get("jti") or f"vc-{int(time.time())}"
     now = int(time.time())
+    
+    # Generate unique recipient ID for QR/NFC scanning
+    recipient_id = base64.urlsafe_b64encode(secrets.token_bytes(12)).decode().rstrip("=")
 
     await db.execute(
-        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, payload, created_at) "
-        "VALUES(?,?,?,?,?)",
+        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, created_at) "
+        "VALUES(?,?,?,?,?,?)",
         (
             jti,
             issuer["id"],
             (vc.get("credentialSubject") or {}).get("id", ""),
+            recipient_id,
             json.dumps(vc),
             now,
         ),
@@ -763,6 +772,141 @@ async def present_get_tmp(pid: str, db=Depends(get_db)):
         return json.loads(row["payload"])
     except Exception:
         raise HTTPException(status_code=500, detail="bad_payload")
+
+
+# ---------- VC Templates management ----------
+@app.post(f"{API}/user/templates", response_model=VCTemplateCreateResp)
+@limiter.limit("20/minute")
+async def create_template(request: Request, body: VCTemplateCreateReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Create a new VC template"""
+    now = int(time.time())
+    
+    cur = await db.execute(
+        """
+        INSERT INTO vc_templates(user_id, name, description, vc_type, fields, created_at, updated_at)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+        """,
+        (user["id"], body.name, body.description or "", body.vc_type, json.dumps(body.fields), now, now)
+    )
+    await db.commit()
+    template_id = cur.lastrowid
+    
+    return VCTemplateCreateResp(ok=True, template_id=template_id)
+
+
+@app.get(f"{API}/user/templates", response_model=VCTemplateListResp)
+@limiter.limit("30/minute")
+async def list_templates(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Get all templates for current user"""
+    rows = await db.execute_fetchall(
+        "SELECT id, name, description, vc_type, fields, created_at, updated_at FROM vc_templates WHERE user_id=? ORDER BY created_at DESC",
+        (user["id"],)
+    )
+    
+    templates = []
+    for row in rows:
+        try:
+            fields = json.loads(row["fields"])
+            templates.append(VCTemplateItem(
+                id=row["id"],
+                name=row["name"],
+                description=row["description"] or None,
+                vc_type=row["vc_type"],
+                fields=fields,
+                created_at=row["created_at"],
+                updated_at=row["updated_at"]
+            ))
+        except Exception:
+            continue
+    
+    return VCTemplateListResp(templates=templates)
+
+
+@app.put(f"{API}/user/templates/{{template_id}}", response_model=VCTemplateUpdateResp)
+@limiter.limit("20/minute")
+async def update_template(request: Request, template_id: int, body: VCTemplateUpdateReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Update a VC template"""
+    now = int(time.time())
+    
+    # Check ownership
+    existing = await db.execute_fetchone(
+        "SELECT id FROM vc_templates WHERE id=? AND user_id=?",
+        (template_id, user["id"])
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="template_not_found")
+    
+    updates = []
+    params = []
+    
+    if body.name is not None:
+        updates.append("name=?")
+        params.append(body.name)
+    
+    if body.description is not None:
+        updates.append("description=?")
+        params.append(body.description)
+    
+    if body.vc_type is not None:
+        updates.append("vc_type=?")
+        params.append(body.vc_type)
+    
+    if body.fields is not None:
+        updates.append("fields=?")
+        params.append(json.dumps(body.fields))
+    
+    if updates:
+        updates.append("updated_at=?")
+        params.append(now)
+        params.append(template_id)
+        
+        sql = f"UPDATE vc_templates SET {', '.join(updates)} WHERE id=?"
+        await db.execute(sql, tuple(params))
+        await db.commit()
+    
+    return VCTemplateUpdateResp(ok=True)
+
+
+@app.delete(f"{API}/user/templates/{{template_id}}", response_model=VCTemplateDeleteResp)
+@limiter.limit("20/minute")
+async def delete_template(request: Request, template_id: int, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Delete a VC template"""
+    # Check ownership
+    existing = await db.execute_fetchone(
+        "SELECT id FROM vc_templates WHERE id=? AND user_id=?",
+        (template_id, user["id"])
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="template_not_found")
+    
+    await db.execute("DELETE FROM vc_templates WHERE id=?", (template_id,))
+    await db.commit()
+    
+    return VCTemplateDeleteResp(ok=True)
+
+
+# ---------- Recipient ID lookup (QR/NFC scanning) ----------
+@app.get(f"{API}/recipient/{{recipient_id}}", response_model=RecipientLookupResp)
+async def lookup_recipient(recipient_id: str, db=Depends(get_db)):
+    """Lookup a VC by recipient ID (for QR/NFC scanning)"""
+    row = await db.execute_fetchone(
+        "SELECT vc_id, subject_did, payload FROM issued_vcs WHERE recipient_id=?",
+        (recipient_id,)
+    )
+    
+    if not row:
+        return RecipientLookupResp(found=False)
+    
+    try:
+        vc_payload = json.loads(row["payload"])
+        return RecipientLookupResp(
+            found=True,
+            vc_id=row["vc_id"],
+            subject_did=row["subject_did"],
+            vc_payload=vc_payload
+        )
+    except Exception:
+        return RecipientLookupResp(found=False)
 
 
 # Mount OAuth router

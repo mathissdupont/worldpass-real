@@ -79,11 +79,27 @@ CREATE TABLE IF NOT EXISTS issued_vcs (
   vc_id TEXT,                   -- jti
   issuer_id INTEGER,
   subject_did TEXT,
+  recipient_id TEXT,            -- unique ID for the recipient (for QR/NFC scanning)
   payload TEXT,                 -- raw VC JSON
   created_at INTEGER NOT NULL,
   FOREIGN KEY(issuer_id) REFERENCES issuers(id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_issued_vcs_recipient_id ON issued_vcs(recipient_id);
+
+CREATE TABLE IF NOT EXISTS vc_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,     -- creator of the template
+  name TEXT NOT NULL,           -- template name
+  description TEXT,             -- template description
+  vc_type TEXT NOT NULL,        -- e.g., "StudentCard", "Membership"
+  fields TEXT NOT NULL,         -- JSON: field definitions
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_vc_templates_user_id ON vc_templates(user_id);
 
 CREATE TABLE IF NOT EXISTS tmp_payloads (
   id TEXT PRIMARY KEY,

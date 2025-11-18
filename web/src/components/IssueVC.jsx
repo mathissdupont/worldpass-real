@@ -4,6 +4,7 @@ import { b64u, ed25519Sign, b64uToBytes } from "../lib/crypto";
 import { addVC as addVCToStore } from "../lib/storage";
 import { t } from "../lib/i18n";
 import MiniQR from "./MiniQR";
+import TemplateManager from "./TemplateManager";
 
 const enc = new TextEncoder();
 const b64uJson = (obj) => b64u(enc.encode(JSON.stringify(obj)));
@@ -60,6 +61,16 @@ function Alert({ type, message }) {
 
 function safeParse(str) { try { return JSON.parse(str); } catch { return null; } }
 
+// Generate a unique recipient ID
+function generateRecipientId() {
+  const array = new Uint8Array(12);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode.apply(null, array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 /* ---------------- Main Component ---------------- */
 export default function IssueVC({ identity }) {
   const [subjectName, setSubjectName] = useState("");
@@ -68,6 +79,8 @@ export default function IssueVC({ identity }) {
   const [busy, setBusy]               = useState(false);
   const [msg, setMsg]                 = useState(null); 
   const [out, setOut]                 = useState(null);
+  const [recipientId, setRecipientId] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // QR scan state
   const [qrScanning, setQrScanning] = useState(false);
@@ -182,11 +195,17 @@ export default function IssueVC({ identity }) {
     setBusy(true);
     try {
       const issuance = nowIso();
+      const newRecipientId = generateRecipientId();
+      
       const vcBody = {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         type: ["VerifiableCredential", vcType],
         issuer: identity.did, issuanceDate: issuance, jti,
-        credentialSubject: { id: subjectDid.trim(), name: subjectName.trim() },
+        credentialSubject: { 
+          id: subjectDid.trim(), 
+          name: subjectName.trim(),
+          recipientId: newRecipientId  // Add recipient ID to credential subject
+        },
       };
 
       const header = { alg: "EdDSA", typ: "JWT" };
@@ -210,19 +229,33 @@ export default function IssueVC({ identity }) {
       URL.revokeObjectURL(a.href);
 
       addVCToStore(vcSigned);
+      setRecipientId(newRecipientId);
       setOut(vcSigned);
       setMsg({ type: "ok", text: t("vc_created_downloaded") });
     } catch (e) { setMsg({ type: "err", text: "Hata: " + e.message }); } finally { setBusy(false); }
   }, [issuerReady, subjectName, subjectDid, vcType, jti, didOk, identity]);
 
   const writeNfc = async () => {
-      if (!out) return;
+      if (!out || !recipientId) return;
       if (!("NDEFWriter" in window)) return setMsg({ type: "info", text: "NFC desteklenmiyor." });
       try {
          const writer = new NDEFWriter();
-         await writer.write({ records: [{ recordType: "mime", mediaType: "application/json", data: enc.encode(JSON.stringify(out)) }] });
-         setMsg({ type: "ok", text: "VC, NFC etiketine yazıldı." });
+         // Write both the VC and a URL that can be used to look it up
+         const recipientUrl = `${window.location.origin}/api/recipient/${recipientId}`;
+         await writer.write({ 
+           records: [
+             { recordType: "url", data: recipientUrl },
+             { recordType: "mime", mediaType: "application/json", data: enc.encode(JSON.stringify(out)) }
+           ] 
+         });
+         setMsg({ type: "ok", text: "VC ve erişim URL'si NFC etiketine yazıldı." });
       } catch { setMsg({ type: "err", text: "NFC yazma başarısız." }); }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setVcType(template.vc_type);
+    setShowTemplates(false);
+    setMsg({ type: "ok", text: `"${template.name}" şablonu yüklendi` });
   };
 
   return (
@@ -275,35 +308,134 @@ export default function IssueVC({ identity }) {
                 <canvas ref={canvasRef} className="hidden" />
 
                 {/* Manual Inputs */}
-                <div className="grid md:grid-cols-2 gap-5">
-                   <div className="space-y-3">
-                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Ad Soyad (Name)</label>
-                      <input 
-                         value={subjectName} onChange={(e) => setSubjectName(e.target.value)} 
-                         className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none"
-                         placeholder="Örn: Ahmet Yılmaz"
-                      />
-                   </div>
-                   <div className="space-y-3">
-                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">DID (Subject ID)</label>
-                      <input 
-                         value={subjectDid} onChange={(e) => setSubjectDid(e.target.value)} 
-                         className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:ring-2 outline-none font-mono text-xs ${didOk ? "border-[color:var(--border)] bg-[color:var(--panel)] focus:ring-[color:var(--brand)]/20" : "border-rose-300 bg-rose-50 focus:ring-rose-200"}`}
-                         placeholder="did:..."
-                      />
-                      {!didOk && subjectDid && <p className="text-xs text-rose-500">Geçersiz DID formatı.</p>}
-                   </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <h4 className="text-sm font-semibold text-[color:var(--fg)]">Alıcı Bilgileri</h4>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                          </svg>
+                          Ad Soyad *
+                        </label>
+                        <input 
+                           value={subjectName} onChange={(e) => setSubjectName(e.target.value)} 
+                           className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all"
+                           placeholder="Örn: Ahmet Yılmaz"
+                        />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                          </svg>
+                          DID (Kimlik Kodu) *
+                        </label>
+                        <input 
+                           value={subjectDid} onChange={(e) => setSubjectDid(e.target.value)} 
+                           className={`w-full px-3 py-2.5 rounded-lg border text-sm focus:ring-2 outline-none font-mono text-xs transition-all ${didOk ? "border-[color:var(--border)] bg-[color:var(--panel)] focus:ring-[color:var(--brand)]/20" : "border-rose-400 bg-rose-50 dark:bg-rose-900/20 focus:ring-rose-200"}`}
+                           placeholder="did:key:z..."
+                        />
+                        {!didOk && subjectDid && (
+                          <p className="text-xs text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <circle cx="12" cy="12" r="10"/>
+                              <line x1="12" y1="8" x2="12" y2="12"/>
+                              <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            Geçersiz DID formatı
+                          </p>
+                        )}
+                        {didOk && subjectDid && (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                              <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            Geçerli DID formatı
+                          </p>
+                        )}
+                     </div>
+                  </div>
                 </div>
                 
-                <div className="space-y-3">
-                   <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Kart Tipi</label>
+                {/* Templates Section - Make it more prominent */}
+                <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-[color:var(--fg)] flex items-center gap-2">
+                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                         </svg>
+                         Şablonlar
+                         <span className="text-xs font-normal text-[color:var(--muted)]">(Hızlı başlat)</span>
+                      </label>
+                      <Button 
+                         onClick={() => setShowTemplates(!showTemplates)} 
+                         variant={showTemplates ? "secondary" : "outline"}
+                         className="h-7 text-xs"
+                      >
+                         {showTemplates ? (
+                           <>
+                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                               <polyline points="18 15 12 9 6 15"/>
+                             </svg>
+                             Gizle
+                           </>
+                         ) : (
+                           <>
+                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                               <polyline points="6 9 12 15 18 9"/>
+                             </svg>
+                             Göster
+                           </>
+                         )}
+                      </Button>
+                   </div>
+                   {showTemplates && (
+                      <div className="border border-[color:var(--border)] rounded-xl p-3 bg-gradient-to-br from-[color:var(--panel-2)] to-[color:var(--panel)] animate-in slide-in-from-top">
+                         <TemplateManager onSelectTemplate={handleTemplateSelect} />
+                      </div>
+                   )}
+                   {!showTemplates && (
+                     <p className="text-xs text-[color:var(--muted)] flex items-center gap-1">
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                         <circle cx="12" cy="12" r="10"/>
+                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                         <line x1="12" y1="17" x2="12.01" y2="17"/>
+                       </svg>
+                       Önceden tanımlı şablonları kullanarak hızlıca başlayın
+                     </p>
+                   )}
+                </div>
+                
+                <div className="border-t border-dashed border-[color:var(--border)]"></div>
+                
+                <div className="space-y-2">
+                   <label className="block text-xs font-medium text-[color:var(--muted)] flex items-center gap-1">
+                     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                       <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                     </svg>
+                     Kimlik Kartı Tipi *
+                   </label>
                    <select 
                       value={vcType} onChange={(e) => setVcType(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none appearance-none"
+                      className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all cursor-pointer"
                    >
-                      <option value="StudentCard">Öğrenci Kartı (StudentCard)</option>
-                      <option value="Membership">Üyelik Kartı (Membership)</option>
-                      <option value="KYC">Kimlik Doğrulama (KYC)</option>
+                      <option value="StudentCard">🎓 Öğrenci Kartı</option>
+                      <option value="Membership">🎫 Üyelik Kartı</option>
+                      <option value="KYC">🔐 Kimlik Doğrulama</option>
+                      <option value="EmployeeCard">👔 Çalışan Kartı</option>
+                      <option value="AccessCard">🚪 Erişim Kartı</option>
                    </select>
                 </div>
              </div>
@@ -341,7 +473,7 @@ export default function IssueVC({ identity }) {
           </SectionCard>
 
           {/* --- STEP 3: Success Result --- */}
-          {out && (
+          {out && recipientId && (
              <div className="animate-in slide-in-from-bottom-6 fade-in duration-500">
                 <div className="rounded-2xl bg-gradient-to-br from-[color:var(--panel)] to-[color:var(--panel-2)] border border-[color:var(--brand)]/30 shadow-xl overflow-hidden">
                    <div className="bg-[color:var(--brand)]/10 p-4 border-b border-[color:var(--brand)]/10 flex items-center gap-3">
@@ -350,18 +482,28 @@ export default function IssueVC({ identity }) {
                    </div>
                    
                    <div className="p-6 space-y-6">
+                      {/* Recipient ID Display */}
+                      <div className="bg-[color:var(--panel-2)] rounded-lg p-4 border border-[color:var(--border)]">
+                         <div className="text-xs font-medium text-[color:var(--muted)] uppercase mb-2">Alıcı Kimliği (Recipient ID)</div>
+                         <div className="font-mono text-sm break-all text-[color:var(--fg)] bg-[color:var(--panel)] p-2 rounded">
+                            {recipientId}
+                         </div>
+                         <p className="text-xs text-[color:var(--muted)] mt-2">Bu ID, QR veya NFC ile okunabilir ve alıcıya özeldir.</p>
+                      </div>
+                      
                       <div className="flex flex-col items-center">
-                         <MiniQR value={JSON.stringify(out)} size={180} />
-                         <p className="text-sm mt-4 font-medium">Kullanıcı bu QR'ı tarayarak kartı alabilir.</p>
+                         <MiniQR value={`${window.location.origin}/api/recipient/${recipientId}`} size={180} />
+                         <p className="text-sm mt-4 font-medium">Bu QR kodu tarayarak kimlik bilgisine erisebilirsiniz.</p>
+                         <p className="text-xs text-[color:var(--muted)] mt-1">Alıcı URL: /api/recipient/{recipientId}</p>
                       </div>
                       
                       <div className="grid sm:grid-cols-2 gap-4">
-                         <Button onClick={writeNfc} variant="outline" className="h-10">NFC'ye Yaz</Button>
-                         <Button onClick={() => navigator.clipboard.writeText(JSON.stringify(out))} variant="secondary" className="h-10">JSON Kopyala</Button>
+                         <Button onClick={writeNfc} variant="outline" className="h-10">NFC'ye Yaz (VC + URL)</Button>
+                         <Button onClick={() => navigator.clipboard.writeText(JSON.stringify(out))} variant="secondary" className="h-10">VC JSON Kopyala</Button>
                       </div>
                       
                       <details className="bg-white/50 border border-[color:var(--border)] rounded-lg text-left">
-                          <summary className="px-4 py-2 text-xs font-medium cursor-pointer select-none opacity-70 hover:opacity-100">Oluşturulan JSON'u Göster</summary>
+                          <summary className="px-4 py-2 text-xs font-medium cursor-pointer select-none opacity-70 hover:opacity-100">Olusturulan VC JSON'u Goster</summary>
                           <pre className="p-4 text-[10px] font-mono overflow-auto max-h-40 bg-[color:var(--code-bg)] rounded-b-lg">
                              {JSON.stringify(out, null, 2)}
                           </pre>
