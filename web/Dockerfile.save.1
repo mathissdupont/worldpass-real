@@ -1,0 +1,10 @@
+# web/Dockerfile  (veya frontend stage'in Dockerfile'ı)
+FROM node:20-bookworm-slim AS frontend
+# İstersen direkt: FROM node:20 AS frontend de ol
+
+
+
+EXPOSE 4173
+
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
+

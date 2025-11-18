@@ -1,7 +1,6 @@
-// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
+import path from 'node:path'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
 // Farklı export şekillerine karşı korumalı çözüm:
@@ -29,16 +28,27 @@ export default defineConfig({
         ]
       : []),
   ],
+
+  preview: {
+    port: 4173,
+    host: true,
+    allowedHosts: ['worldpass.heptapusgroup.com'],
+  },
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+
   assetsInclude: ['**/*.wasm'],
+
   server: {
     port: 5173,
+    host: true,
     proxy: {
       '/api': 'http://localhost:8080',
     },
   },
 })
+

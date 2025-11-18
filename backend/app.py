@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 import os
 
 # Tamamı paket içi relative olsun:
-from .settings import settings
-from .db import get_db, init_db
-from .schemas import (
+from settings import settings
+from db import get_db, init_db
+from schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
@@ -23,9 +23,9 @@ from .schemas import (
     IssuerIssueReq, IssuerIssueResp,
     IssuerRevokeReq, IssuerRevokeResp,
 )
-from .core.crypto_ed25519 import Ed25519Signer, b64u_d
-from .core.vc import verify_vc
-from .oauth_endpoints import router as oauth_router
+from core.crypto_ed25519 import Ed25519Signer, b64u_d
+from core.vc import verify_vc
+from oauth_endpoints import router as oauth_router
 
 import time, secrets, base64
 import hashlib, os, json
