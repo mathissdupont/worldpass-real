@@ -120,3 +120,26 @@ class OAuthUserInfo(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     picture: Optional[str] = None
+
+# User registration and authentication
+class UserRegisterReq(BaseModel):
+    email: str
+    first_name: str = Field(..., alias="firstName")
+    last_name: str = Field(..., alias="lastName")
+    password: str
+    did: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+class UserRegisterResp(BaseModel):
+    token: str
+    user: Dict[str, Any]
+
+class UserLoginReq(BaseModel):
+    email: str
+    password: str
+
+class UserLoginResp(BaseModel):
+    token: str
+    user: Dict[str, Any]

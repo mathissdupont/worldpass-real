@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -22,6 +22,8 @@ from schemas import (
     IssuerListItem,
     IssuerIssueReq, IssuerIssueResp,
     IssuerRevokeReq, IssuerRevokeResp,
+    UserRegisterReq, UserRegisterResp,
+    UserLoginReq, UserLoginResp,
 )
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
@@ -281,6 +283,112 @@ async def _require_admin(x_token: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="invalid_token")
     except JWTError:
         raise HTTPException(status_code=401, detail="invalid_token")
+
+
+# ---------- user register / login ----------
+@app.post(f"{API}/user/register", response_model=UserRegisterResp)
+@limiter.limit("5/minute")
+async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_db)):
+    """Register a new user with secure password hashing"""
+    email = body.email.lower().strip()
+    
+    # Check if user already exists
+    existing = await db.execute_fetchone(
+        "SELECT id FROM users WHERE email=?", (email,)
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="email_already_registered")
+    
+    # Validate password strength
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+    
+    # Hash password with bcrypt
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    
+    now = int(time.time())
+    
+    # Create user
+    cur = await db.execute(
+        """
+        INSERT INTO users(email, first_name, last_name, password_hash, did, created_at, updated_at, status)
+        VALUES(?, ?, ?, ?, ?, ?, ?, 'active')
+        """,
+        (email, body.first_name, body.last_name, password_hash, body.did or "", now, now),
+    )
+    await db.commit()
+    user_id = cur.lastrowid
+    
+    # Generate JWT token
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    to_encode = {"sub": email, "user_id": user_id, "exp": expire}
+    token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    # Audit log
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "user_register", "ok", json.dumps({"email": email, "user_id": user_id})),
+    )
+    await db.commit()
+    
+    return UserRegisterResp(
+        token=token,
+        user={
+            "id": user_id,
+            "email": email,
+            "first_name": body.first_name,
+            "last_name": body.last_name,
+            "did": body.did or "",
+        }
+    )
+
+
+@app.post(f"{API}/user/login", response_model=UserLoginResp)
+@limiter.limit("10/minute")
+async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
+    """Authenticate user and return JWT token"""
+    email = body.email.lower().strip()
+    
+    # Find user
+    user = await db.execute_fetchone(
+        "SELECT id, email, first_name, last_name, password_hash, did, status FROM users WHERE email=?",
+        (email,)
+    )
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Check password
+    if not bcrypt.checkpw(body.password.encode(), user["password_hash"].encode()):
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Check status
+    if user["status"] != "active":
+        raise HTTPException(status_code=403, detail="account_inactive")
+    
+    # Generate JWT token
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    to_encode = {"sub": email, "user_id": user["id"], "exp": expire}
+    token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    # Audit log
+    now = int(time.time())
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "user_login", "ok", json.dumps({"email": email, "user_id": user["id"]})),
+    )
+    await db.commit()
+    
+    return UserLoginResp(
+        token=token,
+        user={
+            "id": user["id"],
+            "email": user["email"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
+            "did": user["did"] or "",
+        }
+    )
 
 
 # ---------- issuer register / list / approve ----------
