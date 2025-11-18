@@ -4,6 +4,7 @@ import { b64u, ed25519Sign, b64uToBytes } from "../lib/crypto";
 import { addVC as addVCToStore } from "../lib/storage";
 import { t } from "../lib/i18n";
 import MiniQR from "./MiniQR";
+import TemplateManager from "./TemplateManager";
 
 const enc = new TextEncoder();
 const b64uJson = (obj) => b64u(enc.encode(JSON.stringify(obj)));
@@ -60,6 +61,16 @@ function Alert({ type, message }) {
 
 function safeParse(str) { try { return JSON.parse(str); } catch { return null; } }
 
+// Generate a unique recipient ID
+function generateRecipientId() {
+  const array = new Uint8Array(12);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode.apply(null, array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 /* ---------------- Main Component ---------------- */
 export default function IssueVC({ identity }) {
   const [subjectName, setSubjectName] = useState("");
@@ -68,6 +79,8 @@ export default function IssueVC({ identity }) {
   const [busy, setBusy]               = useState(false);
   const [msg, setMsg]                 = useState(null); 
   const [out, setOut]                 = useState(null);
+  const [recipientId, setRecipientId] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // QR scan state
   const [qrScanning, setQrScanning] = useState(false);
@@ -182,11 +195,17 @@ export default function IssueVC({ identity }) {
     setBusy(true);
     try {
       const issuance = nowIso();
+      const newRecipientId = generateRecipientId();
+      
       const vcBody = {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         type: ["VerifiableCredential", vcType],
         issuer: identity.did, issuanceDate: issuance, jti,
-        credentialSubject: { id: subjectDid.trim(), name: subjectName.trim() },
+        credentialSubject: { 
+          id: subjectDid.trim(), 
+          name: subjectName.trim(),
+          recipientId: newRecipientId  // Add recipient ID to credential subject
+        },
       };
 
       const header = { alg: "EdDSA", typ: "JWT" };
@@ -210,19 +229,33 @@ export default function IssueVC({ identity }) {
       URL.revokeObjectURL(a.href);
 
       addVCToStore(vcSigned);
+      setRecipientId(newRecipientId);
       setOut(vcSigned);
       setMsg({ type: "ok", text: t("vc_created_downloaded") });
     } catch (e) { setMsg({ type: "err", text: "Hata: " + e.message }); } finally { setBusy(false); }
   }, [issuerReady, subjectName, subjectDid, vcType, jti, didOk, identity]);
 
   const writeNfc = async () => {
-      if (!out) return;
+      if (!out || !recipientId) return;
       if (!("NDEFWriter" in window)) return setMsg({ type: "info", text: "NFC desteklenmiyor." });
       try {
          const writer = new NDEFWriter();
-         await writer.write({ records: [{ recordType: "mime", mediaType: "application/json", data: enc.encode(JSON.stringify(out)) }] });
-         setMsg({ type: "ok", text: "VC, NFC etiketine yazıldı." });
+         // Write both the VC and a URL that can be used to look it up
+         const recipientUrl = `${window.location.origin}/api/recipient/${recipientId}`;
+         await writer.write({ 
+           records: [
+             { recordType: "url", data: recipientUrl },
+             { recordType: "mime", mediaType: "application/json", data: enc.encode(JSON.stringify(out)) }
+           ] 
+         });
+         setMsg({ type: "ok", text: "VC ve erişim URL'si NFC etiketine yazıldı." });
       } catch { setMsg({ type: "err", text: "NFC yazma başarısız." }); }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setVcType(template.vc_type);
+    setShowTemplates(false);
+    setMsg({ type: "ok", text: `"${template.name}" şablonu yüklendi` });
   };
 
   return (
@@ -295,6 +328,25 @@ export default function IssueVC({ identity }) {
                    </div>
                 </div>
                 
+                {/* Templates Section */}
+                <div className="space-y-3">
+                   <div className="flex justify-between items-center mb-2">
+                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Şablonlar</label>
+                      <Button 
+                         onClick={() => setShowTemplates(!showTemplates)} 
+                         variant="outline" 
+                         className="h-8 text-xs"
+                      >
+                         {showTemplates ? "Gizle" : "Şablonları Göster"}
+                      </Button>
+                   </div>
+                   {showTemplates && (
+                      <div className="border border-[color:var(--border)] rounded-lg p-3">
+                         <TemplateManager onSelectTemplate={handleTemplateSelect} />
+                      </div>
+                   )}
+                </div>
+                
                 <div className="space-y-3">
                    <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Kart Tipi</label>
                    <select 
@@ -341,7 +393,7 @@ export default function IssueVC({ identity }) {
           </SectionCard>
 
           {/* --- STEP 3: Success Result --- */}
-          {out && (
+          {out && recipientId && (
              <div className="animate-in slide-in-from-bottom-6 fade-in duration-500">
                 <div className="rounded-2xl bg-gradient-to-br from-[color:var(--panel)] to-[color:var(--panel-2)] border border-[color:var(--brand)]/30 shadow-xl overflow-hidden">
                    <div className="bg-[color:var(--brand)]/10 p-4 border-b border-[color:var(--brand)]/10 flex items-center gap-3">
@@ -350,18 +402,28 @@ export default function IssueVC({ identity }) {
                    </div>
                    
                    <div className="p-6 space-y-6">
+                      {/* Recipient ID Display */}
+                      <div className="bg-[color:var(--panel-2)] rounded-lg p-4 border border-[color:var(--border)]">
+                         <div className="text-xs font-medium text-[color:var(--muted)] uppercase mb-2">Alıcı Kimliği (Recipient ID)</div>
+                         <div className="font-mono text-sm break-all text-[color:var(--fg)] bg-[color:var(--panel)] p-2 rounded">
+                            {recipientId}
+                         </div>
+                         <p className="text-xs text-[color:var(--muted)] mt-2">Bu ID, QR veya NFC ile okunabilir ve alıcıya özeldir.</p>
+                      </div>
+                      
                       <div className="flex flex-col items-center">
-                         <MiniQR value={JSON.stringify(out)} size={180} />
-                         <p className="text-sm mt-4 font-medium">Kullanıcı bu QR'ı tarayarak kartı alabilir.</p>
+                         <MiniQR value={`${window.location.origin}/api/recipient/${recipientId}`} size={180} />
+                         <p className="text-sm mt-4 font-medium">Bu QR kodu tarayarak kimlik bilgisine erisebilirsiniz.</p>
+                         <p className="text-xs text-[color:var(--muted)] mt-1">Alıcı URL: /api/recipient/{recipientId}</p>
                       </div>
                       
                       <div className="grid sm:grid-cols-2 gap-4">
-                         <Button onClick={writeNfc} variant="outline" className="h-10">NFC'ye Yaz</Button>
-                         <Button onClick={() => navigator.clipboard.writeText(JSON.stringify(out))} variant="secondary" className="h-10">JSON Kopyala</Button>
+                         <Button onClick={writeNfc} variant="outline" className="h-10">NFC'ye Yaz (VC + URL)</Button>
+                         <Button onClick={() => navigator.clipboard.writeText(JSON.stringify(out))} variant="secondary" className="h-10">VC JSON Kopyala</Button>
                       </div>
                       
                       <details className="bg-white/50 border border-[color:var(--border)] rounded-lg text-left">
-                          <summary className="px-4 py-2 text-xs font-medium cursor-pointer select-none opacity-70 hover:opacity-100">Oluşturulan JSON'u Göster</summary>
+                          <summary className="px-4 py-2 text-xs font-medium cursor-pointer select-none opacity-70 hover:opacity-100">Olusturulan VC JSON'u Goster</summary>
                           <pre className="p-4 text-[10px] font-mono overflow-auto max-h-40 bg-[color:var(--code-bg)] rounded-b-lg">
                              {JSON.stringify(out, null, 2)}
                           </pre>
