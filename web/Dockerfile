@@ -5,19 +5,17 @@ WORKDIR /app
 # 1) package.json / lock
 COPY package*.json ./
 
-# 2) Normal dependency kurulumu
-RUN npm install
+# 2) Install dependencies (with SSL workaround for build environment)
+RUN npm config set strict-ssl false && \
+    npm install && \
+    npm config set strict-ssl true
 
-# 3) Rollup’ın native paketi bu imajda optional olarak gelmiyor, biz zorla kurduruyoruz
-RUN npm install @rollup/rollup-linux-x64-gnu --save-dev
-
-# 4) Tüm frontend kodunu kopyala
+# 3) Copy frontend code
 COPY . .
 
-# 5) Build
+# 4) Build
 RUN npm run build
 
 EXPOSE 4173
 
 CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
-
