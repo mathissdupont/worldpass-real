@@ -44,29 +44,36 @@ function EyeBtn({ onClick, shown }) {
   );
 }
 
-function Strength({ p }) {
-  const labels = ["Çok zayıf","Zayıf","Orta","İyi","Güçlü"];
+function Strength({ level }) {
+  const labels = ["Çok zayıf", "Zayıf", "Orta", "İyi", "Güçlü"];
   const bars = 5;
+
+  // level'i 0–4 arasına sıkıştır (sağlama)
+  const safeLevel = Math.max(0, Math.min(Number(level) || 0, 4));
+
   return (
     <div className="mt-1">
       <div className="grid grid-cols-5 gap-1">
-        {Array.from({length: bars}).map((_,i)=>(
+        {Array.from({ length: bars }).map((_, i) => (
           <div
             key={i}
             className="h-1.5 rounded-full"
             style={{
               background:
-                i <= p
-                  ? `linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--brand-2)))`
-                  : `color-mix(in srgb, var(--muted) 20%, transparent)`
+                i <= safeLevel
+                  ? "linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--brand-2)))"
+                  : "color-mix(in srgb, var(--muted) 20%, transparent)",
             }}
           />
         ))}
       </div>
-      <div className="text-[10px] text-[color:var(--muted)] mt-1">{labels[p]}</div>
+      <div className="text-[10px] text-[color:var(--muted)] mt-1">
+        {labels[safeLevel]}
+      </div>
     </div>
   );
 }
+
 
 const score = (s) => {
   let p = 0;
@@ -135,7 +142,7 @@ export default function Register(){
   const [err,       setErr]   = useState("");
   const [okMsg,     setOkMsg] = useState("");
 
-  const s = score(pass);
+  const strength = score(pass);
 
   const valid =
     emailRe.test(email) &&
@@ -347,7 +354,7 @@ export default function Register(){
                       />
                       <EyeBtn onClick={()=>setShow1(v=>!v)} shown={show1} />
                     </div>
-                    <Strength p={s} />
+                    <Strength level={strength} />
                   </Field>
 
                   <Field label={t('password_confirm')}>
