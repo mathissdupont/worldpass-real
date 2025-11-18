@@ -4,8 +4,15 @@ import { ed25519Generate, encryptKeystore, didFromPk, b64u } from "../lib/crypto
 import { t } from "../lib/i18n";
 
 /* ——— Enhanced Password Strength bar ——— */
-function SegStrength({ p }) { // 0..4
-  const labels = [t("identity.create.strength_very_weak"), t("identity.create.strength_weak"), t("identity.create.strength_ok"), t("identity.create.strength_good"), t("identity.create.strength_strong")];
+function SegStrength({ p, pwd }) { // 0..4
+  const labels = [
+    t("identity.create.strength_very_weak"),
+    t("identity.create.strength_weak"),
+    t("identity.create.strength_ok"),
+    t("identity.create.strength_good"),
+    t("identity.create.strength_strong"),
+  ];
+
   const colors = [
     "bg-rose-500",
     "bg-orange-500",
@@ -13,48 +20,86 @@ function SegStrength({ p }) { // 0..4
     "bg-emerald-500",
     "bg-emerald-600",
   ];
-  const color = colors[p] || colors[0];
+
+  const safeLevel = typeof p === "number" ? Math.max(0, Math.min(p, 4)) : 0;
+  const color = colors[safeLevel] || colors[0];
+  const s = pwd || ""; // string garanti olsun
 
   return (
     <div className="mt-3" aria-live="polite">
       <div className="flex items-center gap-2 mb-2">
-        <div className="grid grid-cols-5 gap-1 flex-1" role="meter" aria-valuemin={0} aria-valuemax={4} aria-valuenow={p} aria-label="Password strength">
-          {[0,1,2,3,4].map(i=>(
+        <div
+          className="grid grid-cols-5 gap-1 flex-1"
+          role="meter"
+          aria-valuemin={0}
+          aria-valuemax={4}
+          aria-valuenow={safeLevel}
+          aria-label="Password strength"
+        >
+          {[0, 1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className={`h-2 rounded-full transition-all duration-300 ${i<=p? color : "bg-[color:var(--border)] dark:bg-white/10"}`}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                i <= safeLevel
+                  ? color
+                  : "bg-[color:var(--border)] dark:bg-white/10"
+              }`}
             />
           ))}
         </div>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
-          p >= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' :
-          p >= 2 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300' :
-          'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
-        }`}>
-          {labels[p]}
+        <span
+          className={`text-xs font-medium px-2 py-1 rounded-full transition-colors ${
+            safeLevel >= 3
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+              : safeLevel >= 2
+              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300"
+              : "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+          }`}
+        >
+          {labels[safeLevel]}
         </span>
       </div>
-        <div className="text-[11px] text-[color:var(--muted)] space-y-1">
+
+      <div className="text-[11px] text-[color:var(--muted)] space-y-1">
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 rounded-full ${p1.length >= 8 ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              s.length >= 8 ? "bg-emerald-500" : "bg-gray-300"
+            }`}
+          ></span>
           {t("identity.create.chk_min8")}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 rounded-full ${/[A-Z]/.test(p1) && /[a-z]/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              /[A-Z]/.test(s) && /[a-z]/.test(s)
+                ? "bg-emerald-500"
+                : "bg-gray-300"
+            }`}
+          ></span>
           {t("identity.create.chk_mixed_case")}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 rounded-full ${/\d/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              /\d/.test(s) ? "bg-emerald-500" : "bg-gray-300"
+            }`}
+          ></span>
           {t("identity.create.chk_number")}
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-block w-2 h-2 rounded-full ${/[^A-Za-z0-9]/.test(p1) ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              /[^A-Za-z0-9]/.test(s) ? "bg-emerald-500" : "bg-gray-300"
+            }`}
+          ></span>
           {t("identity.create.chk_special")}
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ——— Simple password scoring ——— */
 const scorePwd = (s) => {
@@ -165,7 +210,7 @@ export default function IdentityCreate() {
             )}
           </button>
         </div>
-        <SegStrength p={s} />
+        <SegStrength p={s} pwd={p1} />
         <p id="pwd1-help" className="mt-1 text-[11px] text-[color:var(--muted)]">
           En az 8 karakter. Büyük/küçük harf, rakam ve sembol eklemek güvenliği artırır.
           {capsOn && <span className="ml-2 text-amber-600">CapsLock açık görünüyor.</span>}
