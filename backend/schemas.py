@@ -175,3 +175,45 @@ class UserProfileUpdateReq(BaseModel):
 
 class UserProfileResp(BaseModel):
     user: Dict[str, Any]
+
+# VC Templates management
+class VCTemplateCreateReq(BaseModel):
+    name: str
+    description: Optional[str] = None
+    vc_type: str
+    fields: Dict[str, Any]
+
+class VCTemplateCreateResp(BaseModel):
+    ok: bool
+    template_id: int
+
+class VCTemplateItem(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    vc_type: str
+    fields: Dict[str, Any]
+    created_at: int
+    updated_at: int
+
+class VCTemplateListResp(BaseModel):
+    templates: List[VCTemplateItem]
+
+class VCTemplateUpdateReq(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    vc_type: Optional[str] = None
+    fields: Optional[Dict[str, Any]] = None
+
+class VCTemplateUpdateResp(BaseModel):
+    ok: bool
+
+class VCTemplateDeleteResp(BaseModel):
+    ok: bool
+
+# Recipient ID lookup
+class RecipientLookupResp(BaseModel):
+    found: bool
+    vc_id: Optional[str] = None
+    subject_did: Optional[str] = None
+    vc_payload: Optional[Dict[str, Any]] = None
