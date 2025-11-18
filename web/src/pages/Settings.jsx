@@ -4,6 +4,9 @@ import { useIdentity } from "../lib/identityContext";
 import { t } from "../lib/i18n";
 import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
+import { getToken } from "../lib/auth";
+
+const API_BASE = "/api";
 
 /* ---------------- UI helpers (token-friendly) ---------------- */
 
@@ -51,18 +54,30 @@ export default function Settings() {
   const { identity, setIdentity } = useIdentity();
 
   // ---- Profile (local only) ----
-  const p0 = useMemo(() => loadProfile() || {}, []);
-  const [displayName, setDisplayName] = useState(p0.displayName || "");
-  const [email, setEmail] = useState(p0.email || "");
-  const [phone, setPhone] = useState(p0.phone || "");
-  const [avatar, setAvatar] = useState(p0.avatar || ""); // dataURL
-  const [otpEnabled, setOtpEnabled] = useState(!!p0.otpEnabled);
-  const [lang, setLang] = useState(p0.lang || "en");
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [avatar, setAvatar] = useState(""); // dataURL
+  const [otpEnabled, setOtpEnabled] = useState(false);
+  const [lang, setLang] = useState("en");
+  const [theme, setTheme] = useState("light");
 
-  // ---- Theme (light | dark | system) ----
-  const initialTheme =
-    typeof window !== "undefined" ? localStorage.getItem("wp_theme") || "light" : "light";
-  const [theme, setTheme] = useState(initialTheme);
+  // Load profile on mount (async)
+  useEffect(() => {
+    const loadData = async () => {
+      const p0 = await loadProfile();
+      setDisplayName(p0.displayName || "");
+      setEmail(p0.email || "");
+      setPhone(p0.phone || "");
+      setAvatar(p0.avatar || "");
+      setOtpEnabled(!!p0.otpEnabled);
+      setLang(p0.lang || "en");
+      setTheme(p0.theme || "light");
+      setProfileLoaded(true);
+    };
+    loadData();
+  }, []);
 
   // ---- Toast ----
   const [toast, setToast] = useState(null); // {type:'ok'|'err'|'info', text:''}
@@ -80,13 +95,29 @@ export default function Settings() {
     if (theme === "light") {
       root.classList.remove("dark", "system");
     }
-    localStorage.setItem("wp_theme", theme);
-  }, [theme]);
+    
+    // Save theme to backend if user is authenticated
+    const saveThemeAsync = async () => {
+      const token = getToken();
+      if (token && profileLoaded) {
+        try {
+          await saveProfile({ theme });
+        } catch (e) {
+          console.warn("Failed to save theme:", e);
+        }
+      }
+    };
+    
+    if (profileLoaded) {
+      saveThemeAsync();
+    }
+  }, [theme, profileLoaded]);
 
   // ---- Helpers ----
-  const saveProfileLocal = (patch) => {
-    const next = { ...(loadProfile() || {}), ...patch };
-    saveProfile(next);
+  const saveProfileLocal = async (patch) => {
+    const currentProfile = await loadProfile();
+    const next = { ...currentProfile, ...patch };
+    await saveProfile(next);
   };
 
   const initials = (n) => {
