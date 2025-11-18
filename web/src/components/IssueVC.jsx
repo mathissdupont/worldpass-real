@@ -328,24 +328,57 @@ export default function IssueVC({ identity }) {
                    </div>
                 </div>
                 
-                {/* Templates Section */}
-                <div className="space-y-3">
-                   <div className="flex justify-between items-center mb-2">
-                      <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Şablonlar</label>
+                {/* Templates Section - Make it more prominent */}
+                <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-[color:var(--fg)] flex items-center gap-2">
+                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                         </svg>
+                         Şablonlar
+                         <span className="text-xs font-normal text-[color:var(--muted)]">(Hızlı başlat)</span>
+                      </label>
                       <Button 
                          onClick={() => setShowTemplates(!showTemplates)} 
-                         variant="outline" 
-                         className="h-8 text-xs"
+                         variant={showTemplates ? "secondary" : "outline"}
+                         className="h-7 text-xs"
                       >
-                         {showTemplates ? "Gizle" : "Şablonları Göster"}
+                         {showTemplates ? (
+                           <>
+                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                               <polyline points="18 15 12 9 6 15"/>
+                             </svg>
+                             Gizle
+                           </>
+                         ) : (
+                           <>
+                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                               <polyline points="6 9 12 15 18 9"/>
+                             </svg>
+                             Göster
+                           </>
+                         )}
                       </Button>
                    </div>
                    {showTemplates && (
-                      <div className="border border-[color:var(--border)] rounded-lg p-3">
+                      <div className="border border-[color:var(--border)] rounded-xl p-3 bg-gradient-to-br from-[color:var(--panel-2)] to-[color:var(--panel)] animate-in slide-in-from-top">
                          <TemplateManager onSelectTemplate={handleTemplateSelect} />
                       </div>
                    )}
+                   {!showTemplates && (
+                     <p className="text-xs text-[color:var(--muted)] flex items-center gap-1">
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                         <circle cx="12" cy="12" r="10"/>
+                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                         <line x1="12" y1="17" x2="12.01" y2="17"/>
+                       </svg>
+                       Önceden tanımlı şablonları kullanarak hızlıca başlayın
+                     </p>
+                   )}
                 </div>
+                
+                <div className="border-t border-dashed border-[color:var(--border)]"></div>
                 
                 <div className="space-y-3">
                    <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Kart Tipi</label>
