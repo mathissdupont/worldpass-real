@@ -1,7 +1,13 @@
-# backend/app.py  (Railway'de /app/app.py olarak çalışıyor)
-
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+import bcrypt
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import os
 
 # Tamamı paket içi relative olsun:
 from .settings import settings
@@ -19,6 +25,7 @@ from .schemas import (
 )
 from .core.crypto_ed25519 import Ed25519Signer, b64u_d
 from .core.vc import verify_vc
+from .oauth_endpoints import router as oauth_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -26,13 +33,21 @@ from typing import Optional
 
 
 app = FastAPI(title=settings.APP_NAME)
+
+# Rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 API = settings.API_PREFIX
 signer = Ed25519Signer()
 
-# Development CORS: allow frontend dev server origins (relax for prod)
+# Enhanced CORS with environment variables
+origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,47 +85,162 @@ async def new_challenge(body: ChallengeReq, db=Depends(get_db)):
     return ChallengeResp(challenge=nonce, nonce=nonce, expires_at=exp)
 
 
-# ---------- VC verify (sadece VC, holder yok) ----------
-@app.post(f"{API}/vc/verify", response_model=VerifyResp)
-async def verify_vc_api(req: VerifyReq, db=Depends(get_db)):
+# ---------- /present/verify ----------
+@app.post(f"{API}/present/verify", response_model=VerifyResp)
+async def present_verify(payload: dict, db=Depends(get_db)):
+    """
+    Holder'dan gelen presentation payload'ını doğrular.
+
+    Beklenen şekil (özet):
+    {
+      "type": "presentation",
+      "challenge": "nonce-123",
+      "aud": "kampus-kapi",
+      "exp": 1731000000,
+      "holder": {
+        "did": "did:key:z<pk_b64u>",
+        "pk_b64u": "<base64url>",
+        "sig_b64u": "<base64url>",   # Ed25519 detached signature
+        "alg": "Ed25519"
+      },
+      "vc": { ... imzalı VC ... }
+    }
+    """
     now = int(time.time())
 
+    # 1) Temel alan kontrolleri
+    if payload.get("type") != "presentation":
+        raise HTTPException(status_code=400, detail="bad_type")
+
+    ch = payload.get("challenge")
+    aud = payload.get("aud") or ""
+    exp = payload.get("exp", None)
+
+    if not isinstance(ch, str) or not ch:
+        raise HTTPException(status_code=400, detail="missing_challenge")
+
+    # 2) Nonce / replay kontrolü (DB truth)
     row = await db.execute_fetchone(
-        "SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (req.challenge,)
+        "SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (ch,)
     )
     if not row:
-        raise HTTPException(status_code=409, detail="replay_or_invalid_nonce")
-    if row["expires_at"] < now:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (req.challenge,))
-        await db.commit()
-        raise HTTPException(status_code=409, detail="nonce_expired")
-
-    ok, reason, issuer, subject = verify_vc(req.vc, signer)
-    if not ok:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (req.challenge,))
         await db.execute(
             "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
             "VALUES(?,?,?,?,?,?)",
-            (now, "verify", issuer or "", subject or "", "fail", json.dumps({"reason": "sig"})),
+            (now, "present_verify", "", "", "fail",
+             json.dumps({"reason": "replay_or_invalid_nonce"})),
         )
         await db.commit()
-        raise HTTPException(status_code=401, detail="invalid_signature")
+        raise HTTPException(status_code=409, detail="replay_or_invalid_nonce")
 
-    jti = req.vc.get("jti")
+    if row["expires_at"] < now:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.execute(
+            "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+            "VALUES(?,?,?,?,?,?)",
+            (now, "present_verify", "", "", "fail",
+             json.dumps({"reason": "nonce_expired"})),
+        )
+        await db.commit()
+        raise HTTPException(status_code=409, detail="nonce_expired")
+
+    # Opsiyonel: payload.exp ile DB'deki expires_at uyumlu mu diye bakılabilir
+    if exp is not None:
+        try:
+            exp_int = int(exp)
+            if exp_int != row["expires_at"]:
+                # çok katı olmasın dersen bu bloğu kaldırabilirsin
+                await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+                await db.commit()
+                raise HTTPException(status_code=400, detail="exp_mismatch")
+        except Exception:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+            await db.commit()
+            raise HTTPException(status_code=400, detail="bad_exp")
+
+    # 3) VC imzasını ve issuer bilgisini doğrula
+    vc = payload.get("vc") or {}
+    ok, reason, issuer, subject = verify_vc(vc, signer)
+    if not ok:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.execute(
+            "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+            "VALUES(?,?,?,?,?,?)",
+            (now, "present_verify", issuer or "", subject or "", "fail",
+             json.dumps({"reason": "vc_sig"})),
+        )
+        await db.commit()
+        raise HTTPException(status_code=401, detail="invalid_vc_signature")
+
+    # 4) Revocation kontrolü (vc_status tablosu)
+    jti = vc.get("jti")
     revoked = False
     if jti:
-        row2 = await db.execute_fetchone(
+        r2 = await db.execute_fetchone(
             "SELECT status FROM vc_status WHERE vc_id=?", (jti,)
         )
-        if row2 and row2["status"] == "revoked":
+        if r2 and r2["status"] == "revoked":
             revoked = True
 
-    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (req.challenge,))
+    # 5) Holder bilgisi + DID / subject uyumu
+    holder = payload.get("holder") or {}
+    holder_did = holder.get("did") or ""
+    holder_pk_b64u = holder.get("pk_b64u") or ""
+    holder_sig_b64u = holder.get("sig_b64u") or ""
+    alg = holder.get("alg") or "Ed25519"
+
+    if not (holder_did and holder_pk_b64u and holder_sig_b64u):
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.commit()
+        raise HTTPException(status_code=400, detail="missing_holder")
+
+    if alg != "Ed25519":
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.commit()
+        raise HTTPException(status_code=400, detail="unsupported_alg")
+
+    subject_did = (vc.get("credentialSubject") or {}).get("id", "") or ""
+    if subject_did != holder_did:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.commit()
+        raise HTTPException(status_code=400, detail="subject_holder_mismatch")
+
+    # DID ↔ pk uyumu (senin önceki mantığı koruyorum)
+    expected_did = f"did:key:z{holder_pk_b64u}"
+    if expected_did != holder_did:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.commit()
+        raise HTTPException(status_code=400, detail="did_pk_mismatch")
+
+    # 6) Holder imzası: challenge|aud|exp formatı
+    try:
+        pk = b64u_d(holder_pk_b64u)
+        sig = b64u_d(holder_sig_b64u)
+
+        # Frontend Present.jsx ile birebir aynı mesaj:
+        # const parts = [req.challenge, req.aud || "", req.exp ? String(req.exp) : ""].join("|");
+        # msgBytes = enc.encode(parts);
+        parts = [
+            ch,
+            aud or "",
+            str(exp) if exp is not None else "",
+        ]
+        msg = "|".join(parts).encode("utf-8")
+
+        signer.verify(pk, msg, sig)
+    except Exception:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        await db.commit()
+        raise HTTPException(status_code=401, detail="bad_holder_signature")
+
+    # 7) Nonce'i tüket, audit log yaz, sonucu döndür
+    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
     result = "revoked" if revoked else "ok"
     await db.execute(
         "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
         "VALUES(?,?,?,?,?,?)",
-        (now, "verify", issuer or "", subject or "", result, json.dumps({"reason": ""})),
+        (now, "present_verify", issuer or "", subject or "", result,
+         json.dumps({"revoked": revoked})),
     )
     await db.commit()
 
@@ -123,14 +253,34 @@ async def verify_vc_api(req: VerifyReq, db=Depends(get_db)):
 # ---------- admin auth ----------
 @app.post(f"{API}/admin/login", response_model=AdminLoginResp)
 async def admin_login(body: AdminLoginReq):
-    if body.username == settings.ADMIN_USER and body.password == settings.ADMIN_PASS:
-        return AdminLoginResp(token=settings.ADMIN_JWT)
-    raise HTTPException(status_code=401, detail="bad_credentials")
+    if not settings.ADMIN_PASS_HASH:
+        raise HTTPException(status_code=400, detail="Admin password not configured. Please set ADMIN_PASS_HASH environment variable with a bcrypt hash of your admin password.")
+    
+    if body.username != settings.ADMIN_USER:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    if not bcrypt.checkpw(body.password.encode(), settings.ADMIN_PASS_HASH.encode()):
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Generate JWT token
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    to_encode = {"sub": body.username, "exp": expire}
+    token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    return AdminLoginResp(token=token)
 
 
 async def _require_admin(x_token: Optional[str] = Header(None)):
-    if x_token != settings.ADMIN_JWT:
-        raise HTTPException(status_code=401, detail="unauthorized_admin")
+    if not x_token:
+        raise HTTPException(status_code=401, detail="missing_token")
+    
+    try:
+        payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        username: str = payload.get("sub")
+        if username != settings.ADMIN_USER:
+            raise HTTPException(status_code=401, detail="invalid_token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="invalid_token")
 
 
 # ---------- issuer register / list / approve ----------
@@ -312,71 +462,6 @@ async def get_status(vc_id: str, db=Depends(get_db)):
     return {"vc_id": vc_id, "status": row["status"], "updated_at": row["updated_at"]}
 
 
-# ---------- /present/verify ----------
-@app.post(f"{API}/present/verify", response_model=VerifyResp)
-async def present_verify(payload: dict, db=Depends(get_db)):
-    now = int(time.time())
-    ch = payload.get("challenge")
-
-    row = await db.execute_fetchone("SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (ch,))
-    if not row:
-        raise HTTPException(status_code=409, detail="replay_or_invalid_nonce")
-    if row["expires_at"] < now:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=409, detail="nonce_expired")
-
-    ok, reason, issuer, subject = verify_vc(payload["vc"], signer)
-    if not ok:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=401, detail="invalid_vc_signature")
-
-    jti = payload["vc"].get("jti")
-    revoked = False
-    if jti:
-        r2 = await db.execute_fetchone(
-            "SELECT status FROM vc_status WHERE vc_id=?", (jti,)
-        )
-        if r2 and r2["status"] == "revoked":
-            revoked = True
-
-    holder = payload.get("holder", {})
-    holder_did = holder.get("did") or ""
-    holder_pk_b64u = holder.get("pk_b64u") or ""
-    holder_sig_b64u = holder.get("sig_b64u") or ""
-
-    if (payload["vc"].get("credentialSubject") or {}).get("id", "") != holder_did:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=400, detail="subject_holder_mismatch")
-
-    expected_did = f"did:key:z{holder_pk_b64u}"
-    if expected_did != holder_did:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=400, detail="did_pk_mismatch")
-
-    pk = b64u_d(holder_pk_b64u)
-    sig = b64u_d(holder_sig_b64u)
-    msg = ch.encode("utf-8")
-
-    try:
-        signer.verify(pk, msg, sig)
-    except Exception:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=401, detail="bad_holder_signature")
-
-    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-    await db.commit()
-
-    if revoked:
-        return VerifyResp(valid=False, reason="revoked", issuer=issuer, subject=subject, revoked=True)
-
-    return VerifyResp(valid=True, reason="ok", issuer=issuer, subject=subject, revoked=False)
-
-
 # ---------- temporary presentation hosting (for QR / NFC) ----------
 @app.post(f"{API}/present/upload")
 async def present_upload(payload: dict, db=Depends(get_db)):
@@ -412,3 +497,7 @@ async def present_get_tmp(pid: str, db=Depends(get_db)):
         return json.loads(row["payload"])
     except Exception:
         raise HTTPException(status_code=500, detail="bad_payload")
+
+
+# Mount OAuth router
+app.include_router(oauth_router)

@@ -62,6 +62,39 @@ CREATE TABLE IF NOT EXISTS tmp_payloads (
   expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id TEXT PRIMARY KEY,
+  client_secret_hash TEXT NOT NULL,
+  name TEXT NOT NULL,
+  domain TEXT,
+  redirect_uris TEXT NOT NULL,  -- JSON array
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  status TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_auth_codes (
+  code TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  user_did TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  used INTEGER DEFAULT 0,
+  FOREIGN KEY(client_id) REFERENCES oauth_clients(client_id)
+);
+
+CREATE TABLE IF NOT EXISTS oauth_access_tokens (
+  token TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  user_did TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY(client_id) REFERENCES oauth_clients(client_id)
+);
+
 
 """
 

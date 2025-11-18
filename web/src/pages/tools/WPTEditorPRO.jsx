@@ -1,7 +1,23 @@
 // src/pages/tools/WPTEditorPRO.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-
+import {
+  FaCode,
+  FaQuestionCircle,
+  FaEye,
+  FaDownload,
+  FaUpload,
+  FaMagic,
+  FaPlay,
+  FaPalette,
+  FaFileExport,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaInfoCircle,
+  FaTimesCircle,
+  FaSun,
+  FaMoon
+} from "react-icons/fa";
 
 import { normalizeLite2 } from "@/lib/wpt_lite2";
 import { parseWPT, renderWPT } from "@/lib/wpt";
@@ -157,6 +173,7 @@ export default function WPTEditorPro() {
   const [preview, setPreview] = useState("");
   const [markers, setMarkers] = useState([]);
   const [lintList, setLintList] = useState([]);
+  const [theme, setTheme] = useState("dark"); // dark | light
 
   /* Monaco kurulumu */
   useEffect(() => {
@@ -205,7 +222,7 @@ export default function WPTEditorPro() {
       automaticLayout: true,
       minimap: { enabled: false },
       fontSize: 13,
-      theme: "vs-dark"
+      theme: theme === "dark" ? "vs-dark" : "vs"
     });
     editorRef.current = editor;
 
@@ -217,7 +234,7 @@ export default function WPTEditorPro() {
       editorRef.current && editorRef.current.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [theme]);
 
   // Sekme build'e dönünce preview/göstergeler tazelensin
   useEffect(() => {
@@ -315,6 +332,17 @@ export default function WPTEditorPro() {
     setTab("preview");
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  const goToLine = (line) => {
+    if (!editorRef.current || !line) return;
+    editorRef.current.revealLine(line);
+    editorRef.current.setPosition({ lineNumber: line, column: 1 });
+    editorRef.current.focus();
+  };
+
   const checks = useMemo(() => {
     if (!lintList.length && !markers.length) return [{ level: "ok", msg: "Sorun görünmüyor." }];
     const mm = markers.map(m => ({ level: "err", msg: m.message }));
@@ -361,6 +389,9 @@ export default function WPTEditorPro() {
               <input type="file" accept=".wpt,text/plain" className="hidden" onChange={onUpload} />
             </label>
             <button onClick={fixAll} className="px-3 py-1.5 rounded-lg border text-sm">{t("wpt.fix_commas")}</button>
+            <button onClick={toggleTheme} className="px-3 py-1.5 rounded-lg border text-sm">
+              {theme === "dark" ? <FaSun /> : <FaMoon />}
+            </button>
           </div>
 
           <div className="ml-auto text-xs text-gray-500">WPT · Monaco</div>
@@ -414,12 +445,15 @@ export default function WPTEditorPro() {
             <ul className="mt-2 space-y-1 text-sm">
               {checks.map((c, i) => (
                 <li key={i}
-                    className={{
-                      ok: "text-emerald-700",
-                      err: "text-rose-700",
-                      warn: "text-amber-700",
-                      note: "text-slate-700"
-                    }[c.level] || "text-slate-700"}>
+                    className={`cursor-pointer hover:underline ${
+                      {
+                        ok: "text-emerald-700",
+                        err: "text-rose-700",
+                        warn: "text-amber-700",
+                        note: "text-slate-700"
+                      }[c.level] || "text-slate-700"
+                    }`}
+                    onClick={() => goToLine(c.line)}>
                   {c.level.toUpperCase()}: {c.msg}{("line" in c && c.line ? ` (line ${c.line})` : "")}
                 </li>
               ))}

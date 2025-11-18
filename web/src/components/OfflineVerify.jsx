@@ -6,7 +6,72 @@ import { b64uToBytes } from "../lib/crypto";
 
 const enc = new TextEncoder();
 
-/* ---- Base64url (header/payload) — issuer tarafıyla birebir uyumlu olmalı ---- */
+/* ---------------- UI Components ---------------- */
+
+function cx(...xs) {
+  return xs.filter(Boolean).join(" ");
+}
+
+// Modern Buton
+function Button({ children, onClick, variant = "secondary", className = "", disabled = false, title }) {
+  const base = "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
+  
+  const variants = {
+    primary: "bg-[color:var(--brand)] text-white shadow-md hover:bg-[color:var(--brand)]/90 hover:shadow-lg ring-offset-2 focus:ring-2 ring-[color:var(--brand)]",
+    secondary: "bg-[color:var(--panel-2)] border border-[color:var(--border)] text-[color:var(--fg)] hover:bg-[color:var(--panel)] hover:border-[color:var(--brand-2)]",
+    outline: "border-2 border-[color:var(--border)] hover:border-[color:var(--brand)] text-[color:var(--muted)] hover:text-[color:var(--brand)] bg-transparent",
+    ghost: "bg-transparent text-[color:var(--muted)] hover:text-[color:var(--fg)] hover:bg-[color:var(--panel-2)]",
+    danger: "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100",
+  };
+
+  return (
+    <button onClick={onClick} disabled={disabled} className={cx(base, variants[variant], className)} title={title}>
+      {children}
+    </button>
+  );
+}
+
+// Durum Rozeti
+function StatusBadge({ ok, text }) {
+  const cls = ok
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
+    : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400 dark:border-slate-800";
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cls} transition-colors`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+      {text}
+    </span>
+  );
+}
+
+// Akıllı Bölüm Kartı
+function SectionCard({ title, children, stepNumber, isActive, isCompleted, onToggle }) {
+  return (
+    <div className={`group border rounded-2xl transition-all duration-300 overflow-hidden ${isActive ? "border-[color:var(--brand)]/40 shadow-md bg-[color:var(--panel)] ring-1 ring-[color:var(--brand)]/10" : "border-[color:var(--border)] bg-[color:var(--panel)]/60 opacity-90"}`}>
+      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer select-none">
+        <div className="flex items-center gap-4">
+           <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-colors ${isActive ? "bg-[color:var(--brand)] text-white" : isCompleted ? "bg-emerald-500 text-white" : "bg-[color:var(--panel-2)] text-[color:var(--muted)]"}`}>
+              {isCompleted ? <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg> : stepNumber}
+           </div>
+           <div><h3 className={`font-semibold text-base ${isActive ? "text-[color:var(--fg)]" : "text-[color:var(--muted)]"}`}>{title}</h3></div>
+        </div>
+        <svg className={`w-5 h-5 text-[color:var(--muted)] transition-transform duration-300 ${isActive ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      <div className={`transition-all duration-500 ease-in-out ${isActive ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}>
+         <div className="p-5 pt-0"><div className="border-t border-dashed border-[color:var(--border)] mb-5"></div>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Alert({ type, message }) {
+  if (!message) return null;
+  const styles = type === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : type === "error" ? "bg-rose-50 text-rose-800 border-rose-200" : "bg-blue-50 text-blue-800 border-blue-200";
+  return <div className={`rounded-lg px-4 py-3 border text-sm flex items-start gap-3 animate-in fade-in ${styles}`}>{message}</div>;
+}
+
+/* ---------------- Helpers ---------------- */
+
 function toB64u(obj) {
   const bytes = enc.encode(JSON.stringify(obj));
   let bin = "";
@@ -14,36 +79,32 @@ function toB64u(obj) {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-/* ---- Küçük rozet ---- */
-function Pill({ ok, text }) {
-  const cls = ok
-    ? "border-emerald-300/60 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
-    : "border-rose-300/60 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30";
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold ${cls}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-      {text}
-    </span>
-  );
-}
-
+/* ---------------- Main Component ---------------- */
 export default function OfflineVerify() {
   const [vcText, setVcText] = useState("");
   const [vcObj, setVcObj] = useState(null);
+  const [presentationObj, setPresentationObj] = useState(null);
+  const [isPresentation, setIsPresentation] = useState(false);
 
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState(null);   // { valid: boolean, jti?: string, reason?:string }
-  const [msg, setMsg] = useState(null);   // { type:'ok'|'err'|'info', text }
+  const [res, setRes] = useState(null);
+  const [msg, setMsg] = useState(null);
   const [drag, setDrag] = useState(false);
-
   const [showPreview, setShowPreview] = useState(false);
-  const [rawJson, setRawJson] = useState("");
 
   const fileInputRef = useRef(null);
 
   const jti = vcObj?.jti;
   const vm  = vcObj?.proof?.verificationMethod;
-  const pkB64u = vcObj?.proof?.issuer_pk_b64u;
+  const pkB64uComputed = useMemo(() => {
+    const proof = vcObj?.proof || {};
+    let pk = proof.issuer_pk_b64u;
+    if (!pk && proof.verificationMethod) {
+      const match = proof.verificationMethod.match(/^did:key:z([A-Za-z0-9_-]+)#key-1$/);
+      if (match) pk = match[1];
+    }
+    return pk;
+  }, [vcObj]);
   const sigB64u = vcObj?.proof?.jws;
 
   const vcShort = useMemo(() => {
@@ -51,246 +112,205 @@ export default function OfflineVerify() {
     return vcObj?.id || vcObj?.jti || (Array.isArray(vcObj?.type) ? vcObj.type.join(",") : vcObj?.type) || "VC";
   }, [vcObj]);
 
-  /* ---- Dosya & Yapıştırma Girişi ---- */
-  const handleFile = async (file) => {
-    setRes(null); setMsg(null);
-    if (!file) return;
-    try {
-      const txt = await file.text();
-      const obj = JSON.parse(txt);
-      setVcText(txt);
-      setVcObj(obj);
-      setShowPreview(false);
-      setMsg({ type: "ok", text: "VC yüklendi." });
-      // dosya yüklenince otomatik doğrulama (istersen kapat)
-      verify(obj);
-    } catch {
-      setVcText(""); setVcObj(null);
-      setMsg({ type: "err", text: "Geçersiz JSON dosyası." });
-    }
-  };
-  const onInputFile = (e) => handleFile(e.target.files?.[0] || null);
-
-  const onDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setDrag(false);
-    const f = e.dataTransfer?.files?.[0];
-    handleFile(f || null);
-  };
-
-  const clearFile = () => {
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setVcText(""); setVcObj(null); setRes(null); setMsg(null);
-  };
-
-  const parseFromInputs = () => {
-    if (!vcObj) throw new Error(t("offline.json_loaded") + " " + t("first_load_or_paste") );
-    return vcObj;
-  };
-
-  /* ---- İmza Doğrulama ---- */
+  /* ---- Actions ---- */
   const verify = useCallback((objOptional) => {
-    setMsg(null);
-    setRes(null);
-    const obj = objOptional || parseFromInputs();
+    setMsg(null); setRes(null);
+    const obj = objOptional || vcObj;
+    if (!obj) { setMsg({ type: "err", text: t("first_load_or_paste") }); return; }
 
     try {
       const proof = obj.proof || {};
-      if (!proof.jws || !proof.issuer_pk_b64u) {
-        throw new Error("VC 'proof.jws' veya 'proof.issuer_pk_b64u' eksik.");
+      if (proof.type !== "Ed25519Signature2020") throw new Error("Geçersiz proof type: Ed25519Signature2020 bekleniyor.");
+
+      let pkB64u = proof.issuer_pk_b64u;
+      if (!pkB64u && proof.verificationMethod) {
+        // did:key:z<pk_b64u>#key-1 formatından pk çıkar
+        const match = proof.verificationMethod.match(/^did:key:z([A-Za-z0-9_-]+)#key-1$/);
+        if (match) {
+          pkB64u = match[1];
+        } else {
+          throw new Error("Geçersiz verificationMethod formatı.");
+        }
       }
+      if (!proof.jws || !pkB64u) throw new Error("Proof (jws/pk) eksik.");
 
       const header = { alg: "EdDSA", typ: "JWT" };
       const payload = { ...obj }; delete payload.proof;
 
       const data = `${toB64u(header)}.${toB64u(payload)}`;
       const sig = b64uToBytes(proof.jws);
-      const pk  = b64uToBytes(proof.issuer_pk_b64u);
+      const pk  = b64uToBytes(pkB64u);
 
       const ok = nacl.sign.detached.verify(enc.encode(data), sig, pk);
       if (!ok) throw new Error("bad_sig");
 
       setRes({ valid: true, jti: obj.jti });
-      setMsg({ type: "ok", text: "Signature valid." });
+      setMsg({ type: "ok", text: "İmza matematiksel olarak geçerli." });
     } catch (e) {
-      const reason =
-        e?.message === "bad_sig" ? "Signature invalid." :
-        (e?.message?.includes("JSON") ? "JSON parse error." : (e?.message || "Malformed VC"));
+      const reason = e?.message === "bad_sig" ? "İmza geçersiz (Signature Invalid)." : (e?.message || "Doğrulama hatası");
       setRes({ valid: false, reason });
       setMsg({ type: "err", text: reason });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawJson, vcObj]);
+  }, [vcObj]);
 
-  /* ---- Online Status (opsiyonel) ---- */
+  const handleFile = async (file) => {
+    setRes(null); setMsg(null);
+    if (!file) return;
+    try {
+      const txt = await file.text();
+      const obj = JSON.parse(txt);
+      const isPres = obj.type === "presentation";
+      setVcText(txt);
+      if (isPres) {
+        setPresentationObj(obj);
+        setVcObj(obj.vc); // VC'yi ayır
+        setIsPresentation(true);
+      } else {
+        setVcObj(obj);
+        setPresentationObj(null);
+        setIsPresentation(false);
+      }
+      setShowPreview(false);
+      setMsg({ type: "ok", text: isPres ? "Presentation yüklendi." : "VC yüklendi." });
+      verify(isPres ? obj.vc : obj); // Otomatik doğrula
+    } catch {
+      setVcText(""); setVcObj(null); setPresentationObj(null); setIsPresentation(false);
+      setMsg({ type: "err", text: "Geçersiz JSON dosyası." });
+    }
+  };
+  const onInputFile = (e) => handleFile(e.target.files?.[0] || null);
+  const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDrag(false); handleFile(e.dataTransfer?.files?.[0] || null); };
+  
+  const clearFile = () => {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setVcText(""); setVcObj(null); setPresentationObj(null); setIsPresentation(false); setRes(null); setMsg(null);
+  };
+
   const checkStatus = async () => {
-    if (!jti) return setMsg({ type: "info", text: "Bu VC için jti yok." });
+    if (!jti) return setMsg({ type: "info", text: "jti bulunamadı." });
     try {
       setBusy(true); setMsg(null);
       const r = await fetch(`/api/status/${encodeURIComponent(jti)}`);
       const raw = await r.text();
-      if (!r.ok) return setMsg({ type: "info", text: raw || "status endpoint not available" });
-      setMsg({ type: "ok", text: "status: " + raw });
-    } catch {
-      setMsg({ type: "info", text: "Status check failed." });
-    } finally { setBusy(false); }
+      if (!r.ok) return setMsg({ type: "info", text: raw || "Sunucu yanıt vermedi" });
+      setMsg({ type: "ok", text: "Sunucu Durumu: " + raw });
+    } catch { setMsg({ type: "info", text: "Bağlantı hatası." }); } finally { setBusy(false); }
   };
 
-  /* ---- Yardımcılar ---- */
   const short = (s, n=10) => (s ? (s.length>2*n ? `${s.slice(0,n)}…${s.slice(-n)}` : s) : "");
   const proofInfo = useMemo(() => {
     if (!vcObj?.proof) return null;
     const p = vcObj.proof;
     return {
-      type: p.type || "-",
-      created: p.created || "-",
+      type: p.type || "-", created: p.created || "-",
       verificationMethod: p.verificationMethod || "-",
-      pkShort: short(p.issuer_pk_b64u, 12),
-      sigShort: short(p.jws, 12),
+      pkShort: short(p.issuer_pk_b64u, 12), sigShort: short(p.jws, 12),
       sigLen: p.jws ? (b64uToBytes(p.jws).length) : 0
     };
   }, [vcObj]);
 
-  const canVerify = !!vcObj;
-
-  /* ---- UI ---- */
   return (
-    <section className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)]/90 backdrop-blur p-5 shadow-sm space-y-5">
-      <div className="flex items-center justify-between gap-3">
+    <section className="max-w-3xl mx-auto pb-20">
+      {/* Header */}
+      <div className="mb-8 text-center md:text-left md:flex md:items-end md:justify-between">
         <div>
-          <h2 className="text-base font-semibold">{t("offline.title")}</h2>
-          <p className="text-[12px] text-[color:var(--muted)] mt-0.5">{t("offline.desc")}</p>
+          <h2 className="text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("offline.title")}</h2>
+          <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">{t("offline.desc")}</p>
         </div>
-        <Pill ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? t("offline.invalid") : t("offline.ready")) : t("offline.no_vc")} />
+        <div className="mt-4 md:mt-0 flex gap-2">
+           <StatusBadge ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? t("offline.invalid") : t("offline.ready")) : t("offline.no_vc")} />
+        </div>
       </div>
 
-      {/* File-only input (paste removed) */}
+      <div className="mb-4 sticky top-4 z-50"><Msg msg={msg} /></div>
 
-      {/* Input area */}
-      
-        <div
-          onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
-          onDragLeave={()=>setDrag(false)}
-          onDrop={onDrop}
-          className={[
-            "rounded-xl border-2 border-dashed p-4 transition select-none",
-            drag ? "border-[color:var(--brand-2)] bg-[color:var(--panel-2)]" : "border-[color:var(--border)] bg-[color:var(--panel-2)]/70"
-          ].join(" ")}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">{vcShort}</div>
-              <div className="text-xs text-[color:var(--muted)]">
-                {vcObj ? t("offline.json_loaded") : t("offline.hint_drag")}
-              </div>
+      <SectionCard 
+         stepNumber={1} 
+         title="VC Yükle ve Doğrula" 
+         isActive={true} 
+         isCompleted={res?.valid} 
+         onToggle={()=>{}}
+      >
+         <div className="space-y-4">
+            {/* Dropzone */}
+            <div
+              onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
+              onDragLeave={()=>setDrag(false)}
+              onDrop={onDrop}
+              className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer group
+                ${drag ? "border-[color:var(--brand)] bg-[color:var(--brand)]/5 scale-[1.01]" : "border-[color:var(--border)] hover:border-[color:var(--brand-2)]"}
+                ${vcObj ? "bg-emerald-50/30 border-emerald-200" : ""}
+              `}
+            >
+               <input ref={fileInputRef} type="file" accept=".wpvc,application/json" onChange={onInputFile} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+               
+               {vcObj ? (
+                  <div className="flex flex-col items-center animate-in zoom-in-95">
+                     <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                     </div>
+                     <h3 className="font-medium text-sm text-emerald-800">{t("offline.json_loaded")}</h3>
+                     <p className="text-xs text-[color:var(--muted)] mt-0.5 max-w-md truncate">{vcShort}</p>
+                     <div className="flex gap-2 mt-3 z-20 relative">
+                        <Button variant="danger" onClick={(e) => { e.stopPropagation(); clearFile(); }} className="h-7 px-3 text-xs py-0">Temizle</Button>
+                        <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setShowPreview(!showPreview); }} className="h-7 px-3 text-xs py-0">{showPreview ? "Gizle" : "İncele"}</Button>
+                     </div>
+                  </div>
+               ) : (
+                  <div className="flex flex-col items-center">
+                     <svg className="w-8 h-8 text-[color:var(--muted)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                     <p className="text-sm font-medium text-[color:var(--fg)]">{t("offline.hint_drag")}</p>
+                     <p className="text-xs text-[color:var(--muted)] mt-1">.json, .wpvc</p>
+                  </div>
+               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {vcObj && (
-                <button onClick={clearFile} className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm">
-                  {t("offline.clear")}
-                </button>
-              )}
-              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-black/10 bg-white hover:bg-white/90 cursor-pointer shrink-0">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
-                <span className="text-sm">Dosya seç</span>
-                <input type="file" accept=".wpvc,application/json" onChange={onInputFile} className="hidden" />
-              </label>
+            
+            {/* Preview */}
+            {showPreview && vcText && (
+               <pre className="text-[10px] bg-[color:var(--code-bg)] p-3 rounded-lg border overflow-auto max-h-56">{vcText}</pre>
+            )}
 
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+               <Button onClick={()=>verify()} disabled={!vcObj || busy} variant="primary">
+                  {busy ? t("verifying") : t("offline.verify_signature")}
+               </Button>
+               <Button onClick={checkStatus} disabled={!jti || busy} variant="secondary">
+                  {t("offline.check_status")}
+               </Button>
+               {jti && <span className="text-xs font-mono px-2 py-1 rounded bg-[color:var(--panel-2)] border ml-auto">jti: {jti.slice(0,15)}...</span>}
             </div>
-          </div>
-        </div>
-      
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={()=>verify()}
-          disabled={!canVerify || busy}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {busy ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M21 12a9 9 0 0 1-9 9"/></svg>
-              {t("offline.verify_signature")}
-            </>
-          ) : (
-            <>
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
-              {t("offline.verify_signature")}
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={checkStatus}
-          disabled={!jti || busy}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] disabled:opacity-50"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-          {t("offline.check_status")}
-        </button>
-
-        {jti && (
-          <span className="text-xs font-mono px-2 py-1 rounded-md border border-[color:var(--border)] bg-[color:var(--panel-2)]">
-            jti: {jti}
-          </span>
-        )}
-      </div>
-
-      {/* Result card */}
-      {res && (
-        <div className={`rounded-xl border p-3 text-sm ${
-          res.valid
-            ? "border-emerald-300/60 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
-            : "border-rose-300/60 bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300"
-        }`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="font-medium">{res.valid ? t("offline.signature_valid") : t("offline.signature_invalid")}</div>
-            {vm && <code className="text-[11px] opacity-80">{vm}</code>}
-          </div>
-          {proofInfo && (
-            <ul className="mt-2 text-xs grid sm:grid-cols-2 gap-x-6 gap-y-1">
-              <li><span className="opacity-60">proof.type: </span><code>{proofInfo.type}</code></li>
-              <li><span className="opacity-60">created: </span><code>{proofInfo.created}</code></li>
-              <li><span className="opacity-60">pk: </span><code>{proofInfo.pkShort}</code></li>
-              <li><span className="opacity-60">sig: </span><code>{proofInfo.sigShort}</code> <span className="opacity-60">({proofInfo.sigLen} bytes)</span></li>
-            </ul>
-          )}
-          {!res.valid && res.reason && (
-            <div className="mt-2 text-xs opacity-90">{res.reason}</div>
-          )}
-        </div>
-      )}
-
-      {/* messages */}
-      {msg && (
-        <div className={`text-xs rounded-lg px-3 py-2 border mt-1 ${
-          msg.type==="ok"
-            ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
-            : msg.type==="err"
-            ? "border-rose-200 bg-rose-50 text-rose-800 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30"
-            : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)]"
-        }`}>
-          {msg.text}
-        </div>
-      )}
-
-      {/* preview */}
-      {vcObj && (
-        <div className="mt-1">
-          <button
-            type="button"
-            onClick={() => setShowPreview(v => !v)}
-            className="text-xs underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
-          >
-            {showPreview ? "Önizlemeyi gizle" : "Önizlemeyi göster"}
-          </button>
-          {showPreview && (
-            <pre className="mt-2 text-xs font-mono bg-[color:var(--code-bg)] text-[color:var(--code-fg)] border border-[color:var(--code-border)] rounded-xl p-3 max-h-56 overflow-auto whitespace-pre-wrap">
-{vcText}
-            </pre>
-          )}
-        </div>
-      )}
+            {/* Result Card (Gradient Style) */}
+            {res && (
+               <div className="animate-in slide-in-from-bottom-4 fade-in duration-500">
+                  <div className={`rounded-xl border shadow-lg overflow-hidden mt-4 ${res.valid ? "bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200" : "bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200"}`}>
+                     <div className={`p-5 flex flex-col md:flex-row md:items-center gap-4 ${res.valid ? "text-emerald-900" : "text-rose-900"}`}>
+                        <div className={`w-12 h-12 rounded-full flex shrink-0 items-center justify-center text-2xl ${res.valid ? "bg-emerald-200/50 text-emerald-600" : "bg-rose-200/50 text-rose-600"}`}>
+                           {res.valid ? "✓" : "✕"}
+                        </div>
+                        <div className="flex-1">
+                           <h3 className="font-bold text-lg">{res.valid ? t("offline.signature_valid") : t("offline.signature_invalid")}</h3>
+                           {!res.valid && res.reason && <p className="text-sm opacity-80">{res.reason}</p>}
+                           {proofInfo && (
+                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs opacity-70 font-mono">
+                               <div>Alg: {proofInfo.type}</div>
+                               <div>PK: {proofInfo.pkShort}</div>
+                             </div>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            )}
+         </div>
+      </SectionCard>
     </section>
   );
+}
+
+function Msg({ msg }) {
+  if (!msg) return null;
+  const styles = msg.type === "ok" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : msg.type === "err" ? "bg-rose-50 text-rose-800 border-rose-200" : "bg-blue-50 text-blue-800 border-blue-200";
+  return <div className={`rounded-lg px-4 py-3 border text-sm flex items-start gap-3 animate-in fade-in shadow-sm ${styles}`}>{msg.text}</div>;
 }

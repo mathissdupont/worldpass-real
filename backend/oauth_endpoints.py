@@ -1,3 +1,4 @@
+import html
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from .db import get_db
@@ -32,18 +33,23 @@ async def oauth_authorize_page(request: Request, client_id: str | None = None, r
         # Show a tiny consent form. In a full implementation this should check session/authentication and
         # show the logged-in user and a proper consent UI. For now we provide a form where a user can paste
         # their DID to approve the request.
-        html = f"""
+        # XSS protection: HTML escape all user inputs
+        safe_client_id = html.escape(client_id or 'unknown')
+        safe_redirect_uri = html.escape(redirect_uri or '')
+        safe_scope = html.escape(scope or '')
+        safe_state = html.escape(state or '')
+        html_content = f"""
         <html>
             <head><meta charset="utf-8"><title>Worldpass Authorization</title></head>
             <body style="font-family:system-ui,Segoe UI,Helvetica,Arial;max-width:720px;margin:40px auto;">
                 <h2>Worldpass ile giriş</h2>
-                <p>İzin verilecek istemci: <b>{client_id or 'unknown'}</b></p>
-                <p>Yönlendirme: <code>{redirect_uri or ''}</code></p>
+                <p>İzin verilecek istemci: <b>{safe_client_id}</b></p>
+                <p>Yönlendirme: <code>{safe_redirect_uri}</code></p>
                 <form method="post" action="{API}/oauth/authorize_page">
-                    <input type="hidden" name="client_id" value="{client_id or ''}" />
-                    <input type="hidden" name="redirect_uri" value="{redirect_uri or ''}" />
-                    <input type="hidden" name="scope" value="{scope or ''}" />
-                    <input type="hidden" name="state" value="{state or ''}" />
+                    <input type="hidden" name="client_id" value="{safe_client_id}" />
+                    <input type="hidden" name="redirect_uri" value="{safe_redirect_uri}" />
+                    <input type="hidden" name="scope" value="{safe_scope}" />
+                    <input type="hidden" name="state" value="{safe_state}" />
                     <label for="user_did">Your DID (ör: did:key:z...):</label><br/>
                     <input id="user_did" name="user_did" style="width:100%;padding:8px;margin-top:6px;margin-bottom:12px" placeholder="did:key:z..." />
                     <div style="display:flex;gap:8px">
@@ -54,7 +60,7 @@ async def oauth_authorize_page(request: Request, client_id: str | None = None, r
             </body>
         </html>
         """
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=html_content)
 
 
 @router.post(f"{API}/oauth/authorize_page")

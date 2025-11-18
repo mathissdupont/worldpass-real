@@ -1,663 +1,388 @@
-// src/pages/Present.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+// web/src/pages/Present.jsx
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import QRCode from "qrcode";
-import { t } from "../lib/i18n";
 import { useIdentity } from "../lib/identityContext";
 import { b64u, b64uToBytes } from "../lib/crypto";
 import { getVCs, migrateVCsIfNeeded } from "../lib/storage";
 import nacl from "tweetnacl";
+import { t } from "../lib/i18n";
 
 const enc = new TextEncoder();
 
-/* ---------- helpers ---------- */
-function safeJson(str) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return null;
-  }
+/* ---------------- UI Components ---------------- */
+
+function cx(...xs) {
+  return xs.filter(Boolean).join(" ");
 }
 
-function Pill({ ok, text }) {
-  const cls = ok
-    ? "border-emerald-400/30 bg-[color:var(--panel-2)] text-emerald-300"
-    : "border-rose-400/30 bg-[color:var(--panel-2)] text-rose-300";
+function Button({ children, onClick, variant = "secondary", className = "", disabled = false, title, type="button" }) {
+  const base = "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]";
+  const variants = {
+    primary: "bg-[color:var(--brand)] text-white shadow-md hover:bg-[color:var(--brand)]/90 hover:shadow-lg ring-offset-2 focus:ring-2 ring-[color:var(--brand)]",
+    secondary: "bg-[color:var(--panel-2)] border border-[color:var(--border)] text-[color:var(--fg)] hover:bg-[color:var(--panel)] hover:border-[color:var(--brand-2)]",
+    outline: "border-2 border-[color:var(--border)] hover:border-[color:var(--brand)] text-[color:var(--muted)] hover:text-[color:var(--brand)] bg-transparent",
+    ghost: "bg-transparent text-[color:var(--muted)] hover:text-[color:var(--fg)] hover:bg-[color:var(--panel-2)]",
+  };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold ${cls}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-      {text}
-    </span>
-  );
-}
-
-function CopyBtn({ value, label = "Kopyala", title }) {
-  return (
-    <button
-      type="button"
-      onClick={() => navigator.clipboard.writeText(value)}
-      title={title}
-      className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-[11px]"
-    >
-      <svg className="h-3.5 w-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <rect x="9" y="9" width="13" height="13" rx="2" />
-        <rect x="2" y="2" width="13" height="13" rx="2" />
-      </svg>
-      {label}
+    <button type={type} onClick={onClick} disabled={disabled} className={cx(base, variants[variant], className)} title={title}>
+      {children}
     </button>
   );
 }
 
-/* ---------- component ---------- */
-export default function Present() {
-  const { identity } = useIdentity(); // { did, sk_b64u, pk_b64u }
-  migrateVCsIfNeeded(); // <— eski anahtardan taşı
-  const [vcs, setVcs] = useState(() => getVCs() || []);
+function SectionCard({ title, children, stepNumber, isActive, isCompleted, onToggle }) {
+  return (
+    <div className={`group border rounded-2xl transition-all duration-300 overflow-hidden ${isActive ? "border-[color:var(--brand)]/40 shadow-md bg-[color:var(--panel)] ring-1 ring-[color:var(--brand)]/10" : "border-[color:var(--border)] bg-[color:var(--panel)]/60 opacity-90"}`}>
+      <div onClick={onToggle} className="w-full flex items-center justify-between p-4 cursor-pointer select-none">
+        <div className="flex items-center gap-4">
+           <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-colors ${isActive ? "bg-[color:var(--brand)] text-white" : isCompleted ? "bg-emerald-500 text-white" : "bg-[color:var(--panel-2)] text-[color:var(--muted)]"}`}>
+              {isCompleted ? <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg> : stepNumber}
+           </div>
+           <div><h3 className={`font-semibold text-base ${isActive ? "text-[color:var(--fg)]" : "text-[color:var(--muted)]"}`}>{title}</h3></div>
+        </div>
+        <svg className={`w-5 h-5 text-[color:var(--muted)] transition-transform duration-300 ${isActive ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      <div className={`transition-all duration-500 ease-in-out ${isActive ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}>
+         <div className="p-5 pt-0"><div className="border-t border-dashed border-[color:var(--border)] mb-5"></div>{children}</div>
+      </div>
+    </div>
+  );
+}
 
-  const [qrJson, setQrJson] = useState("");
+function Alert({ type, message }) {
+  if (!message) return null;
+  const styles = type === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : type === "error" ? "bg-rose-50 text-rose-800 border-rose-200" : "bg-blue-50 text-blue-800 border-blue-200";
+  return <div className={`rounded-lg px-4 py-3 border text-sm flex items-start gap-3 animate-in fade-in ${styles}`}>{message}</div>;
+}
+
+function safeJson(str) { try { return JSON.parse(str); } catch { return null; } }
+
+/* ---------------- Main Component ---------------- */
+export default function Present() {
+  const { identity } = useIdentity();
+  migrateVCsIfNeeded();
+
+  const [vcs, setVcs] = useState(() => getVCs() || []);
   const [vcIdx, setVcIdx] = useState(-1);
+  const [selectedFields, setSelectedFields] = useState([]);
+  
   const [out, setOut] = useState("");
+  const [msg, setMsg] = useState(null);
   const [publishedPath, setPublishedPath] = useState(null);
   const [qrImage, setQrImage] = useState(null);
-  const [msg, setMsg] = useState(null); // {type:'ok'|'err'|'info', text}
+  const [request, setRequest] = useState(null);
+
+  const reqVideoRef = useRef(null);
+  const reqCanvasRef = useRef(null);
+  const reqScanIntervalRef = useRef(null);
+  const reqDetectorRef = useRef(null);
+  const reqStreamRef = useRef(null);
+  const reqNdefRef = useRef(null);
+  const [reqQrScanning, setReqQrScanning] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
 
   const refreshVCs = useCallback(() => {
-    try {
-      const list = getVCs() || [];
-      setVcs(Array.isArray(list) ? list : []);
-    } catch {
-      setVcs([]);
-    }
+    try { const list = getVCs() || []; setVcs(Array.isArray(list) ? list : []); } catch { setVcs([]); }
   }, []);
 
-  // ilk yükleme + görünürlük değişince yenile
+  useEffect(() => { refreshVCs(); }, [refreshVCs]);
   useEffect(() => {
-    refreshVCs();
+     if(out) setActiveStep(3); 
+     else if(selectedFields.length > 0 && vcIdx !== -1) setActiveStep(3); 
+     else if(vcIdx !== -1) setActiveStep(2); 
+     else if(request) setActiveStep(1); 
+  }, [out, selectedFields.length, vcIdx, request]);
+
+  useEffect(() => {
+    const onStorage = (e) => { if (!e || e.key === "worldpass_vcs" || e.key === "wp.vcs") refreshVCs(); };
+    const onLocal = () => refreshVCs();
+    window.addEventListener("storage", onStorage); window.addEventListener("vcs:changed", onLocal);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("vcs:changed", onLocal); };
   }, [refreshVCs]);
 
+  useEffect(() => { return () => { stopRequestQrScan(); stopRequestNfcScan(); }; }, []);
+
+  const currentVC = useMemo(() => (vcIdx < 0 || vcIdx >= vcs.length) ? null : vcs[vcIdx], [vcs, vcIdx]);
+  const availableFields = useMemo(() => {
+    if (!currentVC || !currentVC.credentialSubject) return [];
+    return Object.keys(currentVC.credentialSubject);
+  }, [currentVC]);
+
+  useEffect(() => { if (vcs.length === 0) { setVcIdx(-1); return; } }, [vcs]);
+  useEffect(() => { setSelectedFields([]); setOut(""); setPublishedPath(null); setQrImage(null); }, [vcIdx]);
   useEffect(() => {
-    const onStorage = (e) => {
-      // başka sekmede değiştiyse
-      if (!e || e.key === "worldpass_vcs") refreshVCs();
-      if (!e || e.key === "wp.vcs") refreshVCs(); // yeni key’i dinle
-    };
-    const onLocal = () => refreshVCs(); // aynı sekme için custom event
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("vcs:changed", onLocal);
-    document.addEventListener("visibilitychange", onLocal);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("vcs:changed", onLocal);
-      document.removeEventListener("visibilitychange", onLocal);
-    };
-  }, [refreshVCs]);
+    if (!request || !currentVC) return;
+    if (!Array.isArray(request.fields) || request.fields.length === 0) return;
+    if (selectedFields.length > 0) return; 
+    const src = currentVC.credentialSubject || {};
+    const auto = request.fields.filter((f) => Object.prototype.hasOwnProperty.call(src, f));
+    if (auto.length) setSelectedFields(auto);
+  }, [request, currentVC, selectedFields.length]);
 
-  // QR isteğini parse et + normalize
-  const req = useMemo(() => {
-    const j = safeJson(qrJson);
-    if (!j || j.type !== "present" || typeof j.challenge !== "string") return null;
-
-    const aud = j.aud ?? null;
-    const exp = j.exp == null ? null : Number(j.exp); // saniye
-    if (exp != null && !Number.isFinite(exp)) return null;
-
-    const fields = Array.isArray(j.fields)
-      ? j.fields.filter((f) => typeof f === "string")
-      : null;
-
-    const vcReq = j.vc && typeof j.vc === "object" ? j.vc : null;
-    const label = typeof j.label === "string" ? j.label : null;
-
-    return {
-      type: "present",
-      challenge: j.challenge,
-      aud,
-      exp,
-      fields,
-      vcReq,
-      label,
-    };
-  }, [qrJson]);
-
-  // exp (geri sayım)
-  const [left, setLeft] = useState(null);
-  useEffect(() => {
-    if (!req?.exp) {
-      setLeft(null);
-      return;
-    }
-    const tick = () => {
-      const ms = Math.max(0, req.exp * 1000 - Date.now());
-      setLeft(Math.ceil(ms / 1000));
-    };
-    tick();
-    const tId = setInterval(tick, 500);
-    return () => clearInterval(tId);
-  }, [req?.exp]);
-
-  const expired = useMemo(() => {
-    if (!req?.exp) return false;
-    return Date.now() > req.exp * 1000;
-  }, [req?.exp]);
+  const filteredSubject = useMemo(() => {
+    if (!currentVC || !currentVC.credentialSubject || !selectedFields.length) return null;
+    const result = {}; selectedFields.forEach((f) => { result[f] = currentVC.credentialSubject[f]; });
+    return result;
+  }, [currentVC, selectedFields]);
 
   const hasId = !!identity?.sk_b64u && !!identity?.did;
+  const canBuild = !!(hasId && currentVC && filteredSubject);
 
-  // Bu isteğe uyan VCleri bul
-  const matchingIndices = useMemo(() => {
-    if (!req) return [];
-    return vcs
-      .map((vc, i) => ({ vc, i }))
-      .filter(({ vc }) => {
-        if (!vc) return false;
+  const presentationPayload = useMemo(() => {
+    if (!canBuild) return null;
+    const vcId = currentVC.jti || currentVC.id || null;
+    const createdAt = Math.floor(Date.now() / 1000);
+    const challenge = request?.challenge || null;
+    const msgObj = { vc_id: vcId, claims: filteredSubject, created_at: createdAt, holder_did: identity.did, challenge, aud: request?.aud, exp: request?.exp };
+    return {
+      type: "presentation", created_at: createdAt, challenge, aud: request?.aud, exp: request?.exp,
+      holder: { did: identity.did, pk_b64u: identity.pk_b64u, alg: "Ed25519" },
+      vc: currentVC, vc_ref: { id: vcId, type: currentVC.type || null, issuer: currentVC.issuer || null },
+      claims: filteredSubject, request: request ? { label: request.label, fields: request.fields, vc: request.vc } : undefined,
+      _sig_msg: msgObj,
+    };
+  }, [canBuild, currentVC, filteredSubject, identity, request]);
 
-        // VC type kontrolü (isteğe bağlı)
-        if (req.vcReq?.type) {
-          const required = req.vcReq.type;
-          const vcTypes = Array.isArray(vc.type)
-            ? vc.type
-            : vc.type
-            ? [vc.type]
-            : [];
+  const handleRequestObject = (obj) => {
+    if (!obj || obj.type !== "present" || !obj.challenge) { setMsg({ type: "err", text: t("invalid_request_format") }); return; }
+    setRequest(obj); setMsg({ type: "ok", text: `"${obj.label || t("unnamed")}" isteği alındı.` }); stopRequestQrScan();
+  };
 
-          if (Array.isArray(required)) {
-            // en az bir tanesi match etsin
-            if (!required.some((r) => vcTypes.includes(r))) return false;
-          } else {
-            if (!vcTypes.includes(required)) return false;
-          }
-        }
-
-        // issuer kontrolü (isteğe bağlı)
-        if (req.vcReq?.issuer && vc.issuer !== req.vcReq.issuer) return false;
-
-        // fields kontrolü (istenen alanlar bu VC'de var mı?)
-        if (req.fields && req.fields.length > 0) {
-          const cs = vc.credentialSubject || {};
-          for (const f of req.fields) {
-            if (!(f in cs)) return false;
-          }
-        }
-
-        return true;
-      })
-      .map((x) => x.i);
-  }, [vcs, req]);
-
-  const vcValid = vcIdx >= 0 && vcIdx < vcs.length;
-  const vcMatches =
-    vcValid &&
-    (matchingIndices.length === 0 || matchingIndices.includes(vcIdx));
-
-  const canSign = !!(hasId && req && vcValid && vcMatches && !expired);
-
-  // liste güncellenince seçimi düzelt
-  useEffect(() => {
-    if (vcs.length === 0) {
-      setVcIdx(-1);
-      return;
-    }
-
-    // Bu isteğe uyan VC varsa, ilkini seç
-    if (matchingIndices.length > 0) {
-      if (!matchingIndices.includes(vcIdx)) {
-        setVcIdx(matchingIndices[0]);
+  const handleRequestScanned = async (raw) => {
+    if (!raw) return;
+    try {
+      if (/^https?:\/\//.test(raw)) {
+        const r = await fetch(raw); const obj = safeJson(await r.text());
+        if (obj) { handleRequestObject(obj); return; }
       }
-      return;
-    }
+      const obj = safeJson(raw); if (obj) { handleRequestObject(obj); return; }
+      setMsg({ type: "err", text: t("request_not_resolved") });
+    } catch (e) { setMsg({ type: "err", text: t("read_error") + e.message }); }
+  };
 
-    // İstek yok ya da hiç uymayan VC varsa, en azından 0'ı seç
-    if (vcIdx < 0 || vcIdx >= vcs.length) setVcIdx(0);
-  }, [vcs, vcIdx, matchingIndices]);
+  const stopRequestQrScan = async () => {
+     try { if (reqScanIntervalRef.current) clearInterval(reqScanIntervalRef.current); if (reqStreamRef.current) reqStreamRef.current.getTracks().forEach(t => t.stop()); if (reqVideoRef.current) reqVideoRef.current.srcObject = null; } catch {}
+     setReqQrScanning(false);
+  };
+  const startRequestQrScan = async () => {
+    setMsg(null);
+    if (!("BarcodeDetector" in window)) return setMsg({ type: "info", text: t("camera_not_supported") });
+    try {
+      reqDetectorRef.current = new BarcodeDetector({ formats: ["qr_code"] });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      reqStreamRef.current = stream;
+      if (reqVideoRef.current) { reqVideoRef.current.srcObject = stream; await reqVideoRef.current.play(); }
+      reqScanIntervalRef.current = setInterval(async () => {
+        try {
+           if (!reqVideoRef.current || reqVideoRef.current.readyState < 2) return;
+           const canvas = reqCanvasRef.current || document.createElement("canvas");
+           canvas.width = reqVideoRef.current.videoWidth; canvas.height = reqVideoRef.current.videoHeight;
+           const ctx = canvas.getContext("2d"); ctx.drawImage(reqVideoRef.current, 0, 0, canvas.width, canvas.height);
+           const codes = await reqDetectorRef.current.detect(await createImageBitmap(canvas));
+           if (codes?.length) handleRequestScanned(codes[0].rawValue);
+        } catch {}
+      }, 500);
+      setReqQrScanning(true);
+    } catch (e) { setMsg({ type: "err", text: e.message }); }
+  };
 
-  // clipboard paste disabled — use scanner or file upload instead
+  const startRequestNfcScan = async () => {
+     setMsg(null);
+     if (!("NDEFReader" in window)) return setMsg({type: "info", text: t("nfc_not_supported")});
+     try {
+        const reader = new NDEFReader(); reqNdefRef.current = reader; await reader.scan();
+        reader.onreading = (ev) => {
+           const decoder = new TextDecoder();
+           for(const record of ev.message.records) {
+              if(record.recordType === "text" || record.recordType === "url") { handleRequestScanned(decoder.decode(record.data)); break; }
+           }
+        };
+        setMsg({type: "ok", text: t("nfc_listening")});
+     } catch(e) { setMsg({type:"err", text: e.message}); }
+  };
+  const stopRequestNfcScan = async () => { try { reqNdefRef.current = null; } catch{} };
 
   const buildPayload = () => {
-    setMsg(null);
-    setOut("");
-    if (!hasId)
-      return setMsg({
-        type: "err",
-        text: "Önce bu cihaz için kimlik anahtarını oluştur ya da içe aktar.",
-      });
-    if (!req)
-      return setMsg({
-        type: "err",
-        text:
-          "QR içeriği tanınmadı. Uygulamadaki doğrulayıcıdan gelen metni kullan.",
-      });
-    if (expired)
-      return setMsg({
-        type: "err",
-        text: "Bu istek için süre dolmuş görünüyor.",
-      });
-    if (!vcValid)
-      return setMsg({
-        type: "err",
-        text: "Göndermek istediğin sertifikayı seç.",
-      });
-    if (!vcMatches)
-      return setMsg({
-        type: "err",
-        text:
-          "Seçtiğin Kimlik Bilgisi bu isteğin şartlarıyla uyumlu değil. Başka bir VC seç.",
-      });
-
+    setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
+    if (!presentationPayload) return setMsg({ type: "err", text: t("error_missing_data") });
     try {
-      // mesaj = challenge|aud|exp (replay azaltma)
-      const parts = [
-        req.challenge,
-        req.aud || "",
-        req.exp ? String(req.exp) : "",
-      ].join("|");
-      const msgBytes = enc.encode(parts);
-
-      // Ed25519 detached signature (sk 64 byte olmalı)
+      const msgBytes = enc.encode(JSON.stringify(presentationPayload._sig_msg));
       const sk = b64uToBytes(identity.sk_b64u);
       const sig = nacl.sign.detached(msgBytes, sk);
-
-      const holder = {
-        did: identity.did,
-        pk_b64u: identity.pk_b64u,
-        sig_b64u: b64u(sig),
-        alg: "Ed25519",
-      };
-
-      const vc = filteredVC || vcs[vcIdx];
-      const payload = {
-        type: "presentation",
-        challenge: req.challenge,
-        aud: req.aud || null,
-        exp: req.exp || null,
-        holder,
-        vc,
-      };
-
-      const pretty = JSON.stringify(payload, null, 2);
-      setOut(pretty);
-
-      navigator.clipboard
-        .writeText(JSON.stringify(payload))
-        .then(() =>
-          setMsg({ type: "ok", text: "Veri panoya kopyalandı." })
-        )
-        .catch(() =>
-          setMsg({
-            type: "info",
-            text:
-              "Otomatik kopyalanamadı, alttaki JSON’u elle kopyalayabilirsin.",
-          })
-        );
-    } catch (e) {
-      setMsg({
-        type: "err",
-        text: "İmza üretilemedi: " + (e?.message || String(e)),
-      });
-    }
+      const payloadToSend = { ...presentationPayload, holder: { ...presentationPayload.holder, sig_b64u: b64u(sig) } };
+      delete payloadToSend._sig_msg;
+      setOut(JSON.stringify(payloadToSend, null, 2));
+      setMsg({ type: "ok", text: t("presentation_signed_created") });
+    } catch (e) { setMsg({ type: "err", text: t("signature_error") + e.message }); }
   };
 
   const download = () => {
     if (!out) return;
-    const blob = new Blob([out], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "vp_payload.wpvc";
-    a.click();
-    URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([out], { type: "application/json" }));
+    a.download = "presentation.wpvp"; a.click();
   };
 
   const publishToServer = async () => {
-    if (!out)
-      return setMsg({
-        type: "err",
-        text: "Önce gösterim verisi oluşturun.",
-      });
+    if (!out) return;
     try {
       setMsg(null);
-      const r = await fetch("/api/present/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: out,
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: out });
+      if (!r.ok) throw new Error("HTTP " + r.status);
       const d = await r.json();
-      const path = d.path;
-      setPublishedPath(path);
-      const full =
-        window.location.origin.replace(/\/$/, "") +
-        "/" +
-        path.replace(/^\//, "");
-      // generate QR image
-      try {
-        const dataUrl = await QRCode.toDataURL(full, {
-          width: 256,
-          margin: 0,
-        });
-        setQrImage(dataUrl);
-      } catch (e) {
-        setQrImage(null);
-      }
-      setMsg({ type: "ok", text: "Sunucuya yüklendi. QR oluşturuldu." });
-    } catch (e) {
-      setMsg({
-        type: "err",
-        text: "Yükleme başarısız: " + (e?.message || String(e)),
-      });
-    }
+      setPublishedPath(d.path);
+      const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
+      setQrImage(await QRCode.toDataURL(full, { width: 256, margin: 1 }));
+      setMsg({ type: "ok", text: t("uploaded_to_server") });
+    } catch (e) { setMsg({ type: "err", text: t("upload_error") + e.message }); }
   };
 
-  const writeNfc = async () => {
-    if (!publishedPath)
-      return setMsg({
-        type: "err",
-        text: "Önce sunucuya yükleyip QR oluşturun.",
-      });
-    const full =
-      window.location.origin.replace(/\/$/, "") +
-      "/" +
-      publishedPath.replace(/^\//, "");
-    if (!("NDEFWriter" in window) && !("NDEFWriter" in globalThis)) {
-      // try older API names
-      if (!("NDEFWriter" in window))
-        return setMsg({
-          type: "info",
-          text: "Tarayıcınız NFC yazmayı desteklemiyor.",
-        });
-    }
-    try {
-      const writer = new NDEFWriter();
-      await writer.write({ records: [{ recordType: "url", data: full }] });
-      setMsg({
-        type: "ok",
-        text:
-          "URL başarıyla NFC" + String.fromCharCode(8217) + "ya yazıldı.",
-      });
-    } catch (e) {
-      setMsg({
-        type: "err",
-        text: "NFC yazılamadı: " + (e?.message || String(e)),
-      });
-    }
+  const writeNfc = async (writeType = "url") => {
+     if (!publishedPath) return;
+     const full = window.location.origin.replace(/\/$/, "") + "/" + String(publishedPath).replace(/^\//, "");
+     try {
+        setMsg({ type: "info", text: t("nfc_writing") });
+        const writer = new NDEFWriter();
+        const records = [];
+
+        if (writeType === "url" || writeType === "both") {
+           records.push({ recordType: "url", data: full });
+        }
+        if (writeType === "json" || writeType === "both") {
+           records.push({ recordType: "text", data: JSON.stringify(out) });
+        }
+
+        await writer.write({ records });
+        setMsg({ type: "ok", text: t("nfc_write_success") });
+     } catch (e) {
+        setMsg({ type: "err", text: t("nfc_write_error") + ": " + e.message });
+     }
   };
 
-  // Get current VC
-  const currentVC = useMemo(() => {
-    if (vcIdx < 0 || vcIdx >= vcs.length) return null;
-    return vcs[vcIdx];
-  }, [vcs, vcIdx]);
-
-  // Filter VC based on requested fields
-  const filteredVC = useMemo(() => {
-    if (!currentVC || !req?.fields) return currentVC;
-    const { credentialSubject, ...rest } = currentVC;
-    if (!credentialSubject) return currentVC;
-    const filteredSubject = {};
-    req.fields.forEach((field) => {
-      if (Object.prototype.hasOwnProperty.call(credentialSubject, field)) {
-        filteredSubject[field] = credentialSubject[field];
-      }
-    });
-    return { ...rest, credentialSubject: filteredSubject };
-  }, [currentVC, req?.fields]);
+  const toggleField = (f) => {
+    setOut(""); setPublishedPath(null); setQrImage(null); setMsg(null);
+    setSelectedFields((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
+  };
 
   return (
-    <section className="max-w-5xl">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">Kimlik Bilgisini Göster</h2>
-        <div className="flex items-center gap-2 text-xs">
-          <Pill
-            ok={!!identity}
-            text={identity ? "Kimlik: hazır" : "Kimlik: yok"}
-          />
-          <Pill ok={!!vcs.length} text={`Kimlik Bilgileri: ${vcs.length}`} />
-          <Pill
-            ok={!!req && !expired}
-            text={
-              req
-                ? expired
-                  ? "İstek: süresi doldu"
-                  : `İstek: hazır${left != null ? ` (${left}s)` : ""}`
-                : "İstek: yok"
-            }
-          />
+    <section className="max-w-3xl mx-auto pb-20">
+       <div className="mb-8 text-center md:text-left md:flex md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("present_title")}</h2>
+          <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">
+            {t("present_description")}
+          </p>
+        </div>
+        <div className="mt-4 md:mt-0 flex gap-2">
+           {identity ? <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">{t("identity_active")}</span> : <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{t("identity_missing")}</span>}
         </div>
       </div>
 
-      {req && (
-        <div className="mb-3 text-[11px] text-[color:var(--muted)] space-y-0.5">
-          {req.label && (
-            <div>
-              <span className="font-semibold">Amaç:</span> {req.label}
+      <div className="mb-4 sticky top-4 z-50"><Msg msg={msg} /></div>
+
+      <div className="space-y-4">
+        
+        {/* --- STEP 1: Scan Request --- */}
+        <SectionCard stepNumber={1} title={t("scan_request_optional")} isActive={activeStep === 0} isCompleted={!!request} onToggle={() => setActiveStep(activeStep === 0 ? -1 : 0)}>
+           {!request ? (
+             <div className="flex flex-col items-center py-4">
+               <div className="flex flex-wrap justify-center gap-3 w-full">
+                 <Button onClick={() => reqQrScanning ? stopRequestQrScan() : startRequestQrScan()} variant={reqQrScanning ? "primary" : "outline"} className="w-full sm:w-auto min-w-[140px]">
+                    {reqQrScanning ? t("stop_scanning") : t("scan_with_camera")}
+                 </Button>
+                 <Button onClick={startRequestNfcScan} variant="outline" className="w-full sm:w-auto min-w-[140px]">{t("scan_with_nfc")}</Button>
+               </div>
+               <video ref={reqVideoRef} className={`mt-4 rounded-xl border border-[color:var(--border)] ${reqQrScanning ? "block w-64" : "hidden"}`} playsInline muted />
+               <canvas ref={reqCanvasRef} className="hidden" />
+             </div>
+           ) : (
+             <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)] flex items-start justify-between">
+                <div>
+                   <h4 className="font-bold text-sm text-[color:var(--fg)]">{t("request_received")}</h4>
+                   <p className="text-sm text-[color:var(--brand)] font-medium mt-1">{request.label || t("unnamed_request")}</p>
+                </div>
+                <Button variant="ghost" onClick={() => { setRequest(null); setSelectedFields([]); }} className="h-8 w-8 p-0 rounded-full">✕</Button>
+             </div>
+           )}
+        </SectionCard>
+
+        {/* --- STEP 2: Select VC --- */}
+        <SectionCard stepNumber={2} title={t("select_identity")} isActive={activeStep === 1} isCompleted={vcIdx !== -1} onToggle={() => setActiveStep(activeStep === 1 ? -1 : 1)}>
+           {vcs.length === 0 ? (
+             <div className="text-center py-8 text-[color:var(--muted)]">{t("no_credentials_found")}</div>
+           ) : (
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+               {vcs.map((v, i) => {
+                 const isSelected = vcIdx === i;
+                 const typeLabel = Array.isArray(v?.type) ? v.type[v.type.length - 1] : (v?.type || "Credential");
+                 const issuerLabel = typeof v.issuer === 'string' ? v.issuer : (v.issuer?.name || v.issuer?.id || "Unknown Issuer");
+                 return (
+                   <div key={i} onClick={() => { setVcIdx(i); setTimeout(() => setActiveStep(2), 300); }} className={`cursor-pointer rounded-xl p-4 border-2 transition-all duration-200 relative ${isSelected ? "border-[color:var(--brand)] bg-[color:var(--brand)]/5 ring-1 ring-[color:var(--brand)]" : "border-[color:var(--border)] bg-[color:var(--panel-2)] hover:border-[color:var(--brand-2)]"}`}>
+                     <div className="flex items-center justify-between mb-2">
+                       <span className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-md ${isSelected ? "bg-[color:var(--brand)] text-white" : "bg-[color:var(--border)] text-[color:var(--muted)]"}`}>{typeLabel}</span>
+                       {isSelected && <svg className="w-5 h-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg>}
+                     </div>
+                     <div className="text-xs text-[color:var(--muted)] truncate"><span className="opacity-70">{t("issuer_label")}</span> {issuerLabel}</div>
+                   </div>
+                 )
+               })}
+             </div>
+           )}
+        </SectionCard>
+
+        {/* --- STEP 3: Select Fields --- */}
+        <SectionCard stepNumber={3} title={t("shareable_info")} isActive={activeStep === 2} isCompleted={selectedFields.length > 0 && activeStep > 2} onToggle={() => setActiveStep(activeStep === 2 ? -1 : 2)}>
+          {!currentVC ? (<p className="text-sm text-[color:var(--muted)] text-center py-2">{t("select_identity_first")}</p>) : (
+            <div className="space-y-4">
+               <div className="flex flex-wrap gap-2">
+                  {availableFields.map(f => (
+                    <button key={f} onClick={() => toggleField(f)} className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 flex items-center gap-2 ${selectedFields.includes(f) ? "bg-[color:var(--fg)] text-[color:var(--bg)] border-[color:var(--fg)] shadow-sm" : "bg-transparent text-[color:var(--muted)] border-[color:var(--border)] hover:border-[color:var(--muted)]"}`}>
+                         {selectedFields.includes(f) ? <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg> : <div className="w-3.5 h-3.5 rounded-full border border-current opacity-40" />}
+                         {f}
+                    </button>
+                  ))}
+               </div>
+               {filteredSubject && <div className="bg-[color:var(--panel-2)] rounded-xl p-3 border border-[color:var(--border)]"><pre className="text-[10px] font-mono text-[color:var(--muted)] overflow-auto max-h-32">{JSON.stringify(filteredSubject, null, 2)}</pre></div>}
+               <div className="pt-4 flex justify-end">
+                  <Button onClick={buildPayload} disabled={!canBuild} variant="primary" className="w-full sm:w-auto shadow-xl shadow-[color:var(--brand)]/20">{t("sign_and_create")}</Button>
+               </div>
             </div>
           )}
-          {req.vcReq?.type && (
-            <div>
-              <span className="font-semibold">İstenen VC tipi:</span>{" "}
-              <code className="font-mono text-[10px]">
-                {Array.isArray(req.vcReq.type)
-                  ? req.vcReq.type.join(", ")
-                  : String(req.vcReq.type)}
-              </code>
-            </div>
-          )}
-          {req.vcReq?.issuer && (
-            <div>
-              <span className="font-semibold">İstenen issuer:</span>{" "}
-              <code className="font-mono text-[10px]">
-                {req.vcReq.issuer}
-              </code>
-            </div>
-          )}
-          {req.fields && req.fields.length > 0 && (
-            <div>
-              <span className="font-semibold">İstenen alanlar:</span>{" "}
-              {req.fields.join(", ")}
-            </div>
-          )}
-        </div>
-      )}
+        </SectionCard>
 
-      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/80 backdrop-blur p-5 shadow-sm space-y-4">
-        {/* QR JSON */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm text-[color:var(--muted)]">
-              Doğrulayıcıdan gelen QR içeriği
-            </label>
-            <div className="flex gap-2">
-              {/* clipboard paste button removed; use scanner or upload */}
-              <button
-                onClick={() => {
-                  const sample = {
-                    type: "present",
-                    challenge: "demo-chal-123",
-                    aud: "kampus-kapi",
-                    exp: Math.floor(Date.now() / 1000) + 180,
-                  };
-                  setQrJson(JSON.stringify(sample, null, 2));
-                }}
-                className="px-2.5 py-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-xs"
-              >
-                Örnek doldur
-              </button>
-            </div>
-          </div>
-          <textarea
-            rows={8}
-            className="w-full font-mono text-xs px-3 py-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-[color:var(--text)]"
-            placeholder='{"type":"present","challenge":"...","aud":"kampus-kapi","exp":1731000000}'
-            value={qrJson}
-            onChange={(e) => setQrJson(e.target.value)}
-            aria-invalid={!req && qrJson ? "true" : "false"}
-          />
-          {!req && qrJson && (
-            <p className="mt-2 text-xs rounded-lg px-3 py-2 border border-rose-400/30 bg-[color:var(--panel-2)] text-rose-300">
-              Bu QR içeriği tanınmadı. Genelde doğrulayıcı ekranından indirilen
-              `.wpvc` dosyasını yüklemeli veya QR'ı taramalısınız.
-            </p>
-          )}
-        </div>
-
-        {/* Publish / QR / NFC controls */}
-        <div className="flex flex-wrap items-center gap-4">
-          <button
-            onClick={publishToServer}
-            disabled={!out}
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-[color:var(--text)] disabled:opacity-50 text-base font-medium"
-            title="Gösterim verisini sunucuya yükle ve paylaşılabilir QR kod oluştur"
-          >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7,10 12,15 17,10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Sunucuya Yükle ve QR Oluştur
-          </button>
-          <button
-            onClick={writeNfc}
-            disabled={!publishedPath}
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-[color:var(--text)] disabled:opacity-50 text-base font-medium"
-            title="Gösterim verisini NFC etiketine yazarak paylaş"
-          >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M6 12h12M6 8h12M6 16h12" />
-            </svg>
-            NFC'ye Yaz
-          </button>
-          {qrImage && (
-            <div className="flex flex-col items-center gap-2">
-              <img
-                src={qrImage}
-                alt="Presentation QR"
-                className="w-32 h-32 border border-[color:var(--border)] rounded-lg shadow-sm"
-              />
-              <span className="text-xs text-[color:var(--muted)]">
-                QR Kod
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* VC seçimi + aksiyonlar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-sm text-[color:var(--muted)]">
-            Gösterilecek Kimlik Bilgisi
-          </div>
-          <select
-            className="px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] text-sm"
-            value={vcIdx}
-            onChange={(e) => setVcIdx(Number(e.target.value))}
-          >
-            {vcs.length === 0 && (
-              <option disabled>— Kayıtlı Kimlik Bilgisi yok —</option>
-            )}
-            {vcs.map((v, i) => {
-              const labelType = Array.isArray(v?.type)
-                ? v.type.join(", ")
-                : v?.type || "Kimlik Bilgisi";
-              const label = `${labelType} — ${v?.jti || `vc-${i + 1}`}`;
-              const isMatch =
-                matchingIndices.length === 0 ||
-                matchingIndices.includes(i);
-              return (
-                <option key={i} value={i} disabled={!isMatch}>
-                  {label}
-                  {!isMatch ? " (bu istek için uyumsuz)" : ""}
-                </option>
-              );
-            })}
-          </select>
-
-          {req && matchingIndices.length === 0 && (
-            <div className="text-[11px] text-amber-300">
-              Bu isteğe uyan bir Kimlik Bilgisi bulunamadı. İstenen
-              tipe/issuer’a ve alanlara sahip bir VC yok.
-            </div>
-          )}
-
-          <button
-            onClick={buildPayload}
-            disabled={!canSign}
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 disabled:opacity-50 text-base font-medium"
-            title="İmzala ve gösterim verisini panoya kopyala"
-          >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 3v12" />
-              <path d="M8 11l4 4 4-4" />
-              <rect x="4" y="17" width="16" height="4" rx="1" />
-            </svg>
-            İmzala ve Veriyi Kopyala
-          </button>
-
-          <button
-            onClick={download}
-            disabled={!out}
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-[color:var(--text)] disabled:opacity-50 text-base font-medium"
-            title="Gösterim verisini dosya olarak indir"
-          >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 3v12" />
-              <path d="M8 11l4 4 4-4" />
-              <rect x="4" y="17" width="16" height="4" rx="1" />
-            </svg>
-            {t("download_presentation_file")}
-          </button>
-
-          {out && (
-            <CopyBtn
-              value={out}
-              label="JSON’u Kopyala"
-              title="JSON verisini panoya kopyala"
-            />
-          )}
-        </div>
-
-        {/* Seçili VC kısa önizleme */}
-        {filteredVC && (
-          <details className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] p-3 text-xs">
-            <summary className="cursor-pointer select-none">
-              {req?.fields
-                ? "İstenen alanlar filtrelenmiş Kimlik Bilgisi içeriği"
-                : "Seçilen Kimlik Bilgisinin içeriği"}
-            </summary>
-            <pre className="mt-2 max-h-56 overflow-auto bg-[color:var(--code-bg)] text-[color:var(--code-fg)] border border-[color:var(--code-border)] rounded p-2">
-              {JSON.stringify(filteredVC, null, 2)}
-            </pre>
-          </details>
-        )}
-
-        {/* Mesajlar */}
-        {msg && (
-          <div
-            className={[
-              "text-xs rounded-lg px-3 py-2 border",
-              msg.type === "ok"
-                ? "border-emerald-400/30 bg-[color:var(--panel-2)] text-emerald-300"
-                : msg.type === "err"
-                ? "border-rose-400/30 bg-[color:var(--panel-2)] text-rose-300"
-                : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)]",
-            ].join(" ")}
-          >
-            {msg.text}
-          </div>
-        )}
-
-        {/* Çıktı */}
+        {/* --- STEP 4: Result --- */}
         {out && (
-          <div>
-            <div className="text-sm text-[color:var(--text)] mb-1">
-              Gönderilecek veri (JSON)
-            </div>
-            <pre className="font-mono text-xs bg-[color:var(--code-bg)] text-[color:var(--code-fg)] border border-[color:var(--code-border)] rounded-xl p-3 overflow-auto">
-              {out}
-            </pre>
-          </div>
+           <div className="animate-in slide-in-from-bottom-6 fade-in duration-500">
+              <div className="rounded-2xl bg-gradient-to-br from-[color:var(--panel)] to-[color:var(--panel-2)] border border-[color:var(--brand)]/30 shadow-xl overflow-hidden">
+                 <div className="bg-[color:var(--brand)]/10 p-4 border-b border-[color:var(--brand)]/10 flex items-center gap-3">
+                    <div className="bg-emerald-500 text-white rounded-full p-1.5"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><polyline points="20 6 9 17 4 12"/></svg></div>
+                    <div><h3 className="font-bold text-[color:var(--fg)]">{t("presentation_ready")}</h3></div>
+                 </div>
+                 <div className="p-6 space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                       <Button onClick={download} variant="secondary" className="h-auto py-4 flex-col gap-2"><span>{t("download_file")}</span></Button>
+                       <Button onClick={publishToServer} disabled={!!qrImage} variant="primary" className="h-auto py-4 flex-col gap-2"><span>{t("generate_qr")}</span></Button>
+                    </div>
+                    {qrImage && (
+                       <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">
+                          <img src={qrImage} alt="QR" className="w-48 h-48" />
+                          <div className="mt-4 flex gap-3">
+                             <Button onClick={writeNfc} variant="outline" className="text-xs h-8 px-3 text-slate-600">{t("write_to_nfc")}</Button>
+                             <Button onClick={() => { navigator.clipboard.writeText(out); setMsg({type:'ok', text:t("json_copied")}); }} variant="ghost" className="text-xs h-8 px-3 text-slate-500">JSON Kopyala</Button>
+                          </div>
+                       </div>
+                    )}
+                 </div>
+              </div>
+           </div>
         )}
 
-        {/* İpucu */}
-        <div className="text-[11px] text-[color:var(--muted)]">
-          Güvenlik notu: İmza sadece bu isteğe özel üretilir ve gizli
-          anahtarın cihazını terk etmez.
-        </div>
       </div>
     </section>
   );
+}
+
+function Msg({ msg }) {
+  if (!msg) return null;
+  return <Alert type={msg.type === "ok" ? "success" : msg.type === "err" ? "error" : "info"} message={msg.text} />;
 }
