@@ -21,3 +21,6 @@ __pycache__/
 # Keystore dosyaları
 *.json
 *.keystore
+!web/src/i18n/*.json
+!web/package-lock.json
+!web/package.json
