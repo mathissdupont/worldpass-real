@@ -136,23 +136,26 @@ export default function Settings() {
       const token = getToken();
       if (token && profileLoaded) {
         try {
+          // Use debounced update (no immediate flag)
           await updateProfile(token, { theme });
           // Also cache locally
-          await saveProfile({ displayName, email, phone, avatar, otpEnabled, lang, theme }).catch(() => {});
+          const currentProfile = await loadProfile().catch(() => ({}));
+          await saveProfile({ ...currentProfile, theme }).catch(() => {});
         } catch (e) {
           console.warn("Failed to save theme to backend:", e);
           setToast({ type: "err", text: t('theme_update_failed') });
         }
       } else if (!token && profileLoaded) {
         // Not authenticated: save to localStorage only
-        await saveProfile({ displayName, email, phone, avatar, otpEnabled, lang, theme }).catch(() => {});
+        const currentProfile = await loadProfile().catch(() => ({}));
+        await saveProfile({ ...currentProfile, theme }).catch(() => {});
       }
     };
     
     if (profileLoaded) {
       saveThemeAsync();
     }
-  }, [theme, profileLoaded, displayName, email, phone, avatar, otpEnabled, lang]);
+  }, [theme, profileLoaded]);
 
   // ---- Helpers ----
   const saveProfileLocal = async (patch) => {
@@ -233,9 +236,11 @@ export default function Settings() {
       
       const token = getToken();
       if (token) {
-        await updateProfile(token, { avatar: url });
+        // Use immediate update for avatar (user-triggered action)
+        await updateProfile(token, { avatar: url }, { immediate: true });
       }
-      await saveProfileLocal({ avatar: url });
+      const currentProfile = await loadProfile().catch(() => ({}));
+      await saveProfile({ ...currentProfile, avatar: url }).catch(() => {});
       setToast({ type: "ok", text: t('avatar_updated') });
     } catch (error) {
       console.error("Failed to update avatar:", error);
@@ -262,15 +267,16 @@ export default function Settings() {
       const token = getToken();
       
       if (token) {
-        // Authenticated: save to backend
-        const updated = await updateProfile(token, { displayName, email, phone, lang });
+        // Authenticated: save to backend (immediate for explicit save button)
+        const updated = await updateProfile(token, { displayName, email, phone, lang }, { immediate: true });
         // Update local state from response
         setDisplayName(updated.displayName);
         setEmail(updated.email);
         setPhone(updated.phone);
         setLang(updated.lang);
         // Cache locally
-        await saveProfile({ ...updated, avatar, otpEnabled, theme }).catch(() => {});
+        const currentProfile = await loadProfile().catch(() => ({}));
+        await saveProfile({ ...currentProfile, ...updated }).catch(() => {});
         setToast({ type: "ok", text: t('profile_saved') });
       } else {
         // Not authenticated: save to localStorage only
@@ -292,6 +298,7 @@ export default function Settings() {
     try {
       const token = getToken();
       if (token) {
+        // Use debounced update (not immediate) to avoid rapid toggles
         await updateProfile(token, { otpEnabled: v });
       }
       await saveProfileLocal({ otpEnabled: v });
@@ -310,6 +317,7 @@ export default function Settings() {
     try {
       const token = getToken();
       if (token) {
+        // Use debounced update (not immediate)
         await updateProfile(token, { lang: newLang });
       }
       await saveProfileLocal({ lang: newLang });
@@ -363,9 +371,11 @@ export default function Settings() {
                   try {
                     const token = getToken();
                     if (token) {
-                      await updateProfile(token, { avatar: "" });
+                      // Use immediate update for avatar removal (user-triggered action)
+                      await updateProfile(token, { avatar: "" }, { immediate: true });
                     }
-                    await saveProfileLocal({ avatar: "" });
+                    const currentProfile = await loadProfile().catch(() => ({}));
+                    await saveProfile({ ...currentProfile, avatar: "" }).catch(() => {});
                   } catch (error) {
                     console.error("Failed to remove avatar:", error);
                   }

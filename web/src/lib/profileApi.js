@@ -3,6 +3,13 @@
 
 const API_BASE = "/api";
 
+// Request deduplication: track in-flight requests
+let pendingUpdateRequest = null;
+let pendingUpdateTimer = null;
+
+// Debounce timer for batching updates
+const DEBOUNCE_DELAY = 500; // ms
+
 /**
  * Fetch user profile from backend
  * @param {string} token - Auth token
@@ -40,12 +47,12 @@ export async function fetchProfile(token) {
 }
 
 /**
- * Update user profile on backend
+ * Update user profile on backend (immediate, no debouncing)
  * @param {string} token - Auth token
  * @param {Object} patch - Profile fields to update
  * @returns {Promise<Object>} Updated profile data
  */
-export async function updateProfile(token, patch) {
+async function updateProfileImmediate(token, patch) {
   if (!token) {
     throw new Error("Token required");
   }
@@ -86,4 +93,52 @@ export async function updateProfile(token, patch) {
     lang: data.user.lang || patch.lang || "en",
     theme: data.user.theme || patch.theme || "light",
   };
+}
+
+/**
+ * Update user profile on backend with debouncing and deduplication
+ * @param {string} token - Auth token
+ * @param {Object} patch - Profile fields to update
+ * @param {Object} options - Options { immediate: boolean }
+ * @returns {Promise<Object>} Updated profile data
+ */
+export async function updateProfile(token, patch, options = {}) {
+  // If immediate flag is set, bypass debouncing
+  if (options.immediate) {
+    return updateProfileImmediate(token, patch);
+  }
+
+  // Cancel any pending debounced update
+  if (pendingUpdateTimer) {
+    clearTimeout(pendingUpdateTimer);
+    pendingUpdateTimer = null;
+  }
+
+  // If there's already a request in flight, wait for it
+  if (pendingUpdateRequest) {
+    try {
+      await pendingUpdateRequest;
+    } catch {
+      // Ignore errors from previous request
+    }
+  }
+
+  // Create a new debounced request
+  return new Promise((resolve, reject) => {
+    pendingUpdateTimer = setTimeout(async () => {
+      pendingUpdateTimer = null;
+      
+      // Create the request promise
+      pendingUpdateRequest = updateProfileImmediate(token, patch);
+      
+      try {
+        const result = await pendingUpdateRequest;
+        pendingUpdateRequest = null;
+        resolve(result);
+      } catch (error) {
+        pendingUpdateRequest = null;
+        reject(error);
+      }
+    }, DEBOUNCE_DELAY);
+  });
 }
