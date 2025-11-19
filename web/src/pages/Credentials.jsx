@@ -1,33 +1,17 @@
 // src/pages/Credentials.jsx
 import VCList from "../components/VCList";
 import { useState } from "react";
+import { Card, Button, Badge, Alert, Toast as UIToast } from "../components/ui";
 import { t } from "../lib/i18n";
 
-function chip(tone, msg) {
-  // göz yormayan chip: zemini her zaman panel-2, tonlar sadece kenar+metin
-  const base = "text-xs px-2 py-1 rounded-md border bg-[color:var(--panel-2)]";
-  const map = {
-    idle:    "border-[color:var(--border)] text-[color:var(--muted)]",
-    loading: "border-amber-400/30  text-amber-300",
-    success: "border-emerald-400/30 text-emerald-300",
-    error:   "border-rose-400/30    text-rose-300",
-  };
-  return <span className={[base, map[tone] || map.idle].join(" ")}>{msg}</span>;
-}
-
 export default function Credentials() {
-  const [msg, setMsg] = useState("");
+  const [toast, setToast] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const toast = (s, m) => {
+  const showToast = (s, m) => {
     setStatus(s);
-    setMsg(m);
-    if (s !== "loading") {
-      const t = setTimeout(() => setMsg(""), 2200);
-      return () => clearTimeout(t);
-    }
-    return () => {};
+    setToast({ type: s === 'success' ? 'success' : s === 'error' ? 'error' : 'info', text: m });
   };
 
   async function revoke(jti) {
@@ -37,7 +21,7 @@ export default function Credentials() {
     );
     if (!ok) return;
 
-    toast("loading", t('revoking_credential'));
+    showToast("loading", t('revoking_credential'));
     try {
       const r = await fetch("/api/status/revoke", {
         method: "POST",
@@ -48,88 +32,78 @@ export default function Credentials() {
       const raw = await r.text().catch(() => "");
       if (!r.ok) throw new Error(raw || "Server returned non-OK");
 
-      toast("success", t('revoke_success'));
+      showToast("success", t('revoke_success'));
       setRefreshKey(k => k + 1);
     } catch (e) {
-      toast("error", t('revoke_failed') + ": " + (e?.message || t('unknown_error')));
+      showToast("error", t('revoke_failed') + ": " + (e?.message || t('unknown_error')));
     }
   }
 
+  const getStatusBadgeVariant = () => {
+    switch (status) {
+      case 'success': return 'success';
+      case 'error': return 'danger';
+      case 'loading': return 'warning';
+      default: return 'neutral';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'loading': return t('working');
+      case 'success': return t('ok');
+      case 'error': return t('error');
+      default: return t('idle');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">{t('my_credentials')}</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {t('credentials_intro')} <strong>{t('public_info')}</strong> {t('private_key_never_leaves')}
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Page Header */}
+      <Card>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-[color:var(--text)] mb-2">
+              {t('my_credentials')}
+            </h1>
+            <p className="text-sm text-[color:var(--muted)]">
+              {t('credentials_intro')} <strong className="text-[color:var(--text)]">{t('public_info')}</strong> {t('private_key_never_leaves')}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {chip(
-              status,
-              status === "loading" ? t('working') :
-              status === "success" ? t('ok') :
-              status === "error"   ? t('error') : t('idle')
-            )}
-
-            <button
+          <div className="flex items-center gap-3">
+            <Badge variant={getStatusBadgeVariant()}>
+              {getStatusText()}
+            </Badge>
+            
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setRefreshKey(k => k + 1)}
               title={t('refresh_list')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 1 1-3-6.7" />
                 <path d="M21 3v6h-6" />
               </svg>
-              {t('refresh')}
-            </button>
+              <span className="hidden sm:inline">{t('refresh')}</span>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* VC list section */}
-      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 shadow-sm">
+      {/* VC List */}
+      <Card>
         <VCList key={refreshKey} onRevoke={revoke} />
-      </div>
+      </Card>
 
-      {/* Status / Message */}
-      {msg && (
-        <div
-          className={[
-            "px-4 py-3 rounded-xl text-sm border transition-all",
-            status === "loading"
-              ? "border-amber-400/30  bg-[color:var(--panel-2)] text-amber-300"
-              : status === "success"
-              ? "border-emerald-400/30 bg-[color:var(--panel-2)] text-emerald-300"
-              : status === "error"
-              ? "border-rose-400/30    bg-[color:var(--panel-2)] text-rose-300"
-              : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)]"
-          ].join(" ")}
-        >
-          <div className="flex items-center gap-2">
-            {status === "loading" && (
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="9" opacity=".25" />
-                <path d="M21 12a9 9 0 0 1-9 9" />
-              </svg>
-            )}
-            {status === "success" && <span>✅</span>}
-            {status === "error" && <span>❌</span>}
-            <span>{msg}</span>
-          </div>
-        </div>
-      )}
+      {/* Info Footer */}
+      <Alert variant="info">
+        {t('revoked_info_part1')} <strong>{t('revoked')}</strong> {t('revoked_info_part2')}
+      </Alert>
 
-      {/* Tip / info footer (sol tarafta ince accent şerit) */}
-      <div className="relative rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel-2)] p-4 text-xs text-[color:var(--muted)] shadow-sm">
-        <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl bg-[color:var(--brand-2)]/60" />
-        <p className="pl-3">
-          {t('revoked_info_part1')} <strong>{t('revoked')}</strong> {t('revoked_info_part2')}
-        </p>
-      </div>
+      {/* Toast Notification */}
+      <UIToast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
