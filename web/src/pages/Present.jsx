@@ -57,14 +57,6 @@ function Alert({ type, message }) {
 
 function safeJson(str) { try { return JSON.parse(str); } catch { return null; } }
 
-const { identity } = useIdentity();
-
-useEffect(() => {
-  (async () => {
-    await migrateVCsIfNeeded();
-    await refreshVCs();              // migration biter bitmez VCleri yenile
-  })();
-}, [refreshVCs]);
 
 
 /* ---------------- Main Component ---------------- */
@@ -89,6 +81,13 @@ export default function Present() {
   const reqNdefRef = useRef(null);
   const [reqQrScanning, setReqQrScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
+
+useEffect(() => {
+  (async () => {
+    await migrateVCsIfNeeded();
+    await refreshVCs();              // migration biter bitmez VCleri yenile
+  })();
+}, [refreshVCs]);
 
 const refreshVCs = useCallback(async () => {
   try {
