@@ -3,34 +3,7 @@ import { loadProfile, saveProfile } from "./storage";
 
 const KEY_SESSION = "wp_session";
 const KEY_TOKEN = "wp_token";
-const KEY_USERS   = "wp_users"; // { [email]: { email, name, did, salt_b64, hash_b64, createdAt } }
 const API_BASE = "/api";
-
-// --------- helpers ----------
-const enc = new TextEncoder();
-const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-const rb  = (n=16) => crypto.getRandomValues(new Uint8Array(n));
-
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem(KEY_USERS) || "{}"); }
-  catch { return {}; }
-}
-function setUsers(obj) {
-  localStorage.setItem(KEY_USERS, JSON.stringify(obj));
-}
-async function sha256(strOrBytes) {
-  const data = strOrBytes instanceof Uint8Array ? strOrBytes : enc.encode(strOrBytes);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return new Uint8Array(digest);
-}
-
-// password hash = SHA256( salt || password )
-async function hashPassword(password, saltBytes) {
-  const combo = new Uint8Array(saltBytes.length + enc.encode(password).length);
-  combo.set(saltBytes, 0);
-  combo.set(enc.encode(password), saltBytes.length);
-  return sha256(combo);
-}
 
 // --------- public api ----------
 export function getSession(){
@@ -62,11 +35,6 @@ export function setSession({ email, token }){
 export function clearSession(){ 
   localStorage.removeItem(KEY_SESSION); 
   localStorage.removeItem(KEY_TOKEN);
-}
-
-export function getUser(email){
-  const users = getUsers();
-  return users[email.toLowerCase()] || null;
 }
 
 export async function registerUser({ email, firstName, lastName, password, did }) {
@@ -109,9 +77,6 @@ export async function registerUser({ email, firstName, lastName, password, did }
   return { email, name, did: did || "" };
 }
 
-export async function verifyUser(email, password) {
-  email = (email || "").toLowerCase().trim();
-  
 export async function verifyUser(email, password) {
   email = (email || "").toLowerCase().trim();
   
