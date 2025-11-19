@@ -19,5 +19,9 @@ __pycache__/
 /data
 
 # Keystore dosyaları
-*.json
 *.keystore
+# Ignore JSON files except for package.json, package-lock.json, and i18n translations
+*.json
+!web/package.json
+!web/package-lock.json
+!web/src/i18n/*.json
