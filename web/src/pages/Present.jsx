@@ -82,24 +82,21 @@ export default function Present() {
   const [reqQrScanning, setReqQrScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
 
-useEffect(() => {
-  (async () => {
-    await migrateVCsIfNeeded();
-    await refreshVCs();              // migration biter bitmez VCleri yenile
-  })();
-}, [refreshVCs]);
+  const refreshVCs = useCallback(async () => {
+    try {
+      const list = await getVCs();                       // Promise çözüldü
+      setVcs(Array.isArray(list) ? list : []);           // array değilse boş yap
+    } catch {
+      setVcs([]);
+    }
+  }, []);
 
-const refreshVCs = useCallback(async () => {
-  try {
-    const list = await getVCs();                       // Promise çözüldü
-    setVcs(Array.isArray(list) ? list : []);           // array değilse boş yap
-  } catch {
-    setVcs([]);
-  }
-}, []);
-
-
-  useEffect(() => { refreshVCs(); }, [refreshVCs]);
+  useEffect(() => {
+    (async () => {
+      await migrateVCsIfNeeded();
+      await refreshVCs();              // migration biter bitmez VCleri yenile
+    })();
+  }, [refreshVCs]);
   useEffect(() => {
      if(out) setActiveStep(3); 
      else if(selectedFields.length > 0 && vcIdx !== -1) setActiveStep(3); 
