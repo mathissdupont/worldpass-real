@@ -172,6 +172,10 @@ class UserVCDeleteResp(BaseModel):
 class UserProfileUpdateReq(BaseModel):
     display_name: Optional[str] = None
     theme: Optional[str] = None
+    avatar: Optional[str] = None
+    phone: Optional[str] = None
+    lang: Optional[str] = None
+    otp_enabled: Optional[bool] = None
 
 class UserProfileResp(BaseModel):
     user: Dict[str, Any]

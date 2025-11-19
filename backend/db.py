@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive' | 'suspended'
   display_name TEXT,            -- user's display name
-  theme TEXT DEFAULT 'light'    -- UI theme preference
+  theme TEXT DEFAULT 'light',   -- UI theme preference
+  avatar TEXT,                  -- user's profile photo (data URL or path)
+  phone TEXT,                   -- user's phone number
+  lang TEXT DEFAULT 'en',       -- user's preferred language
+  otp_enabled INTEGER DEFAULT 0 -- 2FA enabled flag (0 or 1)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

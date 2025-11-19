@@ -280,6 +280,10 @@ export async function loadProfile() {
       displayName: data.user.display_name,
       did: data.user.did,
       theme: data.user.theme,
+      avatar: data.user.avatar,
+      phone: data.user.phone,
+      lang: data.user.lang,
+      otpEnabled: data.user.otp_enabled,
     };
   } catch (error) {
     console.warn("Backend profile fetch failed, falling back to localStorage:", error.message);
@@ -312,6 +316,10 @@ export async function saveProfile(profile) {
       body: JSON.stringify({
         display_name: profile.displayName,
         theme: profile.theme,
+        avatar: profile.avatar,
+        phone: profile.phone,
+        lang: profile.lang,
+        otp_enabled: profile.otpEnabled,
       }),
     });
 

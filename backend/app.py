@@ -337,10 +337,10 @@ async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_
     display_name = f"{body.first_name} {body.last_name}".strip()
     cur = await db.execute(
         """
-        INSERT INTO users(email, first_name, last_name, password_hash, did, display_name, theme, created_at, updated_at, status)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        INSERT INTO users(email, first_name, last_name, password_hash, did, display_name, theme, avatar, phone, lang, otp_enabled, created_at, updated_at, status)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """,
-        (email, body.first_name, body.last_name, password_hash, body.did or "", display_name, "light", now, now),
+        (email, body.first_name, body.last_name, password_hash, body.did or "", display_name, "light", "", "", "en", 0, now, now),
     )
     await db.commit()
     user_id = cur.lastrowid
@@ -430,7 +430,7 @@ async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(ge
             raise HTTPException(status_code=401, detail="invalid_token")
         
         user = await db.execute_fetchone(
-            "SELECT id, email, first_name, last_name, did, display_name, theme FROM users WHERE id=?",
+            "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled FROM users WHERE id=?",
             (user_id,)
         )
         if not user:
@@ -540,6 +540,10 @@ async def user_profile_get(request: Request, user=Depends(_get_current_user)):
         "did": user["did"] or "",
         "display_name": user["display_name"] or "",
         "theme": user["theme"] or "light",
+        "avatar": user.get("avatar") or "",
+        "phone": user.get("phone") or "",
+        "lang": user.get("lang") or "en",
+        "otp_enabled": bool(user.get("otp_enabled", 0)),
     })
 
 
@@ -560,6 +564,22 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
         updates.append("theme=?")
         params.append(body.theme)
     
+    if body.avatar is not None:
+        updates.append("avatar=?")
+        params.append(body.avatar)
+    
+    if body.phone is not None:
+        updates.append("phone=?")
+        params.append(body.phone)
+    
+    if body.lang is not None:
+        updates.append("lang=?")
+        params.append(body.lang)
+    
+    if body.otp_enabled is not None:
+        updates.append("otp_enabled=?")
+        params.append(1 if body.otp_enabled else 0)
+    
     if updates:
         updates.append("updated_at=?")
         params.append(now)
@@ -571,7 +591,7 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
     
     # Fetch updated user
     updated_user = await db.execute_fetchone(
-        "SELECT id, email, first_name, last_name, did, display_name, theme FROM users WHERE id=?",
+        "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled FROM users WHERE id=?",
         (user["id"],)
     )
     
@@ -583,6 +603,10 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
         "did": updated_user["did"] or "",
         "display_name": updated_user["display_name"] or "",
         "theme": updated_user["theme"] or "light",
+        "avatar": updated_user["avatar"] or "",
+        "phone": updated_user["phone"] or "",
+        "lang": updated_user["lang"] or "en",
+        "otp_enabled": bool(updated_user["otp_enabled"]),
     })
 
 
