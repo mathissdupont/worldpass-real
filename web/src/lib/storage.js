@@ -6,7 +6,7 @@ const API_BASE = "/api";
 // --- Keyler (tekleştirilmiş) ---
 const VC_KEY       = "wp.vcs";         // Tek doğru key (backward compat için)
 const OLD_VC_KEYS  = ["wp_vcs"];       // Eski anahtarlar (taşınacak)
-const PROFILE_KEY  = "wp_profile";     // {displayName, did} (backward compat için)
+const PROFILE_KEY  = "wp_profile";     // Profile data (fallback for non-authenticated users)
 const IDENTITY_KEY = "worldpass_identity"; // Kimlik için key (identityContext ile uyumlu)
 const DISPLAY_NAME_KEY = "worldpass_displayName"; // Görünen ad için key
 const TOKEN_KEY = "wp_token";
