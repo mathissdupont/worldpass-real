@@ -5,21 +5,20 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Bağımlılıklar
+# Copy requirements
 COPY requirements.txt ./requirements.txt
 
+# Install dependencies (with SSL workaround for build environment)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
-    && pip install -r requirements.txt \
+    && apt-get install -y --no-install-recommends build-essential ca-certificates \
+    && pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt \
     && apt-get purge -y build-essential \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
-# Uygulama kodu
+# Copy application code
 COPY . .
 
 EXPOSE 8000
 
-# backend klasörünün içinde app.py var, konteks zaten backend olduğu için /app/app.py
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
-
