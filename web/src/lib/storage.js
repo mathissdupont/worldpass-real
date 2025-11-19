@@ -6,7 +6,7 @@ const API_BASE = "/api";
 // --- Keyler (tekleştirilmiş) ---
 const VC_KEY       = "wp.vcs";         // Tek doğru key (backward compat için)
 const OLD_VC_KEYS  = ["wp_vcs"];       // Eski anahtarlar (taşınacak)
-const PROFILE_KEY  = "wp_profile";     // {displayName, did} (backward compat için)
+const PROFILE_KEY  = "wp_profile";     // Profile data (fallback for non-authenticated users)
 const IDENTITY_KEY = "worldpass_identity"; // Kimlik için key (identityContext ile uyumlu)
 const DISPLAY_NAME_KEY = "worldpass_displayName"; // Görünen ad için key
 const TOKEN_KEY = "wp_token";
@@ -280,6 +280,10 @@ export async function loadProfile() {
       displayName: data.user.display_name,
       did: data.user.did,
       theme: data.user.theme,
+      avatar: data.user.avatar,
+      phone: data.user.phone,
+      lang: data.user.lang,
+      otpEnabled: data.user.otp_enabled,
     };
   } catch (error) {
     console.warn("Backend profile fetch failed, falling back to localStorage:", error.message);
@@ -312,6 +316,10 @@ export async function saveProfile(profile) {
       body: JSON.stringify({
         display_name: profile.displayName,
         theme: profile.theme,
+        avatar: profile.avatar,
+        phone: profile.phone,
+        lang: profile.lang,
+        otp_enabled: profile.otpEnabled,
       }),
     });
 

@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive' | 'suspended'
   display_name TEXT,            -- user's display name
-  theme TEXT DEFAULT 'light'    -- UI theme preference
+  theme TEXT DEFAULT 'light',   -- UI theme preference
+  avatar TEXT,                  -- user's profile photo (data URL or path)
+  phone TEXT,                   -- user's phone number
+  lang TEXT DEFAULT 'en',       -- user's preferred language
+  otp_enabled INTEGER DEFAULT 0 -- 2FA enabled flag (0 or 1)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -163,3 +167,33 @@ async def init_db():
     async with aiosqlite.connect(settings.SQLITE_PATH) as conn:
         await conn.executescript(SCHEMA_SQL)
         await conn.commit()
+        
+        # Run migrations for existing databases
+        await _run_migrations(conn)
+
+async def _run_migrations(conn: aiosqlite.Connection):
+    """Run database migrations to add new columns to existing tables"""
+    
+    # Check if avatar column exists in users table
+    cursor = await conn.execute("PRAGMA table_info(users)")
+    columns = await cursor.fetchall()
+    column_names = [col[1] for col in columns]
+    
+    # Add missing columns if they don't exist
+    migrations = [
+        ("avatar", "ALTER TABLE users ADD COLUMN avatar TEXT"),
+        ("phone", "ALTER TABLE users ADD COLUMN phone TEXT"),
+        ("lang", "ALTER TABLE users ADD COLUMN lang TEXT DEFAULT 'en'"),
+        ("otp_enabled", "ALTER TABLE users ADD COLUMN otp_enabled INTEGER DEFAULT 0"),
+    ]
+    
+    for column_name, alter_sql in migrations:
+        if column_name not in column_names:
+            try:
+                await conn.execute(alter_sql)
+                print(f"Migration: Added column {column_name} to users table")
+            except Exception as e:
+                # Column might already exist due to race condition or previous partial migration
+                print(f"Migration warning: Could not add column {column_name}: {e}")
+    
+    await conn.commit()

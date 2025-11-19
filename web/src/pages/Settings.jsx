@@ -53,7 +53,7 @@ function Toast({ toast }) {
 export default function Settings() {
   const { identity, setIdentity } = useIdentity();
 
-  // ---- Profile (local only) ----
+  // ---- Profile (synced with backend when authenticated) ----
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
