@@ -103,21 +103,16 @@ export async function getVCs() {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch VCs");
+      throw new Error("Failed to fetch VCs from backend");
     }
 
     const data = await response.json();
     return data.vcs.map(item => item.vc_payload);
   } catch (error) {
-    console.warn("Backend VC fetch failed, falling back to localStorage:", error.message);
-    // Fallback to localStorage
-    try {
-      const raw = localStorage.getItem(VC_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch {
-      return [];
-    }
+    console.error("Backend VC fetch failed:", error.message);
+    // When authenticated, backend should be the source of truth
+    // Don't fall back to localStorage - throw error so UI can handle it
+    throw new Error("Unable to fetch credentials from server. Please check your connection.");
   }
 }
 
@@ -126,16 +121,16 @@ export async function setVCs(list) {
   const token = getToken();
   
   if (!token) {
-    // Fallback to localStorage if no token
+    // When not authenticated, store in localStorage temporarily
     localStorage.setItem(VC_KEY, JSON.stringify(list || []));
     window.dispatchEvent(new Event("vcs:changed"));
     return;
   }
 
-  // This function is less commonly used now - prefer addVC and removeVC
-  // But we keep it for backward compatibility
-  localStorage.setItem(VC_KEY, JSON.stringify(list || []));
-  window.dispatchEvent(new Event("vcs:changed"));
+  // When authenticated, this function should not be used
+  // Use addVC and removeVC instead which properly sync to backend
+  console.warn("setVCs called with token - use addVC/removeVC for backend sync");
+  throw new Error("Please use addVC/removeVC methods for authenticated users");
 }
 
 /** Yeni VC ekle veya güncelle */
@@ -165,21 +160,16 @@ export async function addVC(vc) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to add VC");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to add credential to backend");
     }
 
     window.dispatchEvent(new Event("vcs:changed"));
     return await getVCs();
   } catch (error) {
-    console.warn("Backend VC add failed, falling back to localStorage:", error.message);
-    // Fallback to localStorage
-    const all = await getVCs();
-    const idx = all.findIndex(x => x?.jti === vc?.jti);
-    if (idx === -1) all.unshift(vc);
-    else all[idx] = vc;
-    localStorage.setItem(VC_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event("vcs:changed"));
-    return all;
+    console.error("Backend VC add failed:", error.message);
+    // When authenticated, backend must work - don't fall back to localStorage
+    throw new Error("Unable to save credential to server. Please check your connection.");
   }
 }
 
@@ -207,18 +197,16 @@ export async function removeVC(jti) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to delete VC");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to delete credential from backend");
     }
 
     window.dispatchEvent(new Event("vcs:changed"));
     return await getVCs();
   } catch (error) {
-    console.warn("Backend VC delete failed, falling back to localStorage:", error.message);
-    // Fallback to localStorage
-    const all = (await getVCs()).filter(x => x?.jti !== jti);
-    localStorage.setItem(VC_KEY, JSON.stringify(all));
-    window.dispatchEvent(new Event("vcs:changed"));
-    return all;
+    console.error("Backend VC delete failed:", error.message);
+    // When authenticated, backend must work - don't fall back to localStorage
+    throw new Error("Unable to delete credential from server. Please check your connection.");
   }
 }
 
@@ -271,7 +259,7 @@ export async function loadProfile() {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch profile");
+      throw new Error("Failed to fetch profile from backend");
     }
 
     const data = await response.json();
@@ -286,13 +274,9 @@ export async function loadProfile() {
       otpEnabled: data.user.otp_enabled,
     };
   } catch (error) {
-    console.warn("Backend profile fetch failed, falling back to localStorage:", error.message);
-    // Fallback to localStorage
-    try {
-      return JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}");
-    } catch {
-      return {};
-    }
+    console.error("Backend profile fetch failed:", error.message);
+    // When authenticated, backend should be the source of truth
+    throw new Error("Unable to fetch profile from server. Please check your connection.");
   }
 }
 
@@ -300,7 +284,7 @@ export async function saveProfile(profile) {
   const token = getToken();
   
   if (!token) {
-    // Fallback to localStorage
+    // When not authenticated, store in localStorage temporarily
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile || {}));
     return;
   }
@@ -324,12 +308,13 @@ export async function saveProfile(profile) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to save profile");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Failed to save profile to backend");
     }
   } catch (error) {
-    console.warn("Backend profile save failed, falling back to localStorage:", error.message);
-    // Fallback to localStorage
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile || {}));
+    console.error("Backend profile save failed:", error.message);
+    // When authenticated, backend must work - don't fall back to localStorage
+    throw new Error("Unable to save profile to server. Please check your connection.");
   }
 }
 
