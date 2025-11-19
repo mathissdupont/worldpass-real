@@ -183,8 +183,8 @@ export default function Register(){
       {/* Üst başlık + stepper */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[color:var(--text)]">{t('new_account')}</h1>
-          <p className="text-sm text-[color:var(--muted)] mt-1">{t('new_account_intro')}</p>
+          <h1 className="text-xl font-semibold text-[color:var(--text)]">{t('create_user_account')}</h1>
+          <p className="text-sm text-[color:var(--muted)] mt-1">{t('new_account_intro_beta')}</p>
         </div>
         <div className="flex items-center gap-4">
           <StepChip

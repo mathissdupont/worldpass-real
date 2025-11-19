@@ -7,6 +7,8 @@
   "create_did_paragraph": "Yeni bir DID ve şifreli keystore oluşturup indir.",
   "after_create_hint": "Oluşturduktan sonra Ayarlar → Load ile geri yükleyebilirsin.",
   "sign_in": "Oturum Aç",
+  "user_sign_in": "Kullanıcı Girişi",
+  "beta": "Beta",
   "local_demo_auth": "Yerel demo kimlik doğrulama",
   "email": "E-posta",
   "password": "Parola",
@@ -17,6 +19,7 @@
   "login_failed": "Giriş başarısız",
   "no_account": "Hesabın yok mu?",
   "register": "Kayıt ol",
+  "create_user_account": "Kullanıcı Hesabı Oluştur",
   "capslock_on": "CapsLock açık olabilir.",
   "remember": "Hatırla",
   "approve": "Onayla",
@@ -40,6 +43,7 @@
   ,"mini_qr_hint": "Hızlı paylaşım için mini-QR."
   ,"new_account": "Yeni Hesap"
   ,"new_account_intro": "Önce bu cihaza ait kimliğini ve anahtar dosyanı hazırlıyorsun, sonra giriş yapacağın hesabı oluşturuyorsun."
+  ,"new_account_intro_beta": "Dijital kimliğinizi oluşturun ve WorldPass hesabınızı açın."
   ,"step_identity_keystore": "Kimlik & Anahtar Deposu"
   ,"step_user_account": "Kullanıcı Hesabı"
   ,"step1_title": "Adım 1 — Kimlik ve Anahtar Deposu"
@@ -81,6 +85,7 @@
   ,"password_change_demo": "Parola değişikliği demo yer tutucudur. Gerçek uygulamada eski şifre doğrulanır ve yeni şifre backend tarafında güvenli şekilde güncellenir."
   ,"my_account": "Hesabım"
   ,"my_account_desc": "Bu bilgiler yalnızca bu tarayıcıda saklanır."
+  ,"my_account_desc_cloud": "Hesap bilgileriniz WorldPass hesabınızla senkronize edilir."
   ,"upload": "Yükle"
   ,"display_name": "Görünecek İsim"
   ,"phone": "Telefon"
@@ -89,6 +94,13 @@
   ,"change_password_demo": "Parolayı Değiştir (demo)"
   ,"security": "Güvenlik"
   ,"security_desc": "Keystore yalnızca cihazında şifrelenmiş olarak saklanır."
+  ,"security_desc_account": "Hesap güvenlik ayarlarınızı ve dijital kimliğinizi yönetin."
+  ,"two_factor_auth": "İki Aşamalı Doğrulama (Beta)"
+  ,"two_factor_desc_beta": "Ek hesap koruması. Bu anahtar bir önizlemedir; tam uygulama yakında geliyor."
+  ,"clear_session_data": "Oturum Verilerini Temizle"
+  ,"clear_session_data_desc": "Bu yalnızca bu tarayıcının yerel verilerini temizler. Hesabınızı veya yayıncılardan aldığınız kimlik bilgilerini silmez."
+  ,"clear_credential_cache": "Kimlik Bilgisi Önbelleğini Temizle"
+  ,"clear_credential_cache_desc": "Bu, bu tarayıcıdaki önbelleğe alınmış kimlik bilgilerini temizler. Yayıncılardan aldığınız kimlik bilgilerini silmez."
   ,"active_did": "Aktif DID"
   ,"download_identity_json": "Kimlik dosyasını indir"
   ,"export_keystore": "Anahtar deposunu dışa aktar"
@@ -98,7 +110,7 @@
   ,"forget_identity_ram": "RAM'dan kimliği unut"
   ,"general_settings": "Genel Ayarlar"
   ,"theme": "Tema"
-  ,"theme_desc": "Açık / Koyu ya da Sistem teması."
+  ,"theme_desc": "Açık, koyu veya sistem teması seçin. Tercih hesabınıza kaydedilir."
   ,"theme_light": "Açık"
   ,"theme_dark": "Koyu"
   ,"theme_system": "Sistem"
@@ -234,6 +246,10 @@
     ,"reset": "Sıfırla"
     ,"step3_verify": "3) Doğrula"
     ,"verify": "Doğrula"
+  ,"verify_credential": "Doğrula"
+  ,"present_credential": "Göster"
+  ,"user_login": "Kullanıcı Girişi"
+  ,"user_register": "Kullanıcı Kaydı"
 
     ,"issuer_missing_err": "Önce issuer kimliğini yükle/oluştur." 
   ,"subject_name_required": "Konu adı boş olamaz."
@@ -372,6 +388,10 @@
   ,"issuer.register.create_org": "Kuruluş Oluştur"
     ,"issuer.register.created": "Kuruluş kaydı oluşturuldu."
     ,"issuer.register.create_failed": "Kuruluş kaydı oluşturulamadı."
+  ,"issuer.register.org_did_note": "Hesabınızdaki dijital kimlik, kuruluş için kullanılacak (beta)."
+  ,"issuer.register.keystore_note": "Keystore bellekte tutulur. Yenileme yeniden yükleme gerektirir."
+  ,"issuer.register.in_production": "üretimde"
+  ,"issuer.register.beta_note": "Not: Bu beta. Üretim için, DNS/HTTP doğrulaması backend'de yapılmalıdır."
 
   ,"admin.issuers.list_title": "Yayıncılar"
   ,"no_vc": "VC yok"
@@ -480,4 +500,42 @@
   ,"invalid": "Geçersiz"
   ,"valid": "Geçerli"
   ,"revoked": "iptal edilmiş"
+  ,"org_console.overview": "Genel Bakış"
+  ,"org_console.templates": "Şablonlar"
+  ,"org_console.issuance": "Sertifika Verme"
+  ,"org_console.issued_credentials": "Verilen Sertifikalar"
+  ,"org_console.verification_logs": "Doğrulama Kayıtları (Yakında)"
+  ,"org_console.org_settings": "Kuruluş Ayarları"
+  ,"org_console.org_name": "Kuruluş Adı"
+  ,"org_console.org_id": "Kuruluş ID"
+  ,"org_console.templates_count": "Şablonlar"
+  ,"org_console.issued_count": "Verilen Sertifikalar"
+  ,"org_console.create_first_template": "İlk şablonunu oluştur"
+  ,"org_console.issue_new": "Yeni sertifika ver"
+  ,"org_console.certificate_templates": "Sertifika Şablonları"
+  ,"org_console.templates_help": "Şablonlar, gelişmiş bir format kullanarak sertifikalarınızın yapısını ve alanlarını tanımlar."
+  ,"org_console.create_template": "Şablon Oluştur"
+  ,"org_console.edit_template": "Şablonu Düzenle"
+  ,"org_console.delete_template": "Şablonu Sil"
+  ,"org_console.advanced_editor": "Gelişmiş Editör (Beta)"
+  ,"org_console.choose_template": "Şablon Seç"
+  ,"org_console.enter_subject": "Konu tanımlayıcısı girin (kullanıcının dijital kimliği veya e-postası)"
+  ,"org_console.fill_required": "Gerekli alanları doldurun"
+  ,"org_console.success_message": "Sertifika başarıyla verildi. Linki veya QR'ı kullanıcınızla paylaşabilirsiniz."
+  ,"org_console.error_check_fields": "Sertifika verilemedi. Lütfen alanları kontrol edip tekrar deneyin."
+  ,"org_console.org_display_name": "Kuruluş Görünen Adı"
+  ,"org_console.logo": "Logo"
+  ,"org_console.contact_email": "İletişim E-postası"
+  ,"org_console.website": "Web Sitesi URL"
+  ,"org_console.template_format_label": "Sertifika Şablonu (Gelişmiş Format)"
+  ,"org_console.template_format_desc": "Şablonlar, sertifikanın görünümünü ve alanlarını tanımlamak için dahili olarak yapılandırılmış formatlar (WPML/WPT) kullanır."
+  ,"org_console.title": "Kuruluş Konsolu"
+  ,"org_console.organization": "Kuruluş"
+  ,"org_console.create_org_first": "Önce bir kuruluş oluşturun ve doğrulayın."
+  ,"org_console.template_key": "Şablon Anahtarı (Kısa Kod)"
+  ,"org_console.template_name": "Şablon Adı"
+  ,"org_console.design_in_editor": "Editörde Tasarla"
+  ,"org_console.load_wpt": ".wpt Yükle"
+  ,"org_console.advanced_json": "Gelişmiş JSON"
+  ,"org_console.saved_templates": "Kayıtlı Şablonlar"
 }

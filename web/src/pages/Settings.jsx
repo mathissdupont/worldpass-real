@@ -331,7 +331,7 @@ export default function Settings() {
       {/* Account */}
       <Section
         title={t('my_account')}
-        desc={t('my_account_desc')}
+        desc={t('my_account_desc_cloud')}
         icon={
           <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -457,7 +457,7 @@ export default function Settings() {
       {/* Security */}
       <Section
         title={t('security')}
-        desc={t('security_desc')}
+        desc={t('security_desc_account')}
         icon={
           <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -500,8 +500,8 @@ export default function Settings() {
           <div className="rounded-xl border border-[color:var(--border)] p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-[color:var(--text)]">{t('two_factor_demo')}</div>
-                <div className="text-xs text-[color:var(--muted)]">{t('two_factor_desc')}</div>
+                <div className="text-sm font-medium text-[color:var(--text)]">{t('two_factor_auth')}</div>
+                <div className="text-xs text-[color:var(--muted)]">{t('two_factor_desc_beta')}</div>
               </div>
               <label className="inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={otpEnabled} onChange={toggleOtp} />
@@ -604,8 +604,8 @@ export default function Settings() {
       >
         <div className="grid md:grid-cols-2 gap-4">
           <div className="rounded-xl border border-rose-400/30 bg-[color:var(--panel-2)] p-4">
-            <div className="text-sm font-medium text-rose-300">{t('remove_identity_ram')}</div>
-            <p className="text-xs text-rose-300/80 mt-1">{t('remove_identity_ram_desc')}</p>
+            <div className="text-sm font-medium text-rose-300">{t('clear_session_data')}</div>
+            <p className="text-xs text-rose-300/80 mt-1">{t('clear_session_data_desc')}</p>
             <button
               onClick={forget}
               className="mt-3 px-3 py-2 rounded-lg border border-rose-400/30 text-rose-300"
@@ -615,8 +615,8 @@ export default function Settings() {
           </div>
 
           <div className="rounded-xl border border-amber-400/30 bg-[color:var(--panel-2)] p-4">
-            <div className="text-sm font-medium text-amber-300">{t('clear_local_vc_cache')}</div>
-            <p className="text-xs text-amber-300/80 mt-1">{t('clear_local_vc_cache_desc')}</p>
+            <div className="text-sm font-medium text-amber-300">{t('clear_credential_cache')}</div>
+            <p className="text-xs text-amber-300/80 mt-1">{t('clear_credential_cache_desc')}</p>
             <button
               onClick={clearVCs}
               className="mt-3 px-3 py-2 rounded-lg border border-amber-400/30 text-amber-300"

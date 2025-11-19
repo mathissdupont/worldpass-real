@@ -187,7 +187,7 @@ export default function Login(){
 
       <div className="wp-panel p-8 rounded-3xl shadow-lg max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-[color:var(--text)]">{t('sign_in')}</h2>
+          <h2 className="text-xl font-semibold text-[color:var(--text)]">{t('user_sign_in')}</h2>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -196,7 +196,7 @@ export default function Login(){
             >
               {t('worldpass_login')}
             </button>
-            <span className="text-xs px-2 py-1 rounded-full bg-[color:var(--panel-2)] border border-[color:var(--border)] text-[color:var(--muted)]">{t('local_demo_auth')}</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-[color:var(--panel-2)] border border-[color:var(--border)] text-[color:var(--muted)]">{t('beta')}</span>
           </div>
         </div>
 
@@ -307,9 +307,9 @@ export default function Login(){
 
         <div className="mt-6 text-center">
           <p className="text-sm text-[color:var(--muted)]">
-            Hesabın yok mu?{" "}
+            {t('no_account')}{" "}
             <Link to="/register" className="text-[color:var(--brand-2)] hover:text-[color:var(--brand-3)] font-medium transition-colors underline">
-              {t('register')}
+              {t('create_user_account')}
             </Link>
           </p>
         </div>

@@ -164,7 +164,7 @@ export default function IssuerRegister() {
         )}
 
         <p className="text-xs text-gray-500 mt-2">
-          Kuruluş DID olarak hesabındaki DID kullanılacak (demo).
+          {t('issuer.register.org_did_note')}
         </p>
 
         <div className="mt-4 space-y-3">
@@ -250,7 +250,7 @@ export default function IssuerRegister() {
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
             <h3 className="font-semibold">{t('issuer.register.load_create_did')}</h3>
             <p className="text-xs text-gray-500 mb-3">
-              Keystore RAM’de tutulur. Sayfayı yenilersen tekrar yüklemen gerekir.
+              {t('issuer.register.keystore_note')}
             </p>
             <IdentityLoad onLoaded={(ident) => setIdentity(ident)} />
             <div className="my-3 h-px bg-gray-200" />
@@ -279,7 +279,7 @@ export default function IssuerRegister() {
 
                 <div className="mt-3 space-y-3">
                   <div>
-                    <div className="text-xs text-gray-600 mb-1">DNS TXT (gerçekte):</div>
+                    <div className="text-xs text-gray-600 mb-1">DNS TXT ({t('issuer.register.in_production')}):</div>
                     <div className="rounded-lg border bg-gray-50 p-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <pre className="whitespace-pre-wrap break-all">{dnsSnippet}</pre>
@@ -290,7 +290,7 @@ export default function IssuerRegister() {
 
                   <div>
                     <div className="text-xs text-gray-600 mb-1">
-                      HTTP well-known (gerçekte):
+                      HTTP well-known ({t('issuer.register.in_production')}):
                     </div>
                     <div className="rounded-lg border bg-gray-50 p-2 text-xs">
                       <div className="flex items-center justify-between gap-2">
@@ -302,7 +302,7 @@ export default function IssuerRegister() {
                 </div>
               </div>
 
-              {/* demo doğrulama alanı */}
+              {/* beta verification area */}
                 <div className="mt-4">
                 <Label>{t('issuer.register.paste_token')}</Label>
                 <div className="flex items-center gap-2">
@@ -357,7 +357,7 @@ export default function IssuerRegister() {
                 </details>
 
                 <p className="mt-3 text-[11px] text-gray-500">
-                  Not: Bu demo. Gerçek doğrulama için backend’te DNS/HTTP kontrolü yapmalıyız.
+                                    {t('issuer.register.beta_note')}
                 </p>
               </div>
             </>
