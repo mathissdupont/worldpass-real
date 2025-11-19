@@ -83,10 +83,9 @@ export default function NavBar({ health, user, features }) {
 
   const navItems = [
     { to: "/account",           label: t('my_account'),         icon: "account" },
-    { to: "/issue",             label: "Yayıncı (Oluştur)",      icon: "issue",   roles: ["issuer"] },
-    { to: "/verify",            label: "Doğrula",                icon: "verify" },
+    { to: "/verify",            label: t('verify_credential'),  icon: "verify" },
     { to: "/credentials",       label: t('my_credentials'),     icon: "list" },
-    { to: "/present",           label: "Göster",                 icon: "present" },
+    { to: "/present",           label: t('present_credential'), icon: "present" },
     { to: "/settings",          label: t('settings'),           icon: "settings" },
     { to: "/issuer/register",   label: t('issuer_register'),    icon: "shield",  roles: ["issuer"] },
     { to: "/issuer/console",    label: t('issuer_console'),     icon: "issue",   roles: ["issuer"] },
@@ -96,9 +95,9 @@ export default function NavBar({ health, user, features }) {
   const leftMenu = authed
     ? navItems.filter(i => hasAccess(i, user, features))
     : [
-        {to:"/login",    label:"Giriş",       icon:"login"},
-        {to:"/register", label:"Kayıt",       icon:"register"},
-        {to:"/verify",   label:"Doğrula",     icon:"verify"},
+        {to:"/login",    label:t('user_login'),       icon:"login"},
+        {to:"/register", label:t('user_register'),    icon:"register"},
+        {to:"/verify",   label:t('verify_credential'), icon:"verify"},
       ];
 
   const logout = ()=>{
