@@ -1,9 +1,12 @@
+import en from '../i18n/en.json';
 import tr from '../i18n/tr.json';
 
-const locales = { tr };
-let current = 'tr';
+const locales = { en, tr };
+let current = 'en'; // Default to English for beta
 
 export function setLocale(l){ if(locales[l]) current = l; }
+
+export function getLocale(){ return current; }
 
 export function t(key, vars){
   const dict = locales[current] || {};
