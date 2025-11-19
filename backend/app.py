@@ -540,10 +540,10 @@ async def user_profile_get(request: Request, user=Depends(_get_current_user)):
         "did": user["did"] or "",
         "display_name": user["display_name"] or "",
         "theme": user["theme"] or "light",
-        "avatar": user.get("avatar") or "",
-        "phone": user.get("phone") or "",
-        "lang": user.get("lang") or "en",
-        "otp_enabled": bool(user.get("otp_enabled", 0)),
+        "avatar": user["avatar"] or "" if user["avatar"] is not None else "",
+        "phone": user["phone"] or "" if user["phone"] is not None else "",
+        "lang": user["lang"] or "en",
+        "otp_enabled": bool(user["otp_enabled"]),
     })
 
 
