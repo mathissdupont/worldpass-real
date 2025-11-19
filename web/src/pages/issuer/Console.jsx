@@ -380,13 +380,13 @@ export default function IssuerConsole(){
       {/* LEFT */}
       <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-6 shadow-sm relative">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text)]">Kurumsal Sertifika Paneli</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text)]">{t('org_console.title')}</h2>
           {flash && <Pill tone={flash.tone}>{flash.text}</Pill>}
         </div>
 
         {/* ORGANIZATION */}
         <div className="mt-4">
-          <Label text="Kurum"/>
+          <Label text={t('org_console.organization')}/>
           <div className="relative">
             <select
               value={orgId}
@@ -397,33 +397,34 @@ export default function IssuerConsole(){
             </select>
             <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9l6 6 6-6"/></svg>
           </div>
-          {!verifiedOrgs.length && <div className="mt-2"><Pill tone="warn">Önce bir kurum oluştur ve doğrula.</Pill></div>}
+          {!verifiedOrgs.length && <div className="mt-2"><Pill tone="warn">{t('org_console.create_org_first')}</Pill></div>}
         </div>
 
         {/* TEMPLATE SOURCE */}
         <div className="mt-6">
           <div className="flex items-center justify_between">
-            <h3 className="font-semibold text-[color:var(--text)]">Sertifika Taslağı</h3>
+            <h3 className="font-semibold text-[color:var(--text)]">{t('org_console.template_format_label')}</h3>
             <Badge tone="info">{mode==="wpt" ? "WPT" : mode==="wpml" ? "WPML" : "JSON"}</Badge>
           </div>
+          <p className="text-xs text-[color:var(--muted)] mt-1">{t('org_console.template_format_desc')}</p>
 
           {/* meta */}
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <div><Label text="Anahtar (kısa kod)"/><Input value={tplKey} onChange={e=>setTplKey(e.target.value)} /></div>
-            <div><Label text="Taslak adı"/><Input value={tplName} onChange={e=>setTplName(e.target.value)} /></div>
+            <div><Label text={t('org_console.template_key')}/><Input value={tplKey} onChange={e=>setTplKey(e.target.value)} /></div>
+            <div><Label text={t('org_console.template_name')}/><Input value={tplName} onChange={e=>setTplName(e.target.value)} /></div>
           </div>
 
           {/* toolbar */}
           <div className="mt-3 grid sm:grid-cols-3 gap-2">
-            <button onClick={()=>setEditorOpen(true)} className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]">Editörde Tasarla</button>
+            <button onClick={()=>setEditorOpen(true)} className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]">{t('org_console.design_in_editor')}</button>
 
             <label className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] cursor-pointer text-center">
-              .wpt yükle
+              {t('org_console.load_wpt')}
               <input type="file" accept=".wpt,text/plain" onChange={onUploadWPT} className="hidden" />
             </label>
 
             <div className="flex items-center justify-between px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]">
-              <span className="text-sm text-[color:var(--text)]">Gelişmiş JSON</span>
+              <span className="text-sm text-[color:var(--text)]">{t('org_console.advanced_json')}</span>
               <button
                 onClick={()=>setShowAdvanced(v=>!v)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${showAdvanced?"bg-[color:var(--brand)]":"bg-[color:var(--border)]"}`}
@@ -437,7 +438,7 @@ export default function IssuerConsole(){
           {/* existing templates (org) */}
           {!!orgTemplates.length && (
             <div className="mt-3">
-              <div className="text-sm text-[color:var(--text)] mb-1">Kayıtlı taslaklar</div>
+              <div className="text-sm text-[color:var(--text)] mb-1">{t('org_console.saved_templates')}</div>
               <div className="flex flex-wrap gap-2">
                 {orgTemplates.map(([k, v])=>(
                   <button

@@ -380,6 +380,10 @@
   "issuer.register.create_org": "Create Organization",
   "issuer.register.created": "Organization registration created.",
   "issuer.register.create_failed": "Failed to create organization registration.",
+  "issuer.register.org_did_note": "Your account's digital ID will be used for the organization (beta).",
+  "issuer.register.keystore_note": "The keystore is kept in memory. Refresh requires reloading.",
+  "issuer.register.in_production": "in production",
+  "issuer.register.beta_note": "Note: This is beta. For production, DNS/HTTP verification should be done in the backend.",
   "admin.issuers.list_title": "Issuers",
   "no_vc": "No credentials",
   "issuer.console.title": "Organization Console",
@@ -514,5 +518,14 @@
   "org_console.contact_email": "Contact Email",
   "org_console.website": "Website URL",
   "org_console.template_format_label": "Certificate Template (Advanced Format)",
-  "org_console.template_format_desc": "Templates use structured formats (WPML/WPT) internally to define credential appearance and fields."
+  "org_console.template_format_desc": "Templates use structured formats (WPML/WPT) internally to define credential appearance and fields.",
+  "org_console.title": "Organization Console",
+  "org_console.organization": "Organization",
+  "org_console.create_org_first": "Create and verify an organization first.",
+  "org_console.template_key": "Template Key (Short Code)",
+  "org_console.template_name": "Template Name",
+  "org_console.design_in_editor": "Design in Editor",
+  "org_console.load_wpt": "Load .wpt",
+  "org_console.advanced_json": "Advanced JSON",
+  "org_console.saved_templates": "Saved Templates"
 }
