@@ -1,10 +1,11 @@
 // src/pages/Settings.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useIdentity } from "../lib/identityContext";
 import { t } from "../lib/i18n";
 import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 import { getToken } from "../lib/auth";
+import { fetchProfile, updateProfile } from "../lib/profileApi";
 
 const API_BASE = "/api";
 
@@ -62,22 +63,7 @@ export default function Settings() {
   const [otpEnabled, setOtpEnabled] = useState(false);
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("light");
-
-  // Load profile on mount (async)
-  useEffect(() => {
-    const loadData = async () => {
-      const p0 = await loadProfile();
-      setDisplayName(p0.displayName || "");
-      setEmail(p0.email || "");
-      setPhone(p0.phone || "");
-      setAvatar(p0.avatar || "");
-      setOtpEnabled(!!p0.otpEnabled);
-      setLang(p0.lang || "en");
-      setTheme(p0.theme || "light");
-      setProfileLoaded(true);
-    };
-    loadData();
-  }, []);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // ---- Toast ----
   const [toast, setToast] = useState(null); // {type:'ok'|'err'|'info', text:''}
@@ -87,7 +73,56 @@ export default function Settings() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ---- Theme apply (handles "system") ----
+  // Load profile on mount (async) - from backend if authenticated, else localStorage
+  useEffect(() => {
+    const loadData = async () => {
+      const token = getToken();
+      
+      if (token) {
+        // Authenticated: fetch from backend
+        try {
+          const profile = await fetchProfile(token);
+          setDisplayName(profile.displayName || "");
+          setEmail(profile.email || "");
+          setPhone(profile.phone || "");
+          setAvatar(profile.avatar || "");
+          setOtpEnabled(!!profile.otpEnabled);
+          setLang(profile.lang || "en");
+          setTheme(profile.theme || "light");
+          
+          // Optionally cache locally for offline/speed
+          await saveProfile(profile).catch(() => {}); // silent fail
+        } catch (error) {
+          console.error("Failed to load profile from backend:", error);
+          // Fallback to localStorage if backend fails
+          const p0 = await loadProfile().catch(() => ({}));
+          setDisplayName(p0.displayName || "");
+          setEmail(p0.email || "");
+          setPhone(p0.phone || "");
+          setAvatar(p0.avatar || "");
+          setOtpEnabled(!!p0.otpEnabled);
+          setLang(p0.lang || "en");
+          setTheme(p0.theme || "light");
+          setToast({ type: "err", text: t('profile_load_failed') });
+        }
+      } else {
+        // Not authenticated: load from localStorage
+        const p0 = await loadProfile().catch(() => ({}));
+        setDisplayName(p0.displayName || "");
+        setEmail(p0.email || "");
+        setPhone(p0.phone || "");
+        setAvatar(p0.avatar || "");
+        setOtpEnabled(!!p0.otpEnabled);
+        setLang(p0.lang || "en");
+        setTheme(p0.theme || "light");
+      }
+      
+      setProfileLoaded(true);
+    };
+    loadData();
+  }, []);
+
+  // ---- Theme apply (handles "system") and sync to backend ----
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
@@ -96,22 +131,28 @@ export default function Settings() {
       root.classList.remove("dark", "system");
     }
     
-    // Save theme to backend if user is authenticated
+    // Save theme to backend if user is authenticated (only after initial load)
     const saveThemeAsync = async () => {
       const token = getToken();
       if (token && profileLoaded) {
         try {
-          await saveProfile({ theme });
+          await updateProfile(token, { theme });
+          // Also cache locally
+          await saveProfile({ displayName, email, phone, avatar, otpEnabled, lang, theme }).catch(() => {});
         } catch (e) {
-          console.warn("Failed to save theme:", e);
+          console.warn("Failed to save theme to backend:", e);
+          setToast({ type: "err", text: t('theme_update_failed') });
         }
+      } else if (!token && profileLoaded) {
+        // Not authenticated: save to localStorage only
+        await saveProfile({ displayName, email, phone, avatar, otpEnabled, lang, theme }).catch(() => {});
       }
     };
     
     if (profileLoaded) {
       saveThemeAsync();
     }
-  }, [theme, profileLoaded]);
+  }, [theme, profileLoaded, displayName, email, phone, avatar, otpEnabled, lang]);
 
   // ---- Helpers ----
   const saveProfileLocal = async (patch) => {
@@ -189,9 +230,15 @@ export default function Settings() {
     try {
       const url = await fToDataUrl(f);
       setAvatar(url);
-      saveProfileLocal({ avatar: url });
+      
+      const token = getToken();
+      if (token) {
+        await updateProfile(token, { avatar: url });
+      }
+      await saveProfileLocal({ avatar: url });
       setToast({ type: "ok", text: t('avatar_updated') });
-    } catch {
+    } catch (error) {
+      console.error("Failed to update avatar:", error);
       setToast({ type: "err", text: t('avatar_load_failed') });
     }
   };
@@ -205,24 +252,72 @@ export default function Settings() {
     });
   }
 
-  const saveAccount = () => {
+  const saveAccount = async () => {
     if (!emailOk) return setToast({ type: "err", text: t('invalid_email') });
     if (!phoneOk) return setToast({ type: "err", text: t('invalid_phone') });
-    saveProfileLocal({ displayName, email, phone, lang });
-    setToast({ type: "ok", text: t('profile_saved') });
-    // Add confirmation animation
-    const button = document.querySelector('button[onclick*="saveAccount"]');
-    if (button) {
-      button.classList.add('animate-pulse');
-      setTimeout(() => button.classList.remove('animate-pulse'), 1000);
+    
+    setIsSavingProfile(true);
+    
+    try {
+      const token = getToken();
+      
+      if (token) {
+        // Authenticated: save to backend
+        const updated = await updateProfile(token, { displayName, email, phone, lang });
+        // Update local state from response
+        setDisplayName(updated.displayName);
+        setEmail(updated.email);
+        setPhone(updated.phone);
+        setLang(updated.lang);
+        // Cache locally
+        await saveProfile({ ...updated, avatar, otpEnabled, theme }).catch(() => {});
+        setToast({ type: "ok", text: t('profile_saved') });
+      } else {
+        // Not authenticated: save to localStorage only
+        await saveProfileLocal({ displayName, email, phone, lang });
+        setToast({ type: "ok", text: t('profile_saved') });
+      }
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      setToast({ type: "err", text: t('profile_save_failed') });
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
-  const toggleOtp = () => {
+  const toggleOtp = async () => {
     const v = !otpEnabled;
     setOtpEnabled(v);
-    saveProfileLocal({ otpEnabled: v });
-    setToast({ type: "info", text: v ? "2FA (demo) enabled." : "2FA disabled." });
+    
+    try {
+      const token = getToken();
+      if (token) {
+        await updateProfile(token, { otpEnabled: v });
+      }
+      await saveProfileLocal({ otpEnabled: v });
+      setToast({ type: "info", text: v ? "2FA (demo) enabled." : "2FA disabled." });
+    } catch (error) {
+      console.error("Failed to save 2FA setting:", error);
+      // Revert on error
+      setOtpEnabled(!v);
+      setToast({ type: "err", text: t('profile_save_failed') });
+    }
+  };
+
+  const handleLanguageChange = async (newLang) => {
+    setLang(newLang);
+    
+    try {
+      const token = getToken();
+      if (token) {
+        await updateProfile(token, { lang: newLang });
+      }
+      await saveProfileLocal({ lang: newLang });
+      // TODO: If i18n has a setLanguage method, call it here: i18n.setLanguage(newLang)
+    } catch (error) {
+      console.error("Failed to save language:", error);
+      setToast({ type: "err", text: t('profile_save_failed') });
+    }
   };
 
   const changePassword = () => {
@@ -263,9 +358,17 @@ export default function Settings() {
             </label>
             {avatar && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   setAvatar("");
-                  saveProfileLocal({ avatar: "" });
+                  try {
+                    const token = getToken();
+                    if (token) {
+                      await updateProfile(token, { avatar: "" });
+                    }
+                    await saveProfileLocal({ avatar: "" });
+                  } catch (error) {
+                    console.error("Failed to remove avatar:", error);
+                  }
                 }}
                 className="text-xs underline text-[color:var(--muted)]"
               >
@@ -280,32 +383,35 @@ export default function Settings() {
               <div>
                 <div className="text-sm text-[color:var(--muted)] mb-1">{t('display_name')}</div>
                 <input
-                  className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]"
+                  className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] disabled:opacity-50"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Örn. Ada Yılmaz"
+                  disabled={!profileLoaded}
                 />
               </div>
               <div>
                 <div className="text-sm text-[color:var(--muted)] mb-1">{t('email')}</div>
                 <input
-                  className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border ${
+                  className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border disabled:opacity-50 ${
                     emailOk ? "border-[color:var(--border)]" : "border-rose-400/50"
                   }`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="mail@domain.com"
+                  disabled={!profileLoaded}
                 />
               </div>
               <div>
                 <div className="text-sm text-[color:var(--muted)] mb-1">{t('phone')}</div>
                 <input
-                  className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border ${
+                  className={`w-full px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] border disabled:opacity-50 ${
                     phoneOk ? "border-[color:var(--border)]" : "border-rose-400/50"
                   }`}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+90 5xx xxx xx xx"
+                  disabled={!profileLoaded}
                 />
               </div>
               <div>
@@ -313,7 +419,8 @@ export default function Settings() {
                 <select
                   className="w-full px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)]"
                   value={lang}
-                  onChange={(e) => setLang(e.target.value)}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
+                  disabled={!profileLoaded}
                 >
                   <option value="en">{t('language.english')}</option>
                   <option value="tr">{t('language.turkish')}</option>
@@ -324,9 +431,16 @@ export default function Settings() {
             <div className="flex flex-wrap gap-2 pt-2">
               <button
                 onClick={saveAccount}
-                className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 transition-all duration-300 hover:scale-105"
+                disabled={isSavingProfile || !profileLoaded}
+                className="px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white hover:opacity-90 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {t('save_profile')}
+                {isSavingProfile && (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" strokeWidth="3" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                )}
+                {isSavingProfile ? t('saving') : t('save_profile')}
               </button>
               <button
                 onClick={changePassword}
