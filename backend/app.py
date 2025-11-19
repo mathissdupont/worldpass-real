@@ -36,6 +36,7 @@ from schemas import (
 )
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
+from core.vc_crypto import VCEncryptor, generate_encryption_key
 from oauth_endpoints import router as oauth_router
 
 import time, secrets, base64
@@ -53,6 +54,21 @@ app.add_middleware(SlowAPIMiddleware)
 
 API = settings.API_PREFIX
 signer = Ed25519Signer()
+
+# Initialize VC encryptor with encryption key
+# If no key is set, generate one and warn (for development)
+if not settings.VC_ENCRYPTION_KEY:
+    import warnings
+    warnings.warn(
+        "VC_ENCRYPTION_KEY is not set. Generating a temporary key. "
+        "Set VC_ENCRYPTION_KEY environment variable in production.",
+        RuntimeWarning
+    )
+    vc_encryption_key = generate_encryption_key()
+else:
+    vc_encryption_key = settings.VC_ENCRYPTION_KEY
+
+vc_encryptor = VCEncryptor(vc_encryption_key)
 
 # Enhanced CORS with environment variables
 origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
@@ -429,10 +445,16 @@ async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(ge
 @app.post(f"{API}/user/vcs/add", response_model=UserVCAddResp)
 @limiter.limit("20/minute")
 async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_current_user), db=Depends(get_db)):
-    """Add a VC to user's collection"""
+    """Add a VC to user's collection (encrypted at rest)"""
     now = int(time.time())
     vc = body.vc
     vc_id = vc.get("jti") or vc.get("id") or f"vc-{now}"
+    
+    # Encrypt the VC payload before storing
+    try:
+        encrypted_payload = vc_encryptor.encrypt_vc(vc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"encryption_failed: {str(e)}")
     
     # Check if VC already exists for this user
     existing = await db.execute_fetchone(
@@ -444,23 +466,24 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
         # Update existing VC
         await db.execute(
             "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE user_id=? AND vc_id=?",
-            (json.dumps(vc), now, user["id"], vc_id)
+            (encrypted_payload, now, user["id"], vc_id)
         )
     else:
         # Insert new VC
         await db.execute(
             "INSERT INTO user_vcs(user_id, vc_id, vc_payload, created_at, updated_at) VALUES(?,?,?,?,?)",
-            (user["id"], vc_id, json.dumps(vc), now, now)
+            (user["id"], vc_id, encrypted_payload, now, now)
         )
     
     await db.commit()
     return UserVCAddResp(ok=True, vc_id=vc_id)
 
 
+
 @app.get(f"{API}/user/vcs", response_model=UserVCListResp)
 @limiter.limit("30/minute")
 async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
-    """Get all VCs for current user"""
+    """Get all VCs for current user (decrypted from storage)"""
     rows = await db.execute_fetchall(
         "SELECT id, vc_id, vc_payload, created_at, updated_at FROM user_vcs WHERE user_id=? ORDER BY created_at DESC",
         (user["id"],)
@@ -469,7 +492,15 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
     vcs = []
     for row in rows:
         try:
-            vc_payload = json.loads(row["vc_payload"])
+            # Decrypt the VC payload
+            # Support both encrypted (new) and plain JSON (legacy) formats
+            payload_str = row["vc_payload"]
+            if vc_encryptor.is_encrypted(payload_str):
+                vc_payload = vc_encryptor.decrypt_vc(payload_str)
+            else:
+                # Legacy plain JSON format
+                vc_payload = json.loads(payload_str)
+            
             vcs.append(UserVCItem(
                 id=row["id"],
                 vc_id=row["vc_id"],
@@ -478,6 +509,7 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
                 updated_at=row["updated_at"]
             ))
         except Exception:
+            # Skip VCs that cannot be decrypted/parsed
             continue
     
     return UserVCListResp(vcs=vcs)
