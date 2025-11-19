@@ -57,12 +57,21 @@ function Alert({ type, message }) {
 
 function safeJson(str) { try { return JSON.parse(str); } catch { return null; } }
 
+const { identity } = useIdentity();
+
+useEffect(() => {
+  (async () => {
+    await migrateVCsIfNeeded();
+    await refreshVCs();              // migration biter bitmez VCleri yenile
+  })();
+}, [refreshVCs]);
+
+
 /* ---------------- Main Component ---------------- */
 export default function Present() {
   const { identity } = useIdentity();
-  migrateVCsIfNeeded();
 
-  const [vcs, setVcs] = useState(() => getVCs() || []);
+  const [vcs, setVcs] = useState([]);
   const [vcIdx, setVcIdx] = useState(-1);
   const [selectedFields, setSelectedFields] = useState([]);
   
@@ -81,9 +90,15 @@ export default function Present() {
   const [reqQrScanning, setReqQrScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
 
-  const refreshVCs = useCallback(() => {
-    try { const list = getVCs() || []; setVcs(Array.isArray(list) ? list : []); } catch { setVcs([]); }
-  }, []);
+const refreshVCs = useCallback(async () => {
+  try {
+    const list = await getVCs();                       // Promise çözüldü
+    setVcs(Array.isArray(list) ? list : []);           // array değilse boş yap
+  } catch {
+    setVcs([]);
+  }
+}, []);
+
 
   useEffect(() => { refreshVCs(); }, [refreshVCs]);
   useEffect(() => {

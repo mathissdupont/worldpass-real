@@ -32,7 +32,19 @@ export default function VCList({ onRevoke }) {
   const [previewJti, setPreviewJti] = useState(null); // JSON toggle
   const [msg, setMsg] = useState(null);              // {type, text}
 
-  useEffect(() => { setList(safeSort(loadVCs())); }, []);
+  useEffect(() => {
+  let cancelled = false;
+
+  (async () => {
+    const vcs = await loadVCs();   // <-- Artık Promise çözülüyor
+    if (!cancelled) {
+      setList(safeSort(vcs));      // <-- Artık gerçek array
+    }
+  })();
+
+  return () => { cancelled = true; };
+}, []);
+
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return list;
@@ -49,14 +61,14 @@ export default function VCList({ onRevoke }) {
     });
   }, [list, filter]);
 
-  function safeSort(arr){
-    // issuanceDate varsa yeni → eski
-    return [...(arr || [])].sort((a,b) => {
-      const da = Date.parse(a?.issuanceDate || "") || 0;
-      const db = Date.parse(b?.issuanceDate || "") || 0;
-      return db - da;
-    });
-  }
+function safeSort(arr){
+  const list = Array.isArray(arr) ? arr : [];
+  return [...list].sort((a,b) => {
+    const da = Date.parse(a?.issuanceDate || "") || 0;
+    const db = Date.parse(b?.issuanceDate || "") || 0;
+    return db - da;
+  });
+}
 
   async function showQR(vc){
     try{
@@ -77,13 +89,20 @@ export default function VCList({ onRevoke }) {
     URL.revokeObjectURL(a.href);
   }
 
-  function hardRemove(jti){
-    if (!jti) return;
-    if (!confirm("Bu credential’ı listeden kaldırmak istediğine emin misin?")) return;
-    setList(removeVC(jti));
+async function hardRemove(jti){
+  if (!jti) return;
+  if (!confirm("Bu credential’ı listeden kaldırmak istediğine emin misin?")) return;
+  try {
+    const updated = await removeVC(jti); // <-- backend/local storage sync
+    setList(safeSort(updated));
     if (previewJti === jti) setPreviewJti(null);
     setMsg({ type: "ok", text: "Credential kaldırıldı." });
+  } catch (e) {
+    console.warn("hardRemove failed", e);
+    setMsg({ type: "err", text: "Credential kaldırılamadı." });
   }
+}
+
 
   const copy = (txt, ok="Kopyalandı.", fail="Kopyalanamadı.") =>
     navigator.clipboard.writeText(txt).then(
