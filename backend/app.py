@@ -1065,10 +1065,28 @@ async def issuer_issue(
 
 
 @app.post(f"{API}/issuer/revoke", response_model=IssuerRevokeResp)
-async def issuer_revoke(body: IssuerRevokeReq, db=Depends(get_db)):
-    issuer = await _get_approved_issuer_by_key(db, body.api_key)
+async def issuer_revoke(
+    body: IssuerRevokeReq, 
+    x_token: Optional[str] = Header(None),
+    db=Depends(get_db)
+):
+    issuer = None
+    if body.api_key:
+        issuer = await _get_approved_issuer_by_key(db, body.api_key)
+    elif x_token:
+        try:
+            payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+            issuer_id = payload.get("issuer_id")
+            if issuer_id and payload.get("role") == "issuer":
+                issuer = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (issuer_id,))
+        except:
+            pass
+
     if not issuer:
-        raise HTTPException(status_code=401, detail="bad_api_key")
+        raise HTTPException(status_code=401, detail="authentication_required")
+        
+    if issuer["status"] != "approved":
+         raise HTTPException(status_code=403, detail="issuer_not_approved")
 
     now = int(time.time())
     row = await db.execute_fetchone(

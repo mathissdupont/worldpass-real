@@ -153,3 +153,47 @@ export async function issueCredential(apiKey, vc, token) {
   }
   return r.json();
 }
+
+export async function revokeCredential(apiKey, vcId, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['X-Token'] = token;
+  
+  const r = await fetch('/api/issuer/revoke', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ api_key: apiKey, vc_id: vcId })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'revoke_failed');
+  }
+  return r.json();
+}
+
+export async function setup2FA(token) {
+  const r = await fetch('/api/auth/2fa/setup', {
+    method: 'POST',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('setup_2fa_failed');
+  return r.json();
+}
+
+export async function enable2FA(token, secret, code) {
+  const r = await fetch('/api/auth/2fa/enable', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Token': token },
+    body: JSON.stringify({ secret, code })
+  });
+  if (!r.ok) throw new Error('enable_2fa_failed');
+  return r.json();
+}
+
+export async function disable2FA(token) {
+  const r = await fetch('/api/auth/2fa/disable', {
+    method: 'POST',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('disable_2fa_failed');
+  return r.json();
+}

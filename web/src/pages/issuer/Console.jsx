@@ -1,10 +1,10 @@
 // src/pages/issuer/Console.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { putTemplate, revoke, listOrgs, getOrg, removeTemplate } from "@/lib/issuerStore.js";
+import { putTemplate, listOrgs, getOrg, removeTemplate } from "@/lib/issuerStore.js";
 import { useIdentity } from "@/lib/identityContext";
 import { b64u, ed25519Sign, b64uToBytes } from "@/lib/crypto";
-import { getIssuerProfile, rotateIssuerApiKey, issueCredential } from "@/lib/api";
+import { getIssuerProfile, rotateIssuerApiKey, issueCredential, revokeCredential } from "@/lib/api";
 
 import { parseWPML, renderWPML } from "@/lib/wpml";
 import { t } from "@/lib/i18n";
@@ -713,7 +713,15 @@ export default function IssuerConsole(){
                   <button
                     onClick={()=>{
                       const j = safeJ(out)?.jti;
-                      if (j) revoke(j);
+                      if (j) {
+                        const token = localStorage.getItem("issuer_token");
+                        revokeCredential(null, j, token)
+                          .then(() => {
+                            setFlash({tone:"ok", text:"Sertifika iptal edildi."});
+                            setTimeout(()=>setFlash(null), 1500);
+                          })
+                          .catch(e => alert(e.message));
+                      }
                       else alert("Bu sertifikaya ait kod (jti) bulunamadı.");
                     }}
                     className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
@@ -723,7 +731,15 @@ export default function IssuerConsole(){
                   <button
                     onClick={()=>{
                       const j = prompt("İptal etmek istediğin sertifikanın kodu (jti)?");
-                      if(j) revoke(j);
+                      if(j) {
+                        const token = localStorage.getItem("issuer_token");
+                        revokeCredential(null, j, token)
+                          .then(() => {
+                            setFlash({tone:"ok", text:"Sertifika iptal edildi."});
+                            setTimeout(()=>setFlash(null), 1500);
+                          })
+                          .catch(e => alert(e.message));
+                      }
                     }}
                     className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
                   >

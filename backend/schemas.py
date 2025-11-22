@@ -97,7 +97,7 @@ class IssuerIssueResp(BaseModel):
     vc_id: Optional[str] = None
 
 class IssuerRevokeReq(BaseModel):
-    api_key: str
+    api_key: Optional[str] = None
     vc_id: str
 
 class IssuerRevokeResp(BaseModel):

@@ -65,11 +65,11 @@ export function markVerified(id){
 }
 
 export function removeTemplate(orgId, key) {
-  const all = loadOrgs(); // kendi getter’ınız (örnek: localStorage'dan org listesi çekiyor)
-  const org = all.find(o => o.id === orgId);
+  const db = read();
+  const org = db[orgId];
   if (!org) return;
   if (org.templates && org.templates[key]) {
     delete org.templates[key];
   }
-  saveOrgs(all);
+  write(db);
 }

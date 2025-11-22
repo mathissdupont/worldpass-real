@@ -6,7 +6,7 @@ import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 import { getToken } from "../lib/auth";
 import { fetchProfile, updateProfile } from "../lib/profileApi";
-import api from "../lib/api";
+import { setup2FA, enable2FA, disable2FA } from "../lib/api";
 import QRCode from "qrcode";
 
 const API_BASE = "/api";
@@ -300,11 +300,14 @@ export default function Settings() {
   };
 
   const toggleOtp = async () => {
+    const token = getToken();
+    if (!token) return setToast({ type: "err", text: "Please login first" });
+
     if (otpEnabled) {
       // Disable
       if (confirm("Disable 2FA?")) {
         try {
-          await api.post('/auth/2fa/disable');
+          await disable2FA(token);
           setOtpEnabled(false);
           setToast({ type: "info", text: "2FA disabled." });
           await saveProfileLocal({ otpEnabled: false });
@@ -316,7 +319,7 @@ export default function Settings() {
     } else {
       // Enable - Start Setup
       try {
-        const res = await api.post('/auth/2fa/setup');
+        const res = await setup2FA(token);
         setSecret(res.secret);
         const url = await QRCode.toDataURL(res.otpauth_url);
         setQrCodeUrl(url);
@@ -329,8 +332,11 @@ export default function Settings() {
   };
 
   const verifyAndEnable2FA = async () => {
+    const token = getToken();
+    if (!token) return setToast({ type: "err", text: "Please login first" });
+
     try {
-      await api.post('/auth/2fa/enable', { secret, code: otpCode });
+      await enable2FA(token, secret, otpCode);
       setOtpEnabled(true);
       setShow2FASetup(false);
       setOtpCode('');
