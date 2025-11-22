@@ -454,7 +454,7 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
             "first_name": user["first_name"],
             "last_name": user["last_name"],
             "did": user["did"] or "",
-            "email_verified": bool(user.get("email_verified")),
+            "email_verified": bool(user["email_verified"]),
         }
     )
 
@@ -620,7 +620,7 @@ async def user_profile_get(request: Request, user=Depends(_get_current_user)):
         "phone": user["phone"] or "" if user["phone"] is not None else "",
         "lang": user["lang"] or "en",
         "otp_enabled": bool(user["otp_enabled"]),
-        "email_verified": bool(user.get("email_verified")),
+        "email_verified": bool(user["email_verified"]),
     })
 
 
@@ -697,7 +697,7 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
         "phone": updated_user["phone"] or "",
         "lang": updated_user["lang"] or "en",
         "otp_enabled": bool(updated_user["otp_enabled"]),
-        "email_verified": bool(updated_user.get("email_verified")),
+        "email_verified": bool(updated_user["email_verified"]),
     })
 
 
