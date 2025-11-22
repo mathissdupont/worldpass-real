@@ -15,7 +15,7 @@ class ChallengeResp(BaseModel):
 
 class VerifyReq(BaseModel):
     vc: Dict[str, Any]
-    challenge: str
+    challenge: Optional[str] = None
     presenter_did: Optional[str] = None
 
 class VerifyResp(BaseModel):
@@ -34,12 +34,36 @@ class RevokeResp(BaseModel):
 class IssuerRegisterReq(BaseModel):
     name: str
     email: str
+    password: str
     domain: Optional[str] = None
     did: Optional[str] = None
+
+class IssuerLoginReq(BaseModel):
+    email: str
+    password: str
+
+class IssuerLoginResp(BaseModel):
+    token: str
+    issuer: Dict[str, Any]
+
+class IssuerProfileResp(BaseModel):
+    issuer: Dict[str, Any]
+
+class IssuerApiKeyResp(BaseModel):
+    api_key: str
 
 class IssuerRegisterResp(BaseModel):
     status: str
     issuer_id: int
+    verification_code: str
+
+class IssuerVerifyDomainReq(BaseModel):
+    issuer_id: int
+    method: str = "dns"  # 'dns' or 'http'
+
+class IssuerVerifyDomainResp(BaseModel):
+    verified: bool
+    message: str
 
 class AdminLoginReq(BaseModel):
     username: str
@@ -65,7 +89,7 @@ class IssuerListItem(BaseModel):
     updated_at: int
 
 class IssuerIssueReq(BaseModel):
-    api_key: str
+    api_key: Optional[str] = None
     vc: Dict[str, Any]  # imzalanmış VC (issuer kendi anahtarıyla imzalar) veya imzasız (ileride HSM modülü ile imzalatılabilir)
 
 class IssuerIssueResp(BaseModel):
@@ -139,10 +163,51 @@ class UserRegisterResp(BaseModel):
 class UserLoginReq(BaseModel):
     email: str
     password: str
+    otp_code: Optional[str] = None
 
 class UserLoginResp(BaseModel):
     token: str
     user: Dict[str, Any]
+
+# 2FA Management
+class TwoFASetupResp(BaseModel):
+    secret: str
+    otpauth_url: str
+
+class TwoFAEnableReq(BaseModel):
+    code: str
+    secret: str
+
+class TwoFAEnableResp(BaseModel):
+    ok: bool
+
+class TwoFADisableResp(BaseModel):
+    ok: bool
+
+class BackupCodesResp(BaseModel):
+    codes: List[str]
+
+class VerifyEmailReq(BaseModel):
+    token: str
+
+class VerifyEmailResp(BaseModel):
+    ok: bool
+    message: str
+
+class ForgotPasswordReq(BaseModel):
+    email: str
+
+class ForgotPasswordResp(BaseModel):
+    ok: bool
+    message: str
+
+class ResetPasswordReq(BaseModel):
+    token: str
+    new_password: str
+
+class ResetPasswordResp(BaseModel):
+    ok: bool
+    message: str
 
 # User VCs management
 class UserVCAddReq(BaseModel):
@@ -170,6 +235,7 @@ class UserVCDeleteResp(BaseModel):
 
 # User profile management
 class UserProfileUpdateReq(BaseModel):
+    email: Optional[str] = None
     display_name: Optional[str] = None
     theme: Optional[str] = None
     avatar: Optional[str] = None
@@ -179,6 +245,9 @@ class UserProfileUpdateReq(BaseModel):
 
 class UserProfileResp(BaseModel):
     user: Dict[str, Any]
+
+class UserDeleteResp(BaseModel):
+    ok: bool
 
 # VC Templates management
 class VCTemplateCreateReq(BaseModel):

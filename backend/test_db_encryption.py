@@ -8,13 +8,13 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 os.environ['VC_ENCRYPTION_KEY'] = 'test-key-for-unit-test-12345'
-os.environ['SQLITE_PATH'] = '/tmp/test_vc_db.db'
+os.environ['SQLITE_PATH'] = 'test_vc_db.db'
 
 import asyncio
 import aiosqlite
 import json
 from core.vc_crypto import VCEncryptor
-from db import init_db, SCHEMA_SQL
+from database import init_db, SCHEMA_SQL
 
 
 async def test_vc_storage_encryption():
@@ -22,8 +22,8 @@ async def test_vc_storage_encryption():
     print("Testing VC encryption in database storage...")
     
     # Clean up any existing test database
-    if os.path.exists('/tmp/test_vc_db.db'):
-        os.remove('/tmp/test_vc_db.db')
+    if os.path.exists('test_vc_db.db'):
+        os.remove('test_vc_db.db')
     
     # Initialize database
     await init_db()
@@ -32,7 +32,7 @@ async def test_vc_storage_encryption():
     encryptor = VCEncryptor('test-key-for-unit-test-12345')
     
     # Create a test user
-    async with aiosqlite.connect('/tmp/test_vc_db.db') as db:
+    async with aiosqlite.connect('test_vc_db.db') as db:
         db.row_factory = aiosqlite.Row
         
         print("\n1. Creating test user...")
@@ -178,8 +178,8 @@ async def test_vc_storage_encryption():
         print("✓ Legacy plain JSON VC can be parsed")
     
     # Clean up
-    if os.path.exists('/tmp/test_vc_db.db'):
-        os.remove('/tmp/test_vc_db.db')
+    if os.path.exists('test_vc_db.db'):
+        os.remove('test_vc_db.db')
     
     return True
 

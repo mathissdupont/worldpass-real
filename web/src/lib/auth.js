@@ -77,8 +77,11 @@ export async function registerUser({ email, firstName, lastName, password, did }
   return { email, name, did: did || "" };
 }
 
-export async function verifyUser(email, password) {
+export async function verifyUser(email, password, otpCode) {
   email = (email || "").toLowerCase().trim();
+  
+  const body = { email, password };
+  if (otpCode) body.otp_code = otpCode;
   
   // Authenticate with backend - no localStorage fallback
   const response = await fetch(`${API_BASE}/user/login`, {
@@ -86,10 +89,7 @@ export async function verifyUser(email, password) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

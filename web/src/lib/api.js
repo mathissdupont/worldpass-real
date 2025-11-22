@@ -80,3 +80,76 @@ export async function lookupRecipient(recipientId) {
   if (!r.ok) throw new Error('recipient_lookup_failed');
   return r.json();
 }
+
+// Issuer API
+export async function registerIssuer(data) {
+  const r = await fetch('/api/issuer/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'register_failed');
+  }
+  return r.json();
+}
+
+export async function loginIssuer(data) {
+  const r = await fetch('/api/issuer/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'login_failed');
+  }
+  return r.json();
+}
+
+export async function getIssuerProfile(token) {
+  const r = await fetch('/api/issuer/profile', {
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('profile_failed');
+  return r.json();
+}
+
+export async function verifyIssuerDomain(issuerId, method) {
+  const r = await fetch('/api/issuer/verify-domain', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ issuer_id: issuerId, method })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'verify_failed');
+  }
+  return r.json();
+}
+
+export async function rotateIssuerApiKey(token) {
+  const r = await fetch('/api/issuer/api-key', {
+    method: 'POST',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('rotate_key_failed');
+  return r.json();
+}
+
+export async function issueCredential(apiKey, vc, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['X-Token'] = token;
+  
+  const r = await fetch('/api/issuer/issue', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ api_key: apiKey, vc })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'issue_failed');
+  }
+  return r.json();
+}

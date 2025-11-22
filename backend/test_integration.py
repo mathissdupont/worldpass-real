@@ -15,7 +15,7 @@ os.environ['ADMIN_PASS_HASH'] = '$2b$12$test'
 import asyncio
 from fastapi.testclient import TestClient
 from app import app
-from db import init_db
+from database import init_db
 import json
 import bcrypt
 from jose import jwt

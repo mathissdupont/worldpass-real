@@ -97,6 +97,7 @@ export default function NavBar({ health, user, features }) {
     : [
         {to:"/login",    label:t('user_login'),       icon:"login"},
         {to:"/register", label:t('user_register'),    icon:"register"},
+        {to:"/issuer/login", label:t('issuer_login') || "Kurum Girişi", icon:"shield"},
         {to:"/verify",   label:t('verify_credential'), icon:"verify"},
       ];
 

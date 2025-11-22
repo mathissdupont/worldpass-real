@@ -13,6 +13,7 @@ import Credentials from "./pages/Credentials";
 import Settings from "./pages/Settings";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
+import IssuerLogin from "./pages/issuer/Login";
 import IssuerConsole from "./pages/issuer/Console";
 import Verifier from "./pages/Verifier";
 import Present from "./pages/Present";
@@ -82,6 +83,7 @@ export default function App(){
           <Route path="/verifier" element={<Verifier />} />
           {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
           <Route path="/issuer/register" element={<IssuerRegister />} />
+          <Route path="/issuer/login" element={<IssuerLogin />} />
 
           {/* Protected (oturum + DID gerekli) */}
           <Route
@@ -142,11 +144,7 @@ export default function App(){
           <Route
             path="/issuer/console"
             element={
-              <RoleRoute user={user} roles="issuer">
-                <ProtectedRoute>
                   <IssuerConsole/>
-                </ProtectedRoute>
-              </RoleRoute>
             }
           />
           <Route

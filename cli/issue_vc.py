@@ -1,18 +1,14 @@
+import sys, time, os
+
+# Add project root to sys.path to allow imports from backend
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import json, base64
 from getpass import getpass
 from backend.core.crypto_ed25519 import Ed25519Signer, b64u_d
 from backend.core.keystore import decrypt_keystore
 from backend.core.vc import sign_vc
 from backend.core.did import did_from_pk
-
-"""
-Kullanım (örnek):
-python cli/issue_vc.py backend/data/keystore/did_key_z....wpkeystore vc_out.json "Samet Ünsal" "did:key:zHolder"
-"""
-
-import sys, time, os
-
-def main():
     if len(sys.argv) < 5:
         print("usage: python cli/issue_vc.py <keystore_path> <out_vc_json> <name> <subject_did>")
         sys.exit(1)

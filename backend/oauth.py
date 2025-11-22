@@ -1,5 +1,5 @@
 from fastapi import HTTPException, Depends
-from db import get_db
+from database import get_db
 from schemas import (
     OAuthClientRegisterReq, OAuthClientRegisterResp,
     OAuthAuthorizeReq, OAuthAuthorizeResp,

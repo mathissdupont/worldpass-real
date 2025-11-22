@@ -538,4 +538,8 @@
   ,"org_console.load_wpt": ".wpt Yükle"
   ,"org_console.advanced_json": "Gelişmiş JSON"
   ,"org_console.saved_templates": "Kayıtlı Şablonlar"
+  ,"confirm_delete_account": "Hesabınızı ve tüm verilerinizi kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+  ,"delete_failed": "Hesap silinemedi."
+  ,"delete_account": "Hesabı Sil"
+  ,"delete_account_desc": "Hesabınızı ve tüm verilerinizi sunucudan kalıcı olarak siler."
 }

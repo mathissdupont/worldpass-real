@@ -1,7 +1,7 @@
 import html
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from db import get_db
+from database import get_db
 from oauth import register_oauth_client, authorize_oauth, token_oauth, get_user_info
 from schemas import (
     OAuthClientRegisterReq, OAuthClientRegisterResp,

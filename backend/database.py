@@ -46,7 +46,13 @@ CREATE TABLE IF NOT EXISTS users (
   avatar TEXT,                  -- user's profile photo (data URL or path)
   phone TEXT,                   -- user's phone number
   lang TEXT DEFAULT 'en',       -- user's preferred language
-  otp_enabled INTEGER DEFAULT 0 -- 2FA enabled flag (0 or 1)
+  otp_enabled INTEGER DEFAULT 0, -- 2FA enabled flag (0 or 1)
+  otp_secret TEXT,              -- TOTP secret key
+  email_verified INTEGER DEFAULT 0, -- Email verification status
+  verification_token TEXT,      -- Email verification token
+  reset_token TEXT,             -- Password reset token
+  reset_token_expires INTEGER,  -- Password reset token expiration
+  backup_codes TEXT             -- Hashed backup codes (JSON list)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -73,6 +79,7 @@ CREATE TABLE IF NOT EXISTS issuers (
   did TEXT,
   status TEXT NOT NULL,         -- 'pending' | 'approved' | 'revoked'
   api_key_hash TEXT,            -- SHA256(apiKey)
+  password_hash TEXT,           -- bcrypt hash (added for issuer login)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   meta TEXT
@@ -185,6 +192,12 @@ async def _run_migrations(conn: aiosqlite.Connection):
         ("phone", "ALTER TABLE users ADD COLUMN phone TEXT"),
         ("lang", "ALTER TABLE users ADD COLUMN lang TEXT DEFAULT 'en'"),
         ("otp_enabled", "ALTER TABLE users ADD COLUMN otp_enabled INTEGER DEFAULT 0"),
+        ("otp_secret", "ALTER TABLE users ADD COLUMN otp_secret TEXT"),
+        ("email_verified", "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"),
+        ("verification_token", "ALTER TABLE users ADD COLUMN verification_token TEXT"),
+        ("reset_token", "ALTER TABLE users ADD COLUMN reset_token TEXT"),
+        ("reset_token_expires", "ALTER TABLE users ADD COLUMN reset_token_expires INTEGER"),
+        ("backup_codes", "ALTER TABLE users ADD COLUMN backup_codes TEXT"),
     ]
     
     for column_name, alter_sql in migrations:
@@ -196,4 +209,16 @@ async def _run_migrations(conn: aiosqlite.Connection):
                 # Column might already exist due to race condition or previous partial migration
                 print(f"Migration warning: Could not add column {column_name}: {e}")
     
+    # Check if password_hash column exists in issuers table
+    cursor = await conn.execute("PRAGMA table_info(issuers)")
+    columns = await cursor.fetchall()
+    issuer_column_names = [col[1] for col in columns]
+    
+    if "password_hash" not in issuer_column_names:
+        try:
+            await conn.execute("ALTER TABLE issuers ADD COLUMN password_hash TEXT")
+            print("Migration: Added column password_hash to issuers table")
+        except Exception as e:
+            print(f"Migration warning: Could not add column password_hash to issuers: {e}")
+
     await conn.commit()

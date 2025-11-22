@@ -2,9 +2,10 @@
 import { useMemo, useState } from "react";
 import { useIdentity } from "../../lib/identityContext";
 import { t } from "../../lib/i18n";
-import { createOrg, verifyOrg, markVerified } from "@/lib/issuerStore.js";
+import { registerIssuer, verifyIssuerDomain } from "../../lib/api";
 import IdentityLoad from "../../components/IdentityLoad";
 import IdentityCreate from "../../components/IdentityCreate";
+import { Link } from "react-router-dom";
 
 /* ---------- küçük yardımcılar ---------- */
 function Pill({ tone = "info", children }) {
@@ -66,9 +67,10 @@ export default function IssuerRegister() {
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [org, setOrg] = useState(null);
-  const [token, setToken] = useState("");
+  const [org, setOrg] = useState(null); // { issuer_id, verification_code, status }
+  const [token, setToken] = useState(""); // For manual token input if needed, though we use DNS/HTTP check
 
   const [msg, setMsg] = useState(null); // {tone:'ok'|'err'|'info'|'warn', text:string}
   const [busyCreate, setBusyCreate] = useState(false);
@@ -80,10 +82,11 @@ export default function IssuerRegister() {
   const validDomain = domainRx.test(normDomain);
   const validEmail = emailRx.test((email || "").trim());
   const validName = (name || "").trim().length >= 2;
+  const validPass = password.length >= 8;
 
-  const canCreate = !!(validName && validDomain && validEmail && hasDid);
+  const canCreate = !!(validName && validDomain && validEmail && validPass && hasDid);
 
-  const onCreate = () => {
+  const onCreate = async () => {
     setMsg(null);
     if (!canCreate) {
       setMsg({ tone: "err", text: "Eksik veya hatalı bilgi var. Alanları kontrol et." });
@@ -91,18 +94,24 @@ export default function IssuerRegister() {
     }
     try {
       setBusyCreate(true);
-      const o = createOrg({
+      const resp = await registerIssuer({
         name: name.trim(),
+        email: email.trim(),
+        password: password,
         domain: normDomain,
-        ownerEmail: email.trim(),
         did: identity.did,
-        pk_b64u: identity.pk_b64u,
       });
-      setOrg(o);
+      
+      setOrg({
+        id: resp.issuer_id,
+        verification_code: resp.verification_code,
+        status: resp.status,
+        domain: normDomain
+      });
+      
       setMsg({
         tone: "ok",
-        text:
-          "Kuruluş oluşturuldu. Aşağıdaki doğrulama token’ı ile domain doğrula (demo).",
+        text: "Kuruluş oluşturuldu. Aşağıdaki doğrulama yöntemlerinden birini kullanarak domaini doğrula.",
       });
     } catch (e) {
       setMsg({ tone: "err", text: "Kuruluş oluşturulamadı: " + (e?.message || String(e)) });
@@ -111,14 +120,18 @@ export default function IssuerRegister() {
     }
   };
 
-  const onVerify = () => {
+  const onVerify = async (method) => {
     if (!org) return;
     setMsg(null);
     setBusyVerify(true);
     try {
-      const ok = verifyOrg(org.id, (token || "").trim());
-      setMsg(ok ? { tone: "ok", text: "Domain doğrulandı 🎉" } : { tone: "warn", text: "Token yanlış." });
-      if (ok) setOrg({ ...org, status: "verified" });
+      const resp = await verifyIssuerDomain(org.id, method);
+      if (resp.verified) {
+        setMsg({ tone: "ok", text: "Domain doğrulandı 🎉 Giriş yapabilirsiniz." });
+        setOrg({ ...org, status: "verified" });
+      } else {
+        setMsg({ tone: "warn", text: "Doğrulama başarısız: " + resp.message });
+      }
     } catch (e) {
       setMsg({ tone: "err", text: "Doğrulama hatası: " + (e?.message || String(e)) });
     } finally {
@@ -130,10 +143,10 @@ export default function IssuerRegister() {
     identity?.did && identity.did.length > 44 ? identity.did.slice(0, 44) + "…" : identity?.did;
 
   const dnsSnippet = org
-    ? `DNS TXT  @  _worldpass   "${org.verify_token}"`
+    ? `_worldpass-challenge.${org.domain}   TXT   "${org.verification_code}"`
     : "";
   const httpSnippet = org
-    ? `GET https://${normDomain || "example.edu.tr"}/.well-known/worldpass.txt\n\n${org.verify_token}`
+    ? `https://${org.domain}/.well-known/worldpass.txt\n\n(Dosya içeriği: ${org.verification_code})`
     : "";
 
   return (
@@ -210,6 +223,20 @@ export default function IssuerRegister() {
             )}
           </div>
 
+          <div>
+            <Label>Şifre</Label>
+            <Input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="En az 8 karakter"
+              error={password && !validPass}
+            />
+            {password && !validPass && (
+              <div className="text-[11px] text-rose-600 mt-1">En az 8 karakter olmalı.</div>
+            )}
+          </div>
+
           <button
             disabled={!canCreate || busyCreate}
             onClick={onCreate}
@@ -235,6 +262,10 @@ export default function IssuerRegister() {
               </>
             )}
           </button>
+          
+          <div className="text-center text-sm text-gray-600 mt-2">
+            Zaten hesabın var mı? <Link to="/issuer/login" className="text-indigo-600 hover:underline">Giriş Yap</Link>
+          </div>
         </div>
 
         {msg && (
@@ -286,6 +317,13 @@ export default function IssuerRegister() {
                         <CopyBtn value={dnsSnippet} />
                       </div>
                     </div>
+                    <button
+                        onClick={() => onVerify("dns")}
+                        disabled={busyVerify}
+                        className="mt-2 w-full px-3 py-1.5 rounded-lg border border-black/10 hover:bg-gray-50 text-xs font-medium"
+                    >
+                        DNS Kaydını Kontrol Et
+                    </button>
                   </div>
 
                   <div>
@@ -298,67 +336,15 @@ export default function IssuerRegister() {
                         <CopyBtn value={httpSnippet} />
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* beta verification area */}
-                <div className="mt-4">
-                <Label>{t('issuer.register.paste_token')}</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    placeholder="org.verify_token değerini gir"
-                  />
-                  <button
-                    onClick={onVerify}
-                    disabled={busyVerify || !token.trim()}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-black text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    {busyVerify ? (
-                      <>
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <circle cx="12" cy="12" r="9" opacity=".25" />
-                          <path d="M21 12a9 9 0 0 1-9 9" />
-                        </svg>
-                        {t('issuer.register.verifying')}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                        {t('issuer.register.verify_button')}
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <details className="mt-2">
-                  <summary className="text-xs text-gray-600 cursor-pointer">
-                    {t('issuer.register.dev_tools')}
-                  </summary>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => {
-                        markVerified(org.id);
-                        setOrg({ ...org, status: "verified" });
-                        setMsg({ tone: "info", text: t('issuer.register.dev_marked_verified') });
-                      }}
-                      className="px-3 py-2 rounded-xl border hover:bg-gray-50 text-xs"
-                      title="Sadece geliştirme için"
-                      type="button"
+                        onClick={() => onVerify("http")}
+                        disabled={busyVerify}
+                        className="mt-2 w-full px-3 py-1.5 rounded-lg border border-black/10 hover:bg-gray-50 text-xs font-medium"
                     >
-                      Dev: Mark Verified
+                        HTTP Dosyasını Kontrol Et
                     </button>
-                    {org?.verify_token && <CopyBtn value={org.verify_token} label={t('issuer.register.copy_token')} />}
                   </div>
-                </details>
-
-                <p className="mt-3 text-[11px] text-gray-500">
-                                    {t('issuer.register.beta_note')}
-                </p>
+                </div>
               </div>
             </>
           )}

@@ -18,6 +18,8 @@ export default function Login(){
   const [email, setEmail]       = useState(prof.email || "");
   const [remember, setRemember] = useState(Boolean(prof.email));
   const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
 
@@ -38,7 +40,7 @@ export default function Login(){
     setLoading(true);
     
     try{
-      const result = await verifyUser(email, password);
+      const result = await verifyUser(email, password, otpCode);
       if(!result) {
         // verifyUser returns null for invalid credentials (401)
         throw new Error(t('login.error_invalid_credentials'));
@@ -57,9 +59,16 @@ export default function Login(){
     }catch(e){
       // Handle specific error messages from backend
       let errorMessage = e.message || t('login.error_server');
+      
+      if (e.message && e.message.includes('otp_required')) {
+        setShowOtp(true);
+        setLoading(false);
+        return;
+      }
+      
       if (e.message && e.message.includes('account_inactive')) {
         errorMessage = t('login.error_account_inactive');
-      } else if (e.message && (e.message.includes('invalid_credentials') || e.message.includes('Invalid'))) {
+      } else if (e.message && (e.message.includes('invalid_credentials') || e.message.includes('Invalid') || e.message.includes('invalid_otp'))) {
         errorMessage = t('login.error_invalid_credentials');
       } else if (e.message && e.message.includes('Authentication failed')) {
         errorMessage = t('login.error_server');
@@ -189,6 +198,27 @@ export default function Login(){
                 disabled={loading}
               />
             </div>
+
+            {/* OTP Field */}
+            {showOtp && (
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
+                  Two-Factor Code
+                </label>
+                <input
+                  type="text"
+                  autoComplete="one-time-code"
+                  required={showOtp}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent transition text-center tracking-widest font-mono"
+                  value={otpCode}
+                  onChange={e=>setOtpCode(e.target.value.replace(/\D/g,''))}
+                  disabled={loading}
+                  autoFocus
+                />
+              </div>
+            )}
 
             {/* Remember Me */}
             <label className="flex items-center gap-2 text-sm text-[color:var(--text)] cursor-pointer">

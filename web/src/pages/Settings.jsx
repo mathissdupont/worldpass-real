@@ -6,6 +6,8 @@ import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 import { getToken } from "../lib/auth";
 import { fetchProfile, updateProfile } from "../lib/profileApi";
+import api from "../lib/api";
+import QRCode from "qrcode";
 
 const API_BASE = "/api";
 
@@ -64,6 +66,12 @@ export default function Settings() {
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("light");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // 2FA Setup State
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [otpCode, setOtpCode] = useState("");
 
   // ---- Toast ----
   const [toast, setToast] = useState(null); // {type:'ok'|'err'|'info', text:''}
@@ -292,22 +300,45 @@ export default function Settings() {
   };
 
   const toggleOtp = async () => {
-    const v = !otpEnabled;
-    setOtpEnabled(v);
-    
-    try {
-      const token = getToken();
-      if (token) {
-        // Use debounced update (not immediate) to avoid rapid toggles
-        await updateProfile(token, { otpEnabled: v });
+    if (otpEnabled) {
+      // Disable
+      if (confirm("Disable 2FA?")) {
+        try {
+          await api.post('/auth/2fa/disable');
+          setOtpEnabled(false);
+          setToast({ type: "info", text: "2FA disabled." });
+          await saveProfileLocal({ otpEnabled: false });
+        } catch (e) {
+          console.error(e);
+          setToast({ type: "err", text: "Failed to disable 2FA" });
+        }
       }
-      await saveProfileLocal({ otpEnabled: v });
-      setToast({ type: "info", text: v ? "2FA (demo) enabled." : "2FA disabled." });
-    } catch (error) {
-      console.error("Failed to save 2FA setting:", error);
-      // Revert on error
-      setOtpEnabled(!v);
-      setToast({ type: "err", text: t('profile_save_failed') });
+    } else {
+      // Enable - Start Setup
+      try {
+        const res = await api.post('/auth/2fa/setup');
+        setSecret(res.secret);
+        const url = await QRCode.toDataURL(res.otpauth_url);
+        setQrCodeUrl(url);
+        setShow2FASetup(true);
+      } catch (e) {
+        console.error(e);
+        setToast({ type: "err", text: "Failed to start 2FA setup" });
+      }
+    }
+  };
+
+  const verifyAndEnable2FA = async () => {
+    try {
+      await api.post('/auth/2fa/enable', { secret, code: otpCode });
+      setOtpEnabled(true);
+      setShow2FASetup(false);
+      setOtpCode('');
+      setToast({ type: "ok", text: "2FA Enabled!" });
+      await saveProfileLocal({ otpEnabled: true });
+    } catch (e) {
+      console.error(e);
+      setToast({ type: "err", text: "Invalid Code" });
     }
   };
 
@@ -332,6 +363,28 @@ export default function Settings() {
     alert(
       t('password_change_demo')
     );
+  };
+
+  const deleteAccount = async () => {
+    if (!confirm(t('confirm_delete_account'))) return;
+    
+    try {
+      const token = getToken();
+      if (token) {
+        const res = await fetch("/api/user/delete", {
+          method: "POST",
+          headers: { "X-Token": token }
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
+      // Clear local storage
+      setIdentity(null);
+      localStorage.clear();
+      window.location.href = "/";
+    } catch (e) {
+      console.error(e);
+      setToast({ type: "err", text: t('delete_failed') });
+    }
   };
 
   return (
@@ -521,6 +574,36 @@ export default function Settings() {
               </label>
             </div>
 
+            {show2FASetup && (
+              <div className="mt-4 p-4 bg-[color:var(--panel)] rounded-xl border border-[color:var(--border)] animate-in fade-in zoom-in-95">
+                <h4 className="font-semibold mb-2 text-center">Setup 2FA</h4>
+                <div className="flex flex-col items-center gap-4">
+                  {qrCodeUrl && <img src={qrCodeUrl} alt="2FA QR" className="w-48 h-48 rounded-lg bg-white p-2" />}
+                  <div className="text-center">
+                    <p className="text-sm text-[color:var(--muted)] mb-1">Scan with Google Authenticator or Authy</p>
+                    <p className="text-xs font-mono bg-[color:var(--panel-2)] px-2 py-1 rounded select-all">{secret}</p>
+                  </div>
+                  <div className="flex gap-2 w-full max-w-xs">
+                    <input 
+                      className="flex-1 px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-center tracking-widest"
+                      placeholder="000000"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={e => setOtpCode(e.target.value.replace(/\D/g,''))}
+                    />
+                    <button 
+                      onClick={verifyAndEnable2FA}
+                      disabled={otpCode.length !== 6}
+                      className="px-4 py-2 bg-[color:var(--brand)] text-white rounded-lg disabled:opacity-50"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                  <button onClick={() => setShow2FASetup(false)} className="text-xs text-[color:var(--muted)] underline">Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="mt-4">
               <button
                 onClick={clearVCs}
@@ -621,6 +704,17 @@ export default function Settings() {
               className="mt-3 px-3 py-2 rounded-lg border border-rose-400/30 text-rose-300"
             >
               {t('forget_identity')}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-rose-400/30 bg-[color:var(--panel-2)] p-4">
+            <div className="text-sm font-medium text-rose-300">{t('delete_account')}</div>
+            <p className="text-xs text-rose-300/80 mt-1">{t('delete_account_desc')}</p>
+            <button
+              onClick={deleteAccount}
+              className="mt-3 px-3 py-2 rounded-lg border border-rose-400/30 text-rose-300 hover:bg-rose-400/10 transition-colors"
+            >
+              {t('delete_account')}
             </button>
           </div>
 

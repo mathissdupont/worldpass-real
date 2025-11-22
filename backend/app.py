@@ -11,13 +11,15 @@ import os
 
 # Tamamı paket içi relative olsun:
 from settings import settings
-from db import get_db, init_db
+from database import get_db, init_db
 from schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
     AdminLoginReq, AdminLoginResp,
     IssuerRegisterReq, IssuerRegisterResp,
+    IssuerLoginReq, IssuerLoginResp,
+    IssuerProfileResp, IssuerApiKeyResp,
     ApproveIssuerReq, ApproveIssuerResp,
     IssuerListItem,
     IssuerIssueReq, IssuerIssueResp,
@@ -28,11 +30,16 @@ from schemas import (
     UserVCListResp, UserVCItem,
     UserVCDeleteReq, UserVCDeleteResp,
     UserProfileUpdateReq, UserProfileResp,
+    UserDeleteResp,
+    TwoFASetupResp, TwoFAEnableReq, TwoFAEnableResp, TwoFADisableResp,
+    BackupCodesResp, VerifyEmailReq, VerifyEmailResp,
+    ForgotPasswordReq, ForgotPasswordResp, ResetPasswordReq, ResetPasswordResp,
     VCTemplateCreateReq, VCTemplateCreateResp,
     VCTemplateListResp, VCTemplateItem,
     VCTemplateUpdateReq, VCTemplateUpdateResp,
     VCTemplateDeleteResp,
     RecipientLookupResp,
+    IssuerVerifyDomainReq, IssuerVerifyDomainResp,
 )
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
@@ -42,7 +49,9 @@ from oauth_endpoints import router as oauth_router
 import time, secrets, base64
 import hashlib, os, json
 from typing import Optional
-
+import dns.resolver
+import httpx
+import pyotp
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -199,7 +208,7 @@ async def present_verify(payload: dict, db=Depends(get_db)):
         await db.commit()
         raise HTTPException(status_code=401, detail="invalid_vc_signature")
 
-    # 4) Revocation kontrolü (vc_status tablosu)
+    # 4) Revocation kontrolü (vc_status tablosı)
     jti = vc.get("jti")
     revoked = False
     if jti:
@@ -365,6 +374,7 @@ async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_
             "first_name": body.first_name,
             "last_name": body.last_name,
             "did": body.did or "",
+            "email_verified": False,
         }
     )
 
@@ -377,7 +387,7 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
     
     # Find user
     user = await db.execute_fetchone(
-        "SELECT id, email, first_name, last_name, password_hash, did, status FROM users WHERE email=?",
+        "SELECT id, email, first_name, last_name, password_hash, did, status, otp_enabled, otp_secret, backup_codes, email_verified FROM users WHERE email=?",
         (email,)
     )
     
@@ -391,6 +401,37 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
     # Check status
     if user["status"] != "active":
         raise HTTPException(status_code=403, detail="account_inactive")
+    
+    # 2FA Check
+    if user["otp_enabled"]:
+        if not body.otp_code:
+            raise HTTPException(status_code=403, detail="otp_required")
+        
+        valid_otp = False
+        # 1. Try TOTP
+        if user["otp_secret"]:
+            totp = pyotp.TOTP(user["otp_secret"])
+            if totp.verify(body.otp_code):
+                valid_otp = True
+        
+        # 2. Try Backup Codes if TOTP failed
+        if not valid_otp:
+            backup_codes = json.loads(user["backup_codes"] or "[]")
+            # Hash the provided code to check against stored hashes (SHA256)
+            code_hash = hashlib.sha256(body.otp_code.strip().encode()).hexdigest()
+            
+            if code_hash in backup_codes:
+                valid_otp = True
+                # Consume the code
+                backup_codes.remove(code_hash)
+                await db.execute(
+                    "UPDATE users SET backup_codes=? WHERE id=?",
+                    (json.dumps(backup_codes), user["id"])
+                )
+                await db.commit()
+        
+        if not valid_otp:
+            raise HTTPException(status_code=401, detail="invalid_otp")
     
     # Generate JWT token
     expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
@@ -413,6 +454,7 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
             "first_name": user["first_name"],
             "last_name": user["last_name"],
             "did": user["did"] or "",
+            "email_verified": bool(user.get("email_verified")),
         }
     )
 
@@ -430,7 +472,7 @@ async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(ge
             raise HTTPException(status_code=401, detail="invalid_token")
         
         user = await db.execute_fetchone(
-            "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled FROM users WHERE id=?",
+            "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE id=?",
             (user_id,)
         )
         if not user:
@@ -439,6 +481,40 @@ async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(ge
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="invalid_token")
+
+
+@app.post(f"{API}/auth/2fa/setup", response_model=TwoFASetupResp)
+async def setup_2fa(user=Depends(_get_current_user)):
+    """Generate a new TOTP secret for 2FA setup"""
+    secret = pyotp.random_base32()
+    otpauth_url = pyotp.totp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name=settings.APP_NAME)
+    return TwoFASetupResp(secret=secret, otpauth_url=otpauth_url)
+
+
+@app.post(f"{API}/auth/2fa/enable", response_model=TwoFAEnableResp)
+async def enable_2fa(body: TwoFAEnableReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Verify code and enable 2FA"""
+    totp = pyotp.TOTP(body.secret)
+    if not totp.verify(body.code):
+        raise HTTPException(status_code=400, detail="invalid_otp")
+    
+    await db.execute(
+        "UPDATE users SET otp_enabled=1, otp_secret=?, updated_at=? WHERE id=?",
+        (body.secret, int(time.time()), user["id"])
+    )
+    await db.commit()
+    return TwoFAEnableResp(ok=True)
+
+
+@app.post(f"{API}/auth/2fa/disable", response_model=TwoFADisableResp)
+async def disable_2fa(user=Depends(_get_current_user), db=Depends(get_db)):
+    """Disable 2FA"""
+    await db.execute(
+        "UPDATE users SET otp_enabled=0, otp_secret=NULL, updated_at=? WHERE id=?",
+        (int(time.time()), user["id"])
+    )
+    await db.commit()
+    return TwoFADisableResp(ok=True)
 
 
 # ---------- user VCs management ----------
@@ -544,6 +620,7 @@ async def user_profile_get(request: Request, user=Depends(_get_current_user)):
         "phone": user["phone"] or "" if user["phone"] is not None else "",
         "lang": user["lang"] or "en",
         "otp_enabled": bool(user["otp_enabled"]),
+        "email_verified": bool(user.get("email_verified")),
     })
 
 
@@ -555,6 +632,19 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
     
     updates = []
     params = []
+
+    if body.email is not None:
+        new_email = body.email.lower().strip()
+        if new_email != user["email"]:
+            # Check if email already exists
+            existing = await db.execute_fetchone(
+                "SELECT id FROM users WHERE email=? AND id!=?", (new_email, user["id"])
+            )
+            if existing:
+                raise HTTPException(status_code=400, detail="email_already_registered")
+            
+            updates.append("email=?")
+            params.append(new_email)
     
     if body.display_name is not None:
         updates.append("display_name=?")
@@ -591,7 +681,7 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
     
     # Fetch updated user
     updated_user = await db.execute_fetchone(
-        "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled FROM users WHERE id=?",
+        "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE id=?",
         (user["id"],)
     )
     
@@ -607,23 +697,225 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
         "phone": updated_user["phone"] or "",
         "lang": updated_user["lang"] or "en",
         "otp_enabled": bool(updated_user["otp_enabled"]),
+        "email_verified": bool(updated_user.get("email_verified")),
     })
+
+
+@app.post(f"{API}/user/delete", response_model=UserDeleteResp)
+@limiter.limit("5/minute")
+async def user_delete(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Delete current user account and all associated data"""
+    # Delete user VCs
+    await db.execute("DELETE FROM user_vcs WHERE user_id=?", (user["id"],))
+    
+    # Delete user templates
+    await db.execute("DELETE FROM vc_templates WHERE user_id=?", (user["id"],))
+    
+    # Delete user
+    await db.execute("DELETE FROM users WHERE id=?", (user["id"],))
+    
+    await db.commit()
+    
+    return UserDeleteResp(ok=True)
 
 
 # ---------- issuer register / list / approve ----------
 @app.post(f"{API}/issuer/register", response_model=IssuerRegisterResp)
 async def issuer_register(body: IssuerRegisterReq, db=Depends(get_db)):
     now = int(time.time())
+    
+    # Check if email already exists
+    existing = await db.execute_fetchone("SELECT id FROM issuers WHERE email=?", (body.email,))
+    if existing:
+        raise HTTPException(status_code=400, detail="email_already_registered")
+
+    # Hash password
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+
+    verification_code = secrets.token_urlsafe(32)
+    meta = {"verification_code": verification_code, "domain_verified": False}
+    
     cur = await db.execute(
         """
-        INSERT INTO issuers(name,email,domain,did,status,api_key_hash,created_at,updated_at,meta)
-        VALUES(?,?,?,?, 'pending', '', ?, ?, '{}')
+        INSERT INTO issuers(name,email,password_hash,domain,did,status,api_key_hash,created_at,updated_at,meta)
+        VALUES(?,?,?,?,?, 'pending', '', ?, ?, ?)
         """,
-        (body.name, body.email, body.domain or "", body.did or "", now, now),
+        (body.name, body.email, password_hash, body.domain or "", body.did or "", now, now, json.dumps(meta)),
     )
     await db.commit()
     issuer_id = cur.lastrowid
-    return IssuerRegisterResp(status="pending", issuer_id=issuer_id)
+    return IssuerRegisterResp(status="pending", issuer_id=issuer_id, verification_code=verification_code)
+
+
+@app.post(f"{API}/issuer/login", response_model=IssuerLoginResp)
+async def issuer_login(body: IssuerLoginReq, db=Depends(get_db)):
+    """Authenticate issuer and return JWT token"""
+    email = body.email.strip()
+    
+    # Find issuer
+    issuer = await db.execute_fetchone(
+        "SELECT * FROM issuers WHERE email=?",
+        (email,)
+    )
+    
+    if not issuer:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Check password
+    # Handle legacy issuers without password (if any)
+    if not issuer["password_hash"]:
+         raise HTTPException(status_code=401, detail="legacy_account_reset_password_required")
+
+    if not bcrypt.checkpw(body.password.encode(), issuer["password_hash"].encode()):
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Generate JWT token
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    to_encode = {"sub": email, "issuer_id": issuer["id"], "role": "issuer", "exp": expire}
+    token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    # Audit log
+    now = int(time.time())
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "issuer_login", "ok", json.dumps({"email": email, "issuer_id": issuer["id"]})),
+    )
+    await db.commit()
+    
+    return IssuerLoginResp(
+        token=token,
+        issuer={
+            "id": issuer["id"],
+            "name": issuer["name"],
+            "email": issuer["email"],
+            "domain": issuer["domain"],
+            "did": issuer["did"],
+            "status": issuer["status"],
+            "created_at": issuer["created_at"]
+        }
+    )
+
+
+async def _get_current_issuer(x_token: Optional[str] = Header(None), db=Depends(get_db)):
+    """Get current authenticated issuer from JWT token"""
+    if not x_token:
+        raise HTTPException(status_code=401, detail="missing_token")
+    
+    try:
+        payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        issuer_id: int = payload.get("issuer_id")
+        role: str = payload.get("role")
+        
+        if not issuer_id or role != "issuer":
+            raise HTTPException(status_code=401, detail="invalid_token")
+        
+        issuer = await db.execute_fetchone(
+            "SELECT * FROM issuers WHERE id=?",
+            (issuer_id,)
+        )
+        if not issuer:
+            raise HTTPException(status_code=401, detail="issuer_not_found")
+        
+        return issuer
+    except JWTError:
+        raise HTTPException(status_code=401, detail="invalid_token")
+
+
+@app.get(f"{API}/issuer/profile", response_model=IssuerProfileResp)
+async def issuer_profile(issuer=Depends(_get_current_issuer)):
+    return IssuerProfileResp(
+        issuer={
+            "id": issuer["id"],
+            "name": issuer["name"],
+            "email": issuer["email"],
+            "domain": issuer["domain"],
+            "did": issuer["did"],
+            "status": issuer["status"],
+            "created_at": issuer["created_at"],
+            "meta": json.loads(issuer["meta"] or "{}")
+        }
+    )
+
+
+@app.post(f"{API}/issuer/api-key", response_model=IssuerApiKeyResp)
+async def issuer_rotate_api_key(issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    if issuer["status"] != "approved":
+        raise HTTPException(status_code=403, detail="issuer_not_approved")
+        
+    api_key = _gen_api_key()
+    now = int(time.time())
+    
+    await db.execute(
+        "UPDATE issuers SET api_key_hash=?, updated_at=? WHERE id=?",
+        (_sha256(api_key), now, issuer["id"]),
+    )
+    await db.commit()
+    
+    return IssuerApiKeyResp(api_key=api_key)
+
+
+@app.post(f"{API}/issuer/verify-domain", response_model=IssuerVerifyDomainResp)
+async def issuer_verify_domain(body: IssuerVerifyDomainReq, db=Depends(get_db)):
+    row = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (body.issuer_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="issuer_not_found")
+    
+    meta = json.loads(row["meta"] or "{}")
+    if meta.get("domain_verified"):
+        return IssuerVerifyDomainResp(verified=True, message="already_verified")
+        
+    domain = row["domain"]
+    if not domain:
+        raise HTTPException(status_code=400, detail="issuer_has_no_domain")
+        
+    code = meta.get("verification_code")
+    if not code:
+        # Should not happen for new issuers, but for old ones generate one
+        code = secrets.token_urlsafe(32)
+        meta["verification_code"] = code
+        await db.execute("UPDATE issuers SET meta=? WHERE id=?", (json.dumps(meta), body.issuer_id))
+        await db.commit()
+        raise HTTPException(status_code=400, detail="verification_code_generated_retry")
+
+    verified = False
+    error_msg = ""
+
+    if body.method == "dns":
+        try:
+            # Look for TXT record at _worldpass-challenge.<domain>
+            answers = dns.resolver.resolve(f"_worldpass-challenge.{domain}", "TXT")
+            for rdata in answers:
+                # rdata.to_text() returns quoted string like '"code"', so we check if code is in it
+                if code in rdata.to_text():
+                    verified = True
+                    break
+            if not verified:
+                error_msg = "dns_record_not_found_or_mismatch"
+        except Exception as e:
+            error_msg = f"dns_error: {str(e)}"
+            
+    elif body.method == "http":
+        try:
+            # Look for file at https://<domain>/.well-known/worldpass.txt
+            url = f"https://{domain}/.well-known/worldpass.txt"
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, timeout=5.0)
+                if resp.status_code == 200 and code in resp.text:
+                    verified = True
+                else:
+                    error_msg = f"http_failed_status_{resp.status_code}"
+        except Exception as e:
+             error_msg = f"http_error: {str(e)}"
+    
+    if verified:
+        meta["domain_verified"] = True
+        await db.execute("UPDATE issuers SET meta=? WHERE id=?", (json.dumps(meta), body.issuer_id))
+        await db.commit()
+        return IssuerVerifyDomainResp(verified=True, message="verification_success")
+    else:
+        return IssuerVerifyDomainResp(verified=False, message=error_msg or "verification_failed")
 
 
 @app.get(
@@ -680,10 +972,28 @@ async def _get_approved_issuer_by_key(db, api_key: str):
 
 # ---------- issuer /issue & /revoke ----------
 @app.post(f"{API}/issuer/issue", response_model=IssuerIssueResp)
-async def issuer_issue(body: IssuerIssueReq, db=Depends(get_db)):
-    issuer = await _get_approved_issuer_by_key(db, body.api_key)
+async def issuer_issue(
+    body: IssuerIssueReq, 
+    x_token: Optional[str] = Header(None),
+    db=Depends(get_db)
+):
+    issuer = None
+    if body.api_key:
+        issuer = await _get_approved_issuer_by_key(db, body.api_key)
+    elif x_token:
+        try:
+            payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+            issuer_id = payload.get("issuer_id")
+            if issuer_id and payload.get("role") == "issuer":
+                issuer = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (issuer_id,))
+        except:
+            pass
+
     if not issuer:
-        raise HTTPException(status_code=401, detail="bad_api_key")
+        raise HTTPException(status_code=401, detail="authentication_required")
+        
+    if issuer["status"] != "approved":
+         raise HTTPException(status_code=403, detail="issuer_not_approved")
 
     vc = body.vc
     if vc.get("issuer") != (issuer["did"] or ""):
@@ -694,6 +1004,7 @@ async def issuer_issue(body: IssuerIssueReq, db=Depends(get_db)):
     
     # Generate unique recipient ID for QR/NFC scanning
     recipient_id = base64.urlsafe_b64encode(secrets.token_bytes(12)).decode().rstrip("=")
+    subject_did = (vc.get("credentialSubject") or {}).get("id", "")
 
     await db.execute(
         "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, created_at) "
@@ -701,7 +1012,7 @@ async def issuer_issue(body: IssuerIssueReq, db=Depends(get_db)):
         (
             jti,
             issuer["id"],
-            (vc.get("credentialSubject") or {}).get("id", ""),
+            subject_did,
             recipient_id,
             json.dumps(vc),
             now,
@@ -717,13 +1028,40 @@ async def issuer_issue(body: IssuerIssueReq, db=Depends(get_db)):
         (
             jti,
             vc.get("issuer", ""),
-            (vc.get("credentialSubject") or {}).get("id", ""),
+            subject_did,
             now,
             now,
         ),
     )
+
+    # Automatically add to user's wallet if user exists
+    if subject_did:
+        user_row = await db.execute_fetchone("SELECT id FROM users WHERE did=?", (subject_did,))
+        if user_row:
+            try:
+                encrypted_payload = vc_encryptor.encrypt_vc(vc)
+                # Check if VC already exists for this user
+                existing_vc = await db.execute_fetchone(
+                    "SELECT id FROM user_vcs WHERE user_id=? AND vc_id=?",
+                    (user_row["id"], jti)
+                )
+                if existing_vc:
+                    await db.execute(
+                        "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE user_id=? AND vc_id=?",
+                        (encrypted_payload, now, user_row["id"], jti)
+                    )
+                else:
+                    await db.execute(
+                        "INSERT INTO user_vcs(user_id, vc_id, vc_payload, created_at, updated_at) VALUES(?,?,?,?,?)",
+                        (user_row["id"], jti, encrypted_payload, now, now)
+                    )
+            except Exception as e:
+                # Log error but don't fail the issuance
+                print(f"Failed to auto-add VC to user wallet: {e}")
+
     await db.commit()
     return IssuerIssueResp(ok=True, vc_id=jti)
+
 
 
 @app.post(f"{API}/issuer/revoke", response_model=IssuerRevokeResp)
@@ -967,3 +1305,154 @@ async def lookup_recipient(recipient_id: str, db=Depends(get_db)):
 
 # Mount OAuth router
 app.include_router(oauth_router)
+
+# ---------- simple VC verify (no presentation) ----------
+@app.post(f"{API}/vc/verify", response_model=VerifyResp)
+async def vc_verify_simple(body: VerifyReq, db=Depends(get_db)):
+    """
+    Sadece VC imzasını ve revocation durumunu doğrular.
+    Presentation (holder imzası) kontrolü yapmaz.
+    Dosya yükleme ile doğrulama için kullanılır.
+    """
+    vc = body.vc
+    
+    # 1) VC imzasını doğrula
+    ok, reason, issuer, subject = verify_vc(vc, signer)
+    
+    # 2) Revocation kontrolü
+    revoked = False
+    jti = vc.get("jti") or vc.get("id")
+    if jti:
+        r2 = await db.execute_fetchone(
+            "SELECT status FROM vc_status WHERE vc_id=?", (jti,)
+        )
+        if r2 and r2["status"] == "revoked":
+            revoked = True
+            
+    # Audit log (opsiyonel)
+    now = int(time.time())
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+        "VALUES(?,?,?,?,?,?)",
+        (now, "vc_verify_simple", issuer or "", subject or "", "revoked" if revoked else ("ok" if ok else "fail"),
+         json.dumps({"reason": reason})),
+    )
+    await db.commit()
+
+    if not ok:
+        return VerifyResp(valid=False, reason=reason or "invalid_signature", issuer=issuer, subject=subject, revoked=False)
+        
+    if revoked:
+        return VerifyResp(valid=False, reason="revoked", issuer=issuer, subject=subject, revoked=True)
+
+    return VerifyResp(valid=True, reason="ok", issuer=issuer, subject=subject, revoked=False)
+
+
+@app.post(f"{API}/auth/backup-codes/generate", response_model=BackupCodesResp)
+async def generate_backup_codes(user=Depends(_get_current_user), db=Depends(get_db)):
+    """Generate new backup codes. Invalidates old ones."""
+    codes = [secrets.token_hex(4) for _ in range(10)] # 8 chars each
+    hashed_codes = [hashlib.sha256(c.encode()).hexdigest() for c in codes]
+    
+    await db.execute(
+        "UPDATE users SET backup_codes=? WHERE id=?",
+        (json.dumps(hashed_codes), user["id"])
+    )
+    await db.commit()
+    
+    return BackupCodesResp(codes=codes)
+
+
+@app.post(f"{API}/auth/verify-email/request", response_model=VerifyEmailResp)
+@limiter.limit("3/minute")
+async def request_email_verification(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Request email verification link"""
+    if user.get("email_verified"):
+        return VerifyEmailResp(ok=True, message="already_verified")
+        
+    token = secrets.token_urlsafe(32)
+    await db.execute(
+        "UPDATE users SET verification_token=? WHERE id=?",
+        (token, user["id"])
+    )
+    await db.commit()
+    
+    # Mock email sending
+    print(f"EMAIL VERIFICATION LINK: {settings.APP_URL}/verify-email?token={token}")
+    
+    return VerifyEmailResp(ok=True, message="verification_email_sent")
+
+
+@app.post(f"{API}/auth/verify-email/confirm", response_model=VerifyEmailResp)
+async def confirm_email_verification(body: VerifyEmailReq, db=Depends(get_db)):
+    """Confirm email verification"""
+    user = await db.execute_fetchone(
+        "SELECT id FROM users WHERE verification_token=?",
+        (body.token,)
+    )
+    if not user:
+        raise HTTPException(status_code=400, detail="invalid_token")
+        
+    await db.execute(
+        "UPDATE users SET email_verified=1, verification_token=NULL WHERE id=?",
+        (user["id"],)
+    )
+    await db.commit()
+    
+    return VerifyEmailResp(ok=True, message="email_verified")
+
+
+@app.post(f"{API}/auth/password-reset/request", response_model=ForgotPasswordResp)
+@limiter.limit("3/minute")
+async def request_password_reset(request: Request, body: ForgotPasswordReq, db=Depends(get_db)):
+    """Request password reset link"""
+    user = await db.execute_fetchone(
+        "SELECT id FROM users WHERE email=?",
+        (body.email.lower().strip(),)
+    )
+    if not user:
+        # Don't reveal user existence
+        return ForgotPasswordResp(ok=True, message="reset_email_sent_if_exists")
+        
+    token = secrets.token_urlsafe(32)
+    expires = int(time.time()) + 3600 # 1 hour
+    
+    await db.execute(
+        "UPDATE users SET reset_token=?, reset_token_expires=? WHERE id=?",
+        (token, expires, user["id"])
+    )
+    await db.commit()
+    
+    # Mock email sending
+    print(f"PASSWORD RESET LINK: {settings.APP_URL}/reset-password?token={token}")
+    
+    return ForgotPasswordResp(ok=True, message="reset_email_sent_if_exists")
+
+
+@app.post(f"{API}/auth/password-reset/confirm", response_model=ResetPasswordResp)
+async def confirm_password_reset(body: ResetPasswordReq, db=Depends(get_db)):
+    """Reset password with token"""
+    now = int(time.time())
+    user = await db.execute_fetchone(
+        "SELECT id, reset_token_expires FROM users WHERE reset_token=?",
+        (body.token,)
+    )
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="invalid_token")
+        
+    if not user["reset_token_expires"] or user["reset_token_expires"] < now:
+        raise HTTPException(status_code=400, detail="token_expired")
+        
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+        
+    password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    
+    await db.execute(
+        "UPDATE users SET password_hash=?, reset_token=NULL, reset_token_expires=NULL WHERE id=?",
+        (password_hash, user["id"])
+    )
+    await db.commit()
+    
+    return ResetPasswordResp(ok=True, message="password_reset_success")
