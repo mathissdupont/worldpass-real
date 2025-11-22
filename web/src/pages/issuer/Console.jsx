@@ -759,6 +759,3 @@ export default function IssuerConsole(){
 
 /* ------ local helpers ------ */
 function safeJ(s){ try{ return JSON.parse(s); }catch{ return null; } }
-
-/* ------ local helpers ------ */
-function safeJ(s){ try{ return JSON.parse(s); }catch{ return null; } }
