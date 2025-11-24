@@ -1,7 +1,6 @@
 // src/pages/issuer/Console.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { putTemplate, listOrgs, getOrg, removeTemplate } from "@/lib/issuerStore.js";
 import { useIdentity } from "@/lib/identityContext";
 import { b64u, ed25519Sign, b64uToBytes } from "@/lib/crypto";
 import { getIssuerProfile, rotateIssuerApiKey, issueCredential, revokeCredential } from "@/lib/api";
@@ -190,13 +189,13 @@ export default function IssuerConsole(){
 
   // org (Legacy local storage support - might need to migrate to backend)
   // For now, we use the fetched issuer as the "org"
-  const org = issuer ? {
+  const org = useMemo(() => issuer ? {
     id: issuer.id,
     name: issuer.name,
     did: issuer.did,
     domain: issuer.domain,
     templates: {} // TODO: Fetch templates from backend
-  } : null;
+  } : null, [issuer]);
 
   // modlar
   const [mode, setMode] = useState("wpml"); // "wpml" | "wpt" | "manual"
@@ -426,11 +425,6 @@ export default function IssuerConsole(){
     alert("Backend template saving not implemented yet for issuers.");
   };
 
-  const delTpl = ()=>{
-    // TODO: Implement backend delete
-    alert("Backend template deletion not implemented yet for issuers.");
-  };
-
   // textarea kısayolları: Ctrl+S kaydet / Ctrl+Enter preview
   const onTplKeyDown = useCallback((e)=>{
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){
@@ -439,6 +433,7 @@ export default function IssuerConsole(){
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter"){
       e.preventDefault(); doPreview();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tplBody, org, tplKey, tplName]);
 
   // modal ESC ile kapansın

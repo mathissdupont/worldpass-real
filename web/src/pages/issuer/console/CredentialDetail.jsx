@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import IssuerLayout from "@/components/issuer/IssuerLayout";
-import { getIssuerProfile, getIssuerCredentialDetail } from "@/lib/api";
+import { getIssuerProfile, getIssuerCredentialDetail, revokeCredential } from "@/lib/api";
 import { FiCheckCircle, FiXCircle, FiArrowLeft, FiCopy, FiAlertCircle } from "react-icons/fi";
 
 export default function IssuerCredentialDetail() {
@@ -12,6 +12,8 @@ export default function IssuerCredentialDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -21,6 +23,7 @@ export default function IssuerCredentialDetail() {
     }
 
     loadData(token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, vcId]);
 
   const loadData = async (token) => {
@@ -51,6 +54,22 @@ export default function IssuerCredentialDetail() {
     navigator.clipboard.writeText(vcId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRevoke = async () => {
+    setRevoking(true);
+    try {
+      const token = localStorage.getItem("issuer_token");
+      await revokeCredential(null, vcId, token);
+      setShowRevokeConfirm(false);
+      // Reload credential data
+      await loadData(token);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setRevoking(false);
+    }
   };
 
   if (loading && !issuer) {
@@ -158,39 +177,43 @@ export default function IssuerCredentialDetail() {
             <div>
               <label className="text-sm font-medium text-gray-500">Type</label>
               <p className="text-sm text-gray-900 mt-1">
-                {credential.credential?.credential_type || "N/A"}
+                {credential.credential?.type ? (
+                  Array.isArray(credential.credential.type) 
+                    ? credential.credential.type.filter(t => t !== 'VerifiableCredential').join(', ') || 'VerifiableCredential'
+                    : credential.credential.type
+                ) : "N/A"}
               </p>
             </div>
             
             <div>
               <label className="text-sm font-medium text-gray-500">Subject DID</label>
               <p className="text-sm text-gray-900 mt-1 font-mono break-all">
-                {credential.credential?.subject_did || "N/A"}
+                {credential.credential?.credentialSubject?.id || "N/A"}
               </p>
             </div>
             
             <div>
-              <label className="text-sm font-medium text-gray-500">Issued At</label>
-              <p className="text-sm text-gray-900 mt-1">
-                {formatDate(credential.credential?.created_at)}
+              <label className="text-sm font-medium text-gray-500">Issuer</label>
+              <p className="text-sm text-gray-900 mt-1 font-mono break-all">
+                {credential.credential?.issuer || "N/A"}
               </p>
             </div>
             
             <div>
-              <label className="text-sm font-medium text-gray-500">Updated At</label>
-              <p className="text-sm text-gray-900 mt-1">
-                {formatDate(credential.credential?.updated_at)}
+              <label className="text-sm font-medium text-gray-500">Credential ID (JTI)</label>
+              <p className="text-sm text-gray-900 mt-1 font-mono break-all">
+                {credential.credential?.jti || vcId}
               </p>
             </div>
           </div>
         </div>
 
         {/* Credential Data */}
-        {credential.credential?.vc_data && (
+        {credential.credential && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Credential Data</h2>
             <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-x-auto">
-              {JSON.stringify(JSON.parse(credential.credential.vc_data), null, 2)}
+              {JSON.stringify(credential.credential, null, 2)}
             </pre>
           </div>
         )}
@@ -227,15 +250,48 @@ export default function IssuerCredentialDetail() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
             <button
-              disabled
-              className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
-              title="Revoke functionality will be implemented in backend"
+              onClick={() => setShowRevokeConfirm(true)}
+              className="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700"
             >
-              Revoke Credential (Coming Soon)
+              Revoke Credential
             </button>
             <p className="text-xs text-gray-500 mt-2">
-              Credential revocation will be available once the backend implementation is complete
+              Revoking a credential will invalidate it permanently
             </p>
+          </div>
+        )}
+
+        {/* Revoke Confirmation Modal */}
+        {showRevokeConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">Revoke Credential</h2>
+              <p className="text-sm text-gray-600 mb-2">
+                Are you sure you want to revoke this credential?
+              </p>
+              <p className="text-sm font-mono text-gray-700 bg-gray-50 p-2 rounded mb-4 break-all">
+                {vcId}
+              </p>
+              <p className="text-sm text-rose-600 mb-6">
+                ⚠️ This action cannot be undone. The credential will be marked as invalid.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowRevokeConfirm(false)}
+                  disabled={revoking}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRevoke}
+                  disabled={revoking}
+                  className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium disabled:opacity-50"
+                >
+                  {revoking ? 'Revoking...' : 'Revoke Credential'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
