@@ -8,6 +8,7 @@
   "after_create_hint": "Oluşturduktan sonra Ayarlar → Load ile geri yükleyebilirsin.",
   "sign_in": "Oturum Aç",
   "user_sign_in": "Kullanıcı Girişi",
+  "identity_card": "Dijital Kimlik Kartı",
   "beta": "Beta",
   "local_demo_auth": "Yerel demo kimlik doğrulama",
   "email": "E-posta",
@@ -447,6 +448,22 @@
   ,"select_identity": "Kimlik Seçimi"
   ,"no_credentials_found": "Kayıtlı kimlik bilgisi bulunamadı."
   ,"issuer_label": "Issuer:"
+  ,"issuer_login": "Yayıncı Girişi"
+  ,"issuer_login_desc": "VC imzalamak için yayıncı kimlik bilgilerini kullan."
+  ,"issuer_did": "Yayıncı DID"
+  ,"issuer_keystore": "Yayıncı Keystore"
+  ,"issuer_password": "Yayıncı Parolası"  
+  ,"issuer_login_button": "Yayıncı Girişi"
+  ,"issuer_login_loading": "Yayıncı girişi yapılıyor..."
+  ,"issuer_login_failed": "Yayıncı girişi başarısız."
+  ,"requesting_presentation": "Presentation isteniyor..." 
+  ,"request_details": "İstek Detayları"
+  ,"requested_vc_types": "İstenen VC Türleri" 
+  ,"requested_issuer": "İstenen Yayıncı"
+  ,"select_credentials": "Kimlik Bilgilerini Seç"
+  ,"select_fields": "Alanları Seç"
+  ,"no_fields_requested": "İstenen alan yok (tüm alanlar paylaşılabilir)."
+  ,"available_credentials": "Mevcut Kimlik Bilgileri" 
   ,"unknown_issuer": "Unknown Issuer"
   ,"shareable_info": "Paylaşılacak Bilgiler"
   ,"select_identity_first": "Önce bir kimlik seçmelisin."
