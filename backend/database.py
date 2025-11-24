@@ -82,11 +82,7 @@ CREATE TABLE IF NOT EXISTS issuers (
   password_hash TEXT,           -- bcrypt hash (added for issuer login)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  meta TEXT,                    -- JSON: additional settings like contact_email, support_link, timezone, locale
-  contact_email TEXT,
-  support_link TEXT,
-  timezone TEXT DEFAULT 'UTC',
-  locale TEXT DEFAULT 'en'
+  meta TEXT
 );
 
 CREATE TABLE IF NOT EXISTS issued_vcs (
@@ -96,45 +92,11 @@ CREATE TABLE IF NOT EXISTS issued_vcs (
   subject_did TEXT,
   recipient_id TEXT,            -- unique ID for the recipient (for QR/NFC scanning)
   payload TEXT,                 -- raw VC JSON
-  credential_type TEXT,         -- extracted from payload for filtering
   created_at INTEGER NOT NULL,
-  updated_at INTEGER,
   FOREIGN KEY(issuer_id) REFERENCES issuers(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_issued_vcs_recipient_id ON issued_vcs(recipient_id);
-CREATE INDEX IF NOT EXISTS idx_issued_vcs_issuer_id ON issued_vcs(issuer_id);
-CREATE INDEX IF NOT EXISTS idx_issued_vcs_vc_id ON issued_vcs(vc_id);
-
-CREATE TABLE IF NOT EXISTS issuer_templates (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  issuer_id INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  vc_type TEXT NOT NULL,
-  schema_json TEXT NOT NULL,    -- JSON schema for the template
-  is_active INTEGER DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  FOREIGN KEY(issuer_id) REFERENCES issuers(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_issuer_templates_issuer_id ON issuer_templates(issuer_id);
-
-CREATE TABLE IF NOT EXISTS issuer_webhooks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  issuer_id INTEGER NOT NULL,
-  url TEXT NOT NULL,
-  event_type TEXT NOT NULL,     -- 'credential.issued' | 'credential.revoked' | 'credential.updated'
-  secret TEXT,                  -- Optional webhook secret for HMAC validation
-  is_active INTEGER DEFAULT 1,
-  created_at INTEGER NOT NULL,
-  last_delivery INTEGER,
-  failure_count INTEGER DEFAULT 0,
-  FOREIGN KEY(issuer_id) REFERENCES issuers(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_issuer_webhooks_issuer_id ON issuer_webhooks(issuer_id);
 
 CREATE TABLE IF NOT EXISTS vc_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,14 +161,8 @@ async def _execute_fetchone(self, sql: str, parameters=None):
     cursor = await self.execute(sql, parameters or ())
     return await cursor.fetchone()
 
-async def _execute_fetchall(self, sql: str, parameters=None):
-    """Helper method to execute a query and fetch all results"""
-    cursor = await self.execute(sql, parameters or ())
-    return await cursor.fetchall()
-
-# Add the methods to the Connection class
+# Add the method to the Connection class
 aiosqlite.Connection.execute_fetchone = _execute_fetchone
-aiosqlite.Connection.execute_fetchall = _execute_fetchall
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     conn = await aiosqlite.connect(settings.SQLITE_PATH)
@@ -258,38 +214,11 @@ async def _run_migrations(conn: aiosqlite.Connection):
     columns = await cursor.fetchall()
     issuer_column_names = [col[1] for col in columns]
     
-    issuer_migrations = [
-        ("password_hash", "ALTER TABLE issuers ADD COLUMN password_hash TEXT"),
-        ("contact_email", "ALTER TABLE issuers ADD COLUMN contact_email TEXT"),
-        ("support_link", "ALTER TABLE issuers ADD COLUMN support_link TEXT"),
-        ("timezone", "ALTER TABLE issuers ADD COLUMN timezone TEXT DEFAULT 'UTC'"),
-        ("locale", "ALTER TABLE issuers ADD COLUMN locale TEXT DEFAULT 'en'"),
-    ]
-    
-    for column_name, alter_sql in issuer_migrations:
-        if column_name not in issuer_column_names:
-            try:
-                await conn.execute(alter_sql)
-                print(f"Migration: Added column {column_name} to issuers table")
-            except Exception as e:
-                print(f"Migration warning: Could not add column {column_name} to issuers: {e}")
-    
-    # Check and migrate issued_vcs table
-    cursor = await conn.execute("PRAGMA table_info(issued_vcs)")
-    columns = await cursor.fetchall()
-    issued_vcs_column_names = [col[1] for col in columns]
-    
-    issued_vcs_migrations = [
-        ("credential_type", "ALTER TABLE issued_vcs ADD COLUMN credential_type TEXT"),
-        ("updated_at", "ALTER TABLE issued_vcs ADD COLUMN updated_at INTEGER"),
-    ]
-    
-    for column_name, alter_sql in issued_vcs_migrations:
-        if column_name not in issued_vcs_column_names:
-            try:
-                await conn.execute(alter_sql)
-                print(f"Migration: Added column {column_name} to issued_vcs table")
-            except Exception as e:
-                print(f"Migration warning: Could not add column {column_name} to issued_vcs: {e}")
+    if "password_hash" not in issuer_column_names:
+        try:
+            await conn.execute("ALTER TABLE issuers ADD COLUMN password_hash TEXT")
+            print("Migration: Added column password_hash to issuers table")
+        except Exception as e:
+            print(f"Migration warning: Could not add column password_hash to issuers: {e}")
 
     await conn.commit()

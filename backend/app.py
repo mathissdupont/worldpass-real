@@ -45,7 +45,6 @@ from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
 from core.vc_crypto import VCEncryptor, generate_encryption_key
 from oauth_endpoints import router as oauth_router
-from issuer_endpoints import router as issuer_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -1006,26 +1005,16 @@ async def issuer_issue(
     # Generate unique recipient ID for QR/NFC scanning
     recipient_id = base64.urlsafe_b64encode(secrets.token_bytes(12)).decode().rstrip("=")
     subject_did = (vc.get("credentialSubject") or {}).get("id", "")
-    
-    # Extract credential type for filtering
-    vc_types = vc.get("type", [])
-    if isinstance(vc_types, list):
-        # Filter out base types, keep the specific type
-        credential_type = next((t for t in vc_types if t not in ["VerifiableCredential"]), "Unknown")
-    else:
-        credential_type = str(vc_types) if vc_types else "Unknown"
 
     await db.execute(
-        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, credential_type, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, created_at) "
+        "VALUES(?,?,?,?,?,?)",
         (
             jti,
             issuer["id"],
             subject_did,
             recipient_id,
             json.dumps(vc),
-            credential_type,
-            now,
             now,
         ),
     )
@@ -1334,9 +1323,6 @@ async def lookup_recipient(recipient_id: str, db=Depends(get_db)):
 
 # Mount OAuth router
 app.include_router(oauth_router)
-
-# Mount Issuer Console router
-app.include_router(issuer_router)
 
 # ---------- simple VC verify (no presentation) ----------
 @app.post(f"{API}/vc/verify", response_model=VerifyResp)
