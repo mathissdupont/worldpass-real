@@ -250,6 +250,102 @@ class UserProfileResp(BaseModel):
 class UserDeleteResp(BaseModel):
     ok: bool
 
+# Extended Issuer Models for Console
+class IssuerUpdateReq(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
+    contact_email: Optional[str] = None
+    support_link: Optional[str] = None
+    timezone: Optional[str] = None
+    locale: Optional[str] = None
+
+class IssuerStatsResp(BaseModel):
+    total_issued: int
+    active_count: int
+    revoked_count: int
+    expired_count: int
+
+class IssuerCredentialListReq(BaseModel):
+    page: int = 1
+    per_page: int = 20
+    status: Optional[str] = None  # 'valid' | 'revoked'
+    template_type: Optional[str] = None
+    search: Optional[str] = None
+    date_from: Optional[int] = None
+    date_to: Optional[int] = None
+
+class IssuerCredentialItem(BaseModel):
+    id: int
+    vc_id: str
+    subject_did: str
+    recipient_id: Optional[str] = None
+    credential_type: str
+    status: str
+    created_at: int
+    updated_at: Optional[int] = None
+
+class IssuerCredentialListResp(BaseModel):
+    credentials: List[IssuerCredentialItem]
+    total: int
+    page: int
+    per_page: int
+
+class IssuerCredentialDetailResp(BaseModel):
+    credential: Dict[str, Any]
+    status: str
+    audit_log: List[Dict[str, Any]]
+
+class IssuerTemplateReq(BaseModel):
+    name: str
+    description: Optional[str] = None
+    vc_type: str
+    schema_data: Dict[str, Any]
+    is_active: bool = True
+
+class IssuerTemplateItem(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    vc_type: str
+    schema_data: Dict[str, Any]
+    is_active: bool
+    created_at: int
+    updated_at: int
+
+class IssuerTemplateListResp(BaseModel):
+    templates: List[IssuerTemplateItem]
+
+class IssuerApiKeyItem(BaseModel):
+    id: int
+    name: str
+    key_prefix: str
+    created_at: int
+    last_used: Optional[int] = None
+
+class IssuerApiKeyListResp(BaseModel):
+    api_keys: List[IssuerApiKeyItem]
+
+class IssuerWebhookReq(BaseModel):
+    url: str
+    event_type: str  # 'credential.issued' | 'credential.revoked' | 'credential.updated'
+    is_active: bool = True
+    secret: Optional[str] = None
+
+class IssuerWebhookItem(BaseModel):
+    id: int
+    url: str
+    event_type: str
+    is_active: bool
+    created_at: int
+    last_delivery: Optional[int] = None
+    failure_count: int
+
+class IssuerWebhookListResp(BaseModel):
+    webhooks: List[IssuerWebhookItem]
+
+class UserDeleteResp_Legacy(BaseModel):
+    ok: bool
+
 # VC Templates management
 class VCTemplateCreateReq(BaseModel):
     name: str
