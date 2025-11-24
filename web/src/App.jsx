@@ -16,6 +16,11 @@ import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 import IssuerConsole from "./pages/issuer/Console";
 import IssuerDashboard from "./pages/issuer/console/Dashboard";
+import IssuerCredentials from "./pages/issuer/console/Credentials";
+import IssuerCredentialDetail from "./pages/issuer/console/CredentialDetail";
+import IssuerTemplates from "./pages/issuer/console/Templates";
+import IssuerAPIWebhooks from "./pages/issuer/console/APIWebhooks";
+import IssuerSettings from "./pages/issuer/console/Settings";
 import Verifier from "./pages/Verifier";
 import Present from "./pages/Present";
 import WPTEditorPro from "@/pages/tools/WPTEditorPRO.jsx";
@@ -143,6 +148,11 @@ export default function App(){
 
           {/* Role-protected */}
           <Route path="/issuer/console" element={<IssuerDashboard />} />
+          <Route path="/issuer/console/credentials" element={<IssuerCredentials />} />
+          <Route path="/issuer/console/credentials/:vcId" element={<IssuerCredentialDetail />} />
+          <Route path="/issuer/console/templates" element={<IssuerTemplates />} />
+          <Route path="/issuer/console/api" element={<IssuerAPIWebhooks />} />
+          <Route path="/issuer/console/settings" element={<IssuerSettings />} />
           <Route path="/issuer/console-legacy" element={<IssuerConsole />} />
           <Route
             path="/admin/issuers"
