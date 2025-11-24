@@ -1,7 +1,7 @@
 // src/pages/Settings.jsx
 import { useEffect, useState } from "react";
 import { useIdentity } from "../lib/identityContext";
-import { t } from "../lib/i18n";
+import { t, setLocale } from "../lib/i18n";
 import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 import { getToken } from "../lib/auth";
@@ -95,7 +95,9 @@ export default function Settings() {
           setPhone(profile.phone || "");
           setAvatar(profile.avatar || "");
           setOtpEnabled(!!profile.otpEnabled);
-          setLang(profile.lang || "en");
+          const loadedLang = profile.lang || "en";
+          setLang(loadedLang);
+          setLocale(loadedLang); // Apply loaded language
           setTheme(profile.theme || "light");
           
           // Optionally cache locally for offline/speed
@@ -109,7 +111,9 @@ export default function Settings() {
           setPhone(p0.phone || "");
           setAvatar(p0.avatar || "");
           setOtpEnabled(!!p0.otpEnabled);
-          setLang(p0.lang || "en");
+          const loadedLang = p0.lang || "en";
+          setLang(loadedLang);
+          setLocale(loadedLang); // Apply loaded language
           setTheme(p0.theme || "light");
           setToast({ type: "err", text: t('profile_load_failed') });
         }
@@ -121,7 +125,9 @@ export default function Settings() {
         setPhone(p0.phone || "");
         setAvatar(p0.avatar || "");
         setOtpEnabled(!!p0.otpEnabled);
-        setLang(p0.lang || "en");
+        const loadedLang = p0.lang || "en";
+        setLang(loadedLang);
+        setLocale(loadedLang); // Apply loaded language
         setTheme(p0.theme || "light");
       }
       
@@ -350,6 +356,7 @@ export default function Settings() {
 
   const handleLanguageChange = async (newLang) => {
     setLang(newLang);
+    setLocale(newLang); // Apply language change immediately
     
     try {
       const token = getToken();
@@ -358,7 +365,11 @@ export default function Settings() {
         await updateProfile(token, { lang: newLang });
       }
       await saveProfileLocal({ lang: newLang });
-      // TODO: If i18n has a setLanguage method, call it here: i18n.setLanguage(newLang)
+      // Force re-render by updating state to reflect the language change
+      setToast({ type: "ok", text: t('profile_saved') });
+      // Reload page to ensure all components and static text show the new language
+      // This is intentional to handle cases where translations are used outside React lifecycle
+      setTimeout(() => window.location.reload(), 500);
     } catch (error) {
       console.error("Failed to save language:", error);
       setToast({ type: "err", text: t('profile_save_failed') });

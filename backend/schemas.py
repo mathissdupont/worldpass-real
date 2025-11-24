@@ -95,6 +95,7 @@ class IssuerIssueReq(BaseModel):
 class IssuerIssueResp(BaseModel):
     ok: bool
     vc_id: Optional[str] = None
+    recipient_id: Optional[str] = None
 
 class IssuerRevokeReq(BaseModel):
     api_key: Optional[str] = None

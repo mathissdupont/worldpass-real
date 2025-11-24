@@ -1060,7 +1060,7 @@ async def issuer_issue(
                 print(f"Failed to auto-add VC to user wallet: {e}")
 
     await db.commit()
-    return IssuerIssueResp(ok=True, vc_id=jti)
+    return IssuerIssueResp(ok=True, vc_id=jti, recipient_id=recipient_id)
 
 
 
