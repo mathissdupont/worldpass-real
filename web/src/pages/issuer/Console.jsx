@@ -406,11 +406,16 @@ export default function IssuerConsole(){
       };
       
       const token = localStorage.getItem("issuer_token");
-      await issueCredential(null, signed, token);
+      const response = await issueCredential(null, signed, token);
       
       setOut(JSON.stringify(signed, null, 2));
-      setFlash({tone:"ok", text:"Sertifika kullanıcıya gönderildi ve kaydedildi."});
-      setTimeout(()=>setFlash(null), 3000);
+      
+      // Show success with recipient info
+      const successMessage = response.recipient_id 
+        ? t('org_console.credential_issued_success', { recipient_id: response.recipient_id })
+        : t('org_console.credential_issued_simple');
+      setFlash({tone:"ok", text: successMessage});
+      setTimeout(()=>setFlash(null), 5000);
     } catch(e) {
       setTplErr(e.message || String(e));
     }

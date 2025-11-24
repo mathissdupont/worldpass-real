@@ -540,5 +540,11 @@
   "org_console.design_in_editor": "Design in Editor",
   "org_console.load_wpt": "Load .wpt",
   "org_console.advanced_json": "Advanced JSON",
-  "org_console.saved_templates": "Saved Templates"
+  "org_console.saved_templates": "Saved Templates",
+  "confirm_delete_account": "Are you sure you want to permanently delete your account and all your data? This action cannot be undone.",
+  "delete_account": "Delete Account",
+  "delete_account_desc": "Permanently delete your account and all your data from the server.",
+  "delete_failed": "Failed to delete account.",
+  "org_console.credential_issued_success": "Credential successfully saved! If the user's DID matches, it will be automatically added to their wallet. Sharing code: {{recipient_id}}",
+  "org_console.credential_issued_simple": "Credential sent to user and saved."
 }
