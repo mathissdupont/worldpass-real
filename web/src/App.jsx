@@ -78,7 +78,7 @@ export default function App(){
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <NavBar health={health} user={user} />
-      <div className="max-w-5xl mx-auto p-6 transition-all duration-300" id="main">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 transition-all duration-300" id="main">
         <Routes>
           <Route path="/" element={<Navigate to="/account" replace />} />
 

@@ -181,19 +181,19 @@ export default function Register(){
   return (
     <div className="space-y-5">
       {/* Üst başlık + stepper */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-xl font-semibold text-[color:var(--text)]">{t('create_user_account')}</h1>
           <p className="text-sm text-[color:var(--muted)] mt-1">{t('new_account_intro_beta')}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <StepChip
             step={1}
             label={t('step_identity_keystore')}
             active={step === 1}
             done={hasIdentity}
           />
-          <div className="h-px w-8 bg-[color:var(--border)] hidden md:block" />
+          <div className="h-px w-4 sm:w-8 bg-[color:var(--border)]" />
           <StepChip
             step={2}
             label={t('step_user_account')}
@@ -205,16 +205,16 @@ export default function Register(){
 
       {/* ADIM 1: Kimlik */}
       {step === 1 && (
-        <div className="grid md:grid-cols-2 gap-6 items-start">
-          <div className="md:col-span-2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-6 shadow-sm space-y-4">
-            <div className="flex items-start justify-between gap-3">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-4 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--text)]">{t('step1_title')}</h2>
                 <p className="text-xs text-[color:var(--muted)] mt-1">{t('step1_desc')}</p>
               </div>
               <span
                 className={[
-                  "text-[11px] px-2.5 py-1.5 rounded-full border inline-flex items-center gap-1",
+                  "text-[11px] px-2.5 py-1.5 rounded-full border inline-flex items-center gap-1 shrink-0",
                   hasIdentity
                     ? "border-emerald-400/40 bg-[color:var(--panel-2)] text-emerald-300"
                     : "border-amber-400/40 bg-[color:var(--panel-2)] text-amber-300",
@@ -225,7 +225,7 @@ export default function Register(){
               </span>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-4 space-y-3">
                 <h3 className="font-semibold text-[color:var(--text)] text-sm">{t('create_new_identity')}</h3>
                 <p className="text-xs text-[color:var(--muted)]">{t('create_new_identity_desc')}</p>
@@ -247,7 +247,7 @@ export default function Register(){
                 type="button"
                 onClick={()=> setStep(2)}
                 disabled={!hasIdentity}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[color:var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
               >
                 {t('goto_step2')}
               </button>
@@ -258,10 +258,10 @@ export default function Register(){
 
       {/* ADIM 2: Kullanıcı Hesabı */}
       {step === 2 && (
-        <div className="grid md:grid-cols-[2fr,1fr] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 items-start">
           {/* Sol: form */}
-          <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between gap-3">
+          <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)]/85 backdrop-blur-sm p-4 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--text)]">{t('step2_title')}</h2>
                 <p className="text-xs text-[color:var(--muted)]">{t('step2_desc')}</p>
@@ -269,7 +269,7 @@ export default function Register(){
               <button
                 type="button"
                 onClick={()=>setStep(1)}
-                className="text-[11px] px-2.5 py-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--muted)] hover:bg-[color:var(--panel-2)]"
+                className="text-[11px] px-2.5 py-1.5 rounded-full border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--muted)] hover:bg-[color:var(--panel-2)] shrink-0"
               >
                 ← {t('back_to_identity')}
               </button>
@@ -278,13 +278,13 @@ export default function Register(){
             <form onSubmit={onSubmit} className="mt-2 space-y-4" noValidate>
               {/* Ad Soyad */}
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-3 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-medium text-[color:var(--muted)]">Profil bilgileri</span>
                   <span className="text-[10px] text-[color:var(--muted)]">
                     {nameOk ? "Tamam" : "Ad ve soyad zorunlu"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="İsim" htmlFor="first">
                     <input
                       id="first"
@@ -335,13 +335,13 @@ export default function Register(){
 
               {/* Şifre */}
               <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)]/90 p-3 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-medium text-[color:var(--muted)]">{t('password')}</span>
                   <span className="text-[10px] text-[color:var(--muted)]">
                     {passOk ? t('password_ready') : t('password_requirements')}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label={t('password')} help={t('password_help')}>
                     <div className="relative">
                       <input
