@@ -117,6 +117,15 @@ export default function IssuerCredentialDetail() {
     return date.toLocaleString();
   };
 
+  const formatCredentialType = (credentialData) => {
+    if (!credentialData?.type) return "N/A";
+    if (Array.isArray(credentialData.type)) {
+      const specificTypes = credentialData.type.filter(t => t !== 'VerifiableCredential');
+      return specificTypes.length > 0 ? specificTypes.join(', ') : 'VerifiableCredential';
+    }
+    return credentialData.type;
+  };
+
   const StatusBadge = ({ status }) => {
     const styles = {
       valid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -177,11 +186,7 @@ export default function IssuerCredentialDetail() {
             <div>
               <label className="text-sm font-medium text-gray-500">Type</label>
               <p className="text-sm text-gray-900 mt-1">
-                {credential.credential?.type ? (
-                  Array.isArray(credential.credential.type) 
-                    ? credential.credential.type.filter(t => t !== 'VerifiableCredential').join(', ') || 'VerifiableCredential'
-                    : credential.credential.type
-                ) : "N/A"}
+                {formatCredentialType(credential.credential)}
               </p>
             </div>
             
