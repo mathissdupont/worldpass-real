@@ -406,11 +406,16 @@ export default function IssuerConsole(){
       };
       
       const token = localStorage.getItem("issuer_token");
-      await issueCredential(null, signed, token);
+      const response = await issueCredential(null, signed, token);
       
       setOut(JSON.stringify(signed, null, 2));
-      setFlash({tone:"ok", text:"Sertifika kullanıcıya gönderildi ve kaydedildi."});
-      setTimeout(()=>setFlash(null), 3000);
+      
+      // Show success with recipient info
+      const successMessage = response.recipient_id 
+        ? `Sertifika başarıyla kaydedildi! Kullanıcının DID'si eşleşirse otomatik olarak cüzdanına eklenecek. Paylaşım kodu: ${response.recipient_id}`
+        : "Sertifika kullanıcıya gönderildi ve kaydedildi.";
+      setFlash({tone:"ok", text: successMessage});
+      setTimeout(()=>setFlash(null), 5000);
     } catch(e) {
       setTplErr(e.message || String(e));
     }
