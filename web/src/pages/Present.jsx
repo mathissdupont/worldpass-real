@@ -277,17 +277,19 @@ export default function Present() {
 
   return (
     <section className="max-w-3xl mx-auto pb-20">
-       <div className="mb-8 text-center md:text-left md:flex md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("present_title")}</h2>
-          <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">
-            {t("present_description")}
-          </p>
-        </div>
-        <div className="mt-4 md:mt-0 flex gap-2">
-           {identity ? <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">{t("identity_active")}</span> : <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{t("identity_missing")}</span>}
-        </div>
-      </div>
+       <div className="mb-6 sm:mb-8">
+         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+           <div>
+             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("present_title")}</h2>
+             <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">
+               {t("present_description")}
+             </p>
+           </div>
+           <div className="flex gap-2">
+              {identity ? <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">{t("identity_active")}</span> : <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{t("identity_missing")}</span>}
+           </div>
+         </div>
+       </div>
 
       <div className="mb-4 sticky top-4 z-50"><Msg msg={msg} /></div>
 
@@ -297,22 +299,22 @@ export default function Present() {
         <SectionCard stepNumber={1} title={t("scan_request_optional")} isActive={activeStep === 0} isCompleted={!!request} onToggle={() => setActiveStep(activeStep === 0 ? -1 : 0)}>
            {!request ? (
              <div className="flex flex-col items-center py-4">
-               <div className="flex flex-wrap justify-center gap-3 w-full">
-                 <Button onClick={() => reqQrScanning ? stopRequestQrScan() : startRequestQrScan()} variant={reqQrScanning ? "primary" : "outline"} className="w-full sm:w-auto min-w-[140px]">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md">
+                 <Button onClick={() => reqQrScanning ? stopRequestQrScan() : startRequestQrScan()} variant={reqQrScanning ? "primary" : "outline"} className="w-full">
                     {reqQrScanning ? t("stop_scanning") : t("scan_with_camera")}
                  </Button>
-                 <Button onClick={startRequestNfcScan} variant="outline" className="w-full sm:w-auto min-w-[140px]">{t("scan_with_nfc")}</Button>
+                 <Button onClick={startRequestNfcScan} variant="outline" className="w-full">{t("scan_with_nfc")}</Button>
                </div>
-               <video ref={reqVideoRef} className={`mt-4 rounded-xl border border-[color:var(--border)] ${reqQrScanning ? "block w-64" : "hidden"}`} playsInline muted />
+               <video ref={reqVideoRef} className={`mt-4 rounded-xl border border-[color:var(--border)] w-full max-w-xs ${reqQrScanning ? "block" : "hidden"}`} playsInline muted />
                <canvas ref={reqCanvasRef} className="hidden" />
              </div>
            ) : (
-             <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)] flex items-start justify-between">
-                <div>
+             <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)] flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                    <h4 className="font-bold text-sm text-[color:var(--fg)]">{t("request_received")}</h4>
-                   <p className="text-sm text-[color:var(--brand)] font-medium mt-1">{request.label || t("unnamed_request")}</p>
+                   <p className="text-sm text-[color:var(--brand)] font-medium mt-1 break-all">{request.label || t("unnamed_request")}</p>
                 </div>
-                <Button variant="ghost" onClick={() => { setRequest(null); setSelectedFields([]); }} className="h-8 w-8 p-0 rounded-full">✕</Button>
+                <Button variant="ghost" onClick={() => { setRequest(null); setSelectedFields([]); }} className="h-8 w-8 p-0 rounded-full shrink-0">✕</Button>
              </div>
            )}
         </SectionCard>
