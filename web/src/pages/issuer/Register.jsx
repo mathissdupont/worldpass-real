@@ -22,7 +22,7 @@ function Pill({ tone = "info", children }) {
   );
 }
 const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
-const domainRx = /^(?!\-)(?:[a-z0-9\-]{1,63}\.)+[a-z]{2,}$/i; // basit ama sağlam
+const domainRx = /^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,}$/i; // basit ama sağlam
 
 function Label({ children }) {
   return <div className="text-sm text-gray-700 mb-1">{children}</div>;
@@ -70,7 +70,6 @@ export default function IssuerRegister() {
   const [password, setPassword] = useState("");
 
   const [org, setOrg] = useState(null); // { issuer_id, verification_code, status }
-  const [token, setToken] = useState(""); // For manual token input if needed, though we use DNS/HTTP check
 
   const [msg, setMsg] = useState(null); // {tone:'ok'|'err'|'info'|'warn', text:string}
   const [busyCreate, setBusyCreate] = useState(false);

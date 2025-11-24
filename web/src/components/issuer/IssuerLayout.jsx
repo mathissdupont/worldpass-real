@@ -7,10 +7,6 @@ export default function IssuerLayout({ children, issuer }) {
   const navigate = useNavigate();
   const [showLogout, setShowLogout] = useState(false);
 
-  const handleLogout = () => {
-    setShowLogout(true);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
