@@ -274,20 +274,22 @@ export default function VerifyVC() {
   return (
     <section className="max-w-3xl mx-auto pb-20">
        {/* Header */}
-       <div className="mb-8 text-center md:text-left md:flex md:items-end md:justify-between">
-         <div>
-           <h2 className="text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("verify_vc_title")}</h2>
-           <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">
-             Bir istek oluştur, kullanıcının sunduğu kimliği (VC) al ve doğruluğunu kontrol et.
-           </p>
-         </div>
-         <div className="mt-4 md:mt-0 flex gap-2">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qrJson ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
-              {qrJson ? "İstek Hazır" : "İstek Yok"}
-            </span>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${vcObj ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
-              {vcObj ? "Veri Yüklendi" : "Veri Bekleniyor"}
-            </span>
+       <div className="mb-6 sm:mb-8">
+         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+           <div>
+             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("verify_vc_title")}</h2>
+             <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">
+               Bir istek oluştur, kullanıcının sunduğu kimliği (VC) al ve doğruluğunu kontrol et.
+             </p>
+           </div>
+           <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${qrJson ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+                {qrJson ? "İstek Hazır" : "İstek Yok"}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${vcObj ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+                {vcObj ? "Veri Yüklendi" : "Veri Bekleniyor"}
+              </span>
+           </div>
          </div>
        </div>
 
@@ -306,7 +308,7 @@ export default function VerifyVC() {
              onToggle={() => setActiveStep(activeStep === 0 ? -1 : 0)}
           >
              <div className="grid gap-6">
-                <div className="grid md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                    <div className="space-y-3">
                       <label className="block text-xs font-medium text-[color:var(--muted)] uppercase">Amaç (Label)</label>
                       <input type="text" className="w-full px-4 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none"
@@ -327,17 +329,17 @@ export default function VerifyVC() {
                    </div>
                 </div>
 
-                <div className="pt-4 border-t border-[color:var(--border)] flex flex-col sm:flex-row gap-4 items-start">
+                <div className="pt-4 border-t border-[color:var(--border)] flex flex-col gap-4">
                    <Button onClick={onGenerateRequest} disabled={busy} variant="primary" className="w-full sm:w-auto">
                       {busy ? "Oluşturuluyor..." : "İstek QR Oluştur"}
                    </Button>
                    
                    {requestQrImage && (
-                      <div className="flex-1 bg-[color:var(--panel-2)] rounded-xl p-3 flex gap-3 animate-in fade-in border border-[color:var(--border)]">
-                         <div className="bg-white p-1.5 rounded shrink-0 shadow-sm border"><img src={requestQrImage} className="w-20 h-20" alt="QR" /></div>
-                         <div className="min-w-0 flex-1">
+                      <div className="bg-[color:var(--panel-2)] rounded-xl p-3 flex flex-col sm:flex-row gap-3 animate-in fade-in border border-[color:var(--border)]">
+                         <div className="bg-white p-1.5 rounded shrink-0 shadow-sm border mx-auto sm:mx-0"><img src={requestQrImage} className="w-20 h-20" alt="QR" /></div>
+                         <div className="min-w-0 flex-1 text-center sm:text-left">
                             <p className="text-xs text-[color:var(--muted)] mb-2">Bu QR'ı kullanıcıya (Present ekranına) okut.</p>
-                            <div className="flex gap-2">
+                            <div className="flex justify-center sm:justify-start gap-2">
                                <CopyBtn value={qrJson} label="JSON Kopyala" />
                             </div>
                          </div>

@@ -113,17 +113,17 @@ async function hardRemove(jti){
   return (
     <section className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold">{t('my_credentials')}</h2>
           <p className="text-[12px] text-[color:var(--muted)]">{t('credentials_intro')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <input
             value={filter}
             onChange={(e)=>setFilter(e.target.value)}
             placeholder={t('search_placeholder')}
-            className="h-9 w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm"
+            className="h-9 w-full sm:w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm"
           />
         </div>
       </div>
@@ -146,10 +146,10 @@ async function hardRemove(jti){
 
           return (
             <article key={vc?.jti || Math.random()} className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-3 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[color:var(--text)]">{title}{subjectLabel ? ` — ${subjectLabel}` : ""}</div>
-                  <div className="text-[11px] text-[color:var(--muted)] mt-0.5">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-[color:var(--text)] break-words">{title}{subjectLabel ? ` — ${subjectLabel}` : ""}</div>
+                  <div className="text-[11px] text-[color:var(--muted)] mt-0.5 break-all">
                     {issued ? <>{t('issued')}: <time dateTime={vc?.issuanceDate}>{issued}</time> · </> : null}
                     {t('issuer_label')}: <code className="font-mono">{short(vc?.issuer)}</code>
                   </div>
@@ -160,7 +160,7 @@ async function hardRemove(jti){
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
                   <button
                     onClick={() => showQR(vc)}
                     className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
@@ -176,8 +176,7 @@ async function hardRemove(jti){
                   {vc?.jti && onRevoke && (
                     <button
                       onClick={() => onRevoke(vc.jti)}
-                     className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
-
+                      className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
                     >
                       {t('revoke')}
                     </button>
@@ -185,7 +184,6 @@ async function hardRemove(jti){
                   <button
                     onClick={() => hardRemove(vc?.jti)}
                     className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
-
                   >
                     {t('remove')}
                   </button>

@@ -212,13 +212,15 @@ export default function OfflineVerify() {
   return (
     <section className="max-w-3xl mx-auto pb-20">
       {/* Header */}
-      <div className="mb-8 text-center md:text-left md:flex md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("offline.title")}</h2>
-          <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">{t("offline.desc")}</p>
-        </div>
-        <div className="mt-4 md:mt-0 flex gap-2">
-           <StatusBadge ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? t("offline.invalid") : t("offline.ready")) : t("offline.no_vc")} />
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--fg)]">{t("offline.title")}</h2>
+            <p className="text-sm text-[color:var(--muted)] mt-2 max-w-lg leading-relaxed">{t("offline.desc")}</p>
+          </div>
+          <div className="flex gap-2">
+             <StatusBadge ok={!!vcObj && res?.valid !== false} text={vcObj ? (res?.valid === false ? t("offline.invalid") : t("offline.ready")) : t("offline.no_vc")} />
+          </div>
         </div>
       </div>
 
@@ -237,7 +239,7 @@ export default function OfflineVerify() {
               onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
               onDragLeave={()=>setDrag(false)}
               onDrop={onDrop}
-              className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer group
+              className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all duration-200 cursor-pointer group
                 ${drag ? "border-[color:var(--brand)] bg-[color:var(--brand)]/5 scale-[1.01]" : "border-[color:var(--border)] hover:border-[color:var(--brand-2)]"}
                 ${vcObj ? "bg-emerald-50/30 border-emerald-200" : ""}
               `}
