@@ -322,10 +322,11 @@ export default function IssuerSettings() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Security</h2>
           <div className="space-y-3">
             <button
-              onClick={() => alert('Password change functionality will be implemented')}
-              className="w-full md:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              disabled
+              className="w-full md:w-auto px-4 py-2 border border-gray-300 text-gray-400 rounded-lg bg-gray-50 text-sm font-medium cursor-not-allowed"
+              title="Coming soon"
             >
-              Change Password
+              Change Password (Coming Soon)
             </button>
             <p className="text-xs text-gray-500">
               Update your password regularly to keep your account secure

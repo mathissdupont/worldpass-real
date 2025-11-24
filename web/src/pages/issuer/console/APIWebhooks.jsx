@@ -27,6 +27,8 @@ export default function IssuerAPIWebhooks() {
   });
   const [webhookFormError, setWebhookFormError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // API Key state
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
@@ -145,13 +147,16 @@ export default function IssuerAPIWebhooks() {
   };
 
   const handleDeleteWebhook = async (webhook) => {
-    if (!confirm(`Are you sure you want to delete webhook "${webhook.url}"? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteConfirm(webhook);
+  };
 
+  const confirmDeleteWebhook = async () => {
+    if (!deleteConfirm) return;
+    
     try {
       const token = localStorage.getItem("issuer_token");
-      await deleteIssuerWebhook(token, webhook.id);
+      await deleteIssuerWebhook(token, deleteConfirm.id);
+      setDeleteConfirm(null);
       await loadData(token);
     } catch (err) {
       console.error(err);
@@ -162,7 +167,8 @@ export default function IssuerAPIWebhooks() {
   const handleCopyApiKey = () => {
     if (apiKey) {
       navigator.clipboard.writeText(apiKey);
-      alert('API key copied to clipboard!');
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
     }
   };
 
@@ -313,9 +319,14 @@ export default function IssuerAPIWebhooks() {
                   onClick={handleCopyApiKey}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
                 >
-                  Copy
+                  {copySuccess ? 'Copied!' : 'Copy'}
                 </button>
               </div>
+              {copySuccess && (
+                <p className="text-xs text-emerald-600 mt-2">
+                  ✓ API key copied to clipboard
+                </p>
+              )}
               <p className="text-xs text-amber-600">
                 ⚠️ Store this key securely. For security reasons, it cannot be retrieved again.
               </p>
@@ -463,6 +474,38 @@ export default function IssuerAPIWebhooks() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Delete Webhook</h2>
+            <p className="text-sm text-gray-600 mb-2">
+              Are you sure you want to delete this webhook?
+            </p>
+            <p className="text-sm font-mono text-gray-700 bg-gray-50 p-2 rounded mb-4 break-all">
+              {deleteConfirm.url}
+            </p>
+            <p className="text-sm text-gray-600 mb-6">
+              This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteWebhook}
+                className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium"
+              >
+                Delete Webhook
+              </button>
+            </div>
           </div>
         </div>
       )}

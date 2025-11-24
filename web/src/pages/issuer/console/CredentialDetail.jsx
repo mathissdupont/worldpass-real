@@ -227,16 +227,15 @@ export default function IssuerCredentialDetail() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
             <button
-              onClick={() => {
-                if (confirm('Are you sure you want to revoke this credential? This action cannot be undone.')) {
-                  // TODO: Implement revoke functionality
-                  alert('Revoke functionality will be implemented in the backend');
-                }
-              }}
-              className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium"
+              disabled
+              className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+              title="Revoke functionality will be implemented in backend"
             >
-              Revoke Credential
+              Revoke Credential (Coming Soon)
             </button>
+            <p className="text-xs text-gray-500 mt-2">
+              Credential revocation will be available once the backend implementation is complete
+            </p>
           </div>
         )}
       </div>

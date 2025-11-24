@@ -27,7 +27,7 @@ export default function IssuerTemplates() {
     is_active: true
   });
   const [formError, setFormError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -78,13 +78,31 @@ export default function IssuerTemplates() {
 
   const openEditModal = (template) => {
     setEditingTemplate(template);
+    
+    // Parse schema data safely
+    let schemaData = "{}";
+    try {
+      if (typeof template.schema_data === 'string') {
+        schemaData = template.schema_data;
+      } else if (template.schema_json) {
+        schemaData = typeof template.schema_json === 'string' 
+          ? template.schema_json 
+          : JSON.stringify(template.schema_json, null, 2);
+      } else if (template.schema_data) {
+        schemaData = JSON.stringify(template.schema_data, null, 2);
+      }
+      // Validate it's proper JSON
+      JSON.parse(schemaData);
+    } catch (e) {
+      console.error('Error parsing template schema:', e);
+      schemaData = "{}";
+    }
+    
     setFormData({
       name: template.name,
       description: template.description || "",
       vc_type: template.vc_type,
-      schema_data: typeof template.schema_data === 'string' 
-        ? template.schema_data 
-        : JSON.stringify(JSON.parse(template.schema_json || template.schema_data || "{}"), null, 2),
+      schema_data: schemaData,
       is_active: template.is_active
     });
     setFormError(null);
@@ -149,13 +167,16 @@ export default function IssuerTemplates() {
   };
 
   const handleDelete = async (template) => {
-    if (!confirm(`Are you sure you want to delete "${template.name}"? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteConfirm(template);
+  };
 
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    
     try {
       const token = localStorage.getItem("issuer_token");
-      await deleteIssuerTemplate(token, template.id);
+      await deleteIssuerTemplate(token, deleteConfirm.id);
+      setDeleteConfirm(null);
       await loadData(token);
     } catch (err) {
       console.error(err);
@@ -409,6 +430,33 @@ export default function IssuerTemplates() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Delete Template</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete "<span className="font-medium text-gray-900">{deleteConfirm.name}</span>"? 
+              This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium"
+              >
+                Delete Template
+              </button>
+            </div>
           </div>
         </div>
       )}
