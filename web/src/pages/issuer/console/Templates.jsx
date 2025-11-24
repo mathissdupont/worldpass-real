@@ -28,6 +28,7 @@ export default function IssuerTemplates() {
   });
   const [formError, setFormError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
