@@ -15,6 +15,7 @@ import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 import IssuerConsole from "./pages/issuer/Console";
+import IssuerDashboard from "./pages/issuer/console/Dashboard";
 import Verifier from "./pages/Verifier";
 import Present from "./pages/Present";
 import WPTEditorPro from "@/pages/tools/WPTEditorPRO.jsx";
@@ -141,12 +142,8 @@ export default function App(){
           />
 
           {/* Role-protected */}
-          <Route
-            path="/issuer/console"
-            element={
-                  <IssuerConsole/>
-            }
-          />
+          <Route path="/issuer/console" element={<IssuerDashboard />} />
+          <Route path="/issuer/console-legacy" element={<IssuerConsole />} />
           <Route
             path="/admin/issuers"
             element={
