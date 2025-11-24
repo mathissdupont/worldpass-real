@@ -142,9 +142,16 @@ export default function VisualIDCardVertical({ did, name }) {
               </div>
             </div>
           </div>
-          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-200/80 font-medium">
-            WorldPass ID
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <img 
+              src="/worldpass_logo.svg" 
+              className="h-8 w-auto opacity-90 drop-shadow-md invert" 
+              alt="WorldPass" 
+            />
+            <span className="text-[8px] uppercase tracking-[0.2em] text-slate-200/60 font-medium">
+              WorldPass ID
+            </span>
+          </div>
         </div>
 
         {/* ORTA: QR */}
