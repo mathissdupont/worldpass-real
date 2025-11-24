@@ -3,7 +3,7 @@ Issuer Console API Endpoints
 Modern, production-grade issuer management APIs
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Optional
 import time
 import json
@@ -27,12 +27,22 @@ from schemas import (
 router = APIRouter(prefix="/api/issuer", tags=["issuer"])
 
 
-async def _get_current_issuer_from_dep(x_token: Optional[str], db):
-    """Shared dependency to get current authenticated issuer"""
+async def _get_current_issuer_from_dep(x_token: Optional[str] = Header(None), db=Depends(get_db)):
+    """Shared dependency to get current authenticated issuer
+    
+    Args:
+        x_token: JWT token from X-Token header
+        db: Database connection
+        
+    Returns:
+        Issuer row from database
+        
+    Raises:
+        HTTPException: If token is invalid or issuer not found
+    """
     # This will be imported from app.py's _get_current_issuer
     # For now, we'll import it dynamically to avoid circular imports
     from app import _get_current_issuer
-    from fastapi import Header
     return await _get_current_issuer(x_token=x_token, db=db)
 
 
@@ -386,7 +396,7 @@ async def update_issuer_template(
     await db.execute(
         """
         UPDATE issuer_templates
-        SET name=?, description=?, vc_type=?, schema_data=?, is_active=?, updated_at=?
+        SET name=?, description=?, vc_type=?, schema_json=?, is_active=?, updated_at=?
         WHERE id=?
         """,
         (

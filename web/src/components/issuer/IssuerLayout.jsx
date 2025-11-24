@@ -8,11 +8,7 @@ export default function IssuerLayout({ children, issuer }) {
   const [showLogout, setShowLogout] = useState(false);
 
   const handleLogout = () => {
-    if (confirm("Are you sure you want to log out?")) {
-      localStorage.removeItem("issuer_token");
-      localStorage.removeItem("issuer_info");
-      navigate("/issuer/login");
-    }
+    setShowLogout(true);
   };
 
   return (
@@ -62,7 +58,11 @@ export default function IssuerLayout({ children, issuer }) {
                 Cancel
               </button>
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  localStorage.removeItem("issuer_token");
+                  localStorage.removeItem("issuer_info");
+                  navigate("/issuer/login");
+                }}
                 className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700"
               >
                 Logout

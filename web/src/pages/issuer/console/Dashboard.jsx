@@ -113,7 +113,14 @@ export default function IssuerDashboard() {
     {
       header: 'Issued',
       accessor: 'created_at',
-      render: (row) => new Date(row.created_at * 1000).toLocaleDateString()
+      render: (row) => {
+        // Handle both Unix timestamps (seconds) and milliseconds
+        const timestamp = row.created_at;
+        const date = timestamp > 10000000000 
+          ? new Date(timestamp) // Already in milliseconds
+          : new Date(timestamp * 1000); // Convert from seconds
+        return date.toLocaleDateString();
+      }
     },
   ];
 
