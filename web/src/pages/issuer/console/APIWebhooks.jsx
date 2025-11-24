@@ -7,9 +7,10 @@ import {
   listIssuerWebhooks,
   createIssuerWebhook,
   updateIssuerWebhook,
-  deleteIssuerWebhook
+  deleteIssuerWebhook,
+  rotateIssuerApiKey
 } from "@/lib/api";
-import { FiPlus, FiEdit2, FiTrash2, FiEye, FiEyeOff, FiX, FiToggleLeft, FiToggleRight, FiKey } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiEye, FiEyeOff, FiX, FiToggleLeft, FiToggleRight, FiKey, FiRefreshCw } from "react-icons/fi";
 
 export default function IssuerAPIWebhooks() {
   const navigate = useNavigate();
@@ -33,6 +34,8 @@ export default function IssuerAPIWebhooks() {
   // API Key state
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [apiKey, setApiKey] = useState(null);
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [showKeyConfirm, setShowKeyConfirm] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -42,6 +45,7 @@ export default function IssuerAPIWebhooks() {
     }
 
     loadData(token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const loadData = async (token) => {
@@ -169,6 +173,23 @@ export default function IssuerAPIWebhooks() {
       navigator.clipboard.writeText(apiKey);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
+
+  const handleGenerateApiKey = async () => {
+    setGeneratingKey(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem("issuer_token");
+      const response = await rotateIssuerApiKey(token);
+      setApiKey(response.api_key);
+      setShowKeyConfirm(false);
+      setApiKeyVisible(true); // Show the key immediately after generation
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setGeneratingKey(false);
     }
   };
 
@@ -321,6 +342,14 @@ export default function IssuerAPIWebhooks() {
                 >
                   {copySuccess ? 'Copied!' : 'Copy'}
                 </button>
+                <button
+                  onClick={() => setShowKeyConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                  title="Generate new API key (invalidates old key)"
+                >
+                  <FiRefreshCw className="h-4 w-4" />
+                  Rotate
+                </button>
               </div>
               {copySuccess && (
                 <p className="text-xs text-emerald-600 mt-2">
@@ -334,13 +363,18 @@ export default function IssuerAPIWebhooks() {
           ) : (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <p className="text-sm text-gray-600 mb-3">
-                No API key generated yet. Contact support to generate an API key for your account.
+                {issuer?.status === 'approved' 
+                  ? "No API key generated yet. Click the button below to generate one."
+                  : "Your issuer account must be approved before you can generate an API key."
+                }
               </p>
               <button
-                disabled
-                className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-medium cursor-not-allowed"
+                onClick={() => setShowKeyConfirm(true)}
+                disabled={issuer?.status !== 'approved'}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                Generate API Key (Coming Soon)
+                <FiKey className="h-4 w-4" />
+                Generate API Key
               </button>
             </div>
           )}
@@ -504,6 +538,55 @@ export default function IssuerAPIWebhooks() {
                 className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium"
               >
                 Delete Webhook
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* API Key Generation Confirmation Modal */}
+      {showKeyConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-3">
+              {apiKey ? 'Rotate API Key' : 'Generate API Key'}
+            </h2>
+            {apiKey ? (
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to rotate your API key? The current key will be <strong>permanently invalidated</strong> and cannot be recovered.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600 mb-4">
+                This will generate a new API key for your account. Make sure to copy and store it securely as it will only be shown once.
+              </p>
+            )}
+            <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+              ⚠️ All applications using the {apiKey ? 'current' : ''} API key will need to be updated.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowKeyConfirm(false)}
+                disabled={generatingKey}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateApiKey}
+                disabled={generatingKey}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+              >
+                {generatingKey ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <circle cx="12" cy="12" r="9" opacity=".25" />
+                      <path d="M21 12a9 9 0 0 1-9 9" />
+                    </svg>
+                    Generating...
+                  </>
+                ) : (
+                  apiKey ? 'Rotate Key' : 'Generate Key'
+                )}
               </button>
             </div>
           </div>
