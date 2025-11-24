@@ -412,8 +412,8 @@ export default function IssuerConsole(){
       
       // Show success with recipient info
       const successMessage = response.recipient_id 
-        ? `Sertifika başarıyla kaydedildi! Kullanıcının DID'si eşleşirse otomatik olarak cüzdanına eklenecek. Paylaşım kodu: ${response.recipient_id}`
-        : "Sertifika kullanıcıya gönderildi ve kaydedildi.";
+        ? t('org_console.credential_issued_success', { recipient_id: response.recipient_id })
+        : t('org_console.credential_issued_simple');
       setFlash({tone:"ok", text: successMessage});
       setTimeout(()=>setFlash(null), 5000);
     } catch(e) {

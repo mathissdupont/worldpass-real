@@ -555,4 +555,6 @@
   ,"login.link_register": "Hesap oluştur"
   ,"login.link_register_text": "Hesabınız yok mu?"
   ,"login.link_org_login": "Kuruluş girişi"
+  ,"org_console.credential_issued_success": "Sertifika başarıyla kaydedildi! Kullanıcının DID'si eşleşirse otomatik olarak cüzdanına eklenecek. Paylaşım kodu: {{recipient_id}}"
+  ,"org_console.credential_issued_simple": "Sertifika kullanıcıya gönderildi ve kaydedildi."
 }

@@ -367,7 +367,8 @@ export default function Settings() {
       await saveProfileLocal({ lang: newLang });
       // Force re-render by updating state to reflect the language change
       setToast({ type: "ok", text: t('profile_saved') });
-      // Trigger page reload to ensure all translations are updated
+      // Reload page to ensure all components and static text show the new language
+      // This is intentional to handle cases where translations are used outside React lifecycle
       setTimeout(() => window.location.reload(), 500);
     } catch (error) {
       console.error("Failed to save language:", error);
