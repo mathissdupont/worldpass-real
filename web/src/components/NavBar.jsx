@@ -135,9 +135,7 @@ export default function NavBar({ health, user, features }) {
           className="flex items-center gap-2.5 font-semibold text-lg hover:opacity-90 transition-all duration-200 group"
           aria-label="WorldPass Home"
         >
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-200">
-            W
-          </span>
+          <img src="/worldpass_logo.svg" alt="WorldPass Logo" className="h-8 w-8 object-contain" />
           <span className="tracking-tight hidden sm:inline">WorldPass</span>
         </Link>
 
