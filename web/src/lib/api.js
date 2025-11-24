@@ -254,25 +254,6 @@ export async function deleteIssuerWebhook(token, webhookId) {
   return r.json();
 }
 
-export async function rotateIssuerApiKey(token) {
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  if (!r.ok) {
-    const err = await r.json();
-    throw new Error(err.detail || 'login_failed');
-  }
-  return r.json();
-}
-
-export async function getIssuerProfile(token) {
-  const r = await fetch('/api/issuer/profile', {
-    headers: { 'X-Token': token }
-  });
-  if (!r.ok) throw new Error('profile_failed');
-  return r.json();
-}
-
 export async function verifyIssuerDomain(issuerId, method) {
   const r = await fetch('/api/issuer/verify-domain', {
     method: 'POST',
