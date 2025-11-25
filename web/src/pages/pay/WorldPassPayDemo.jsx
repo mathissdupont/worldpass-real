@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSession } from '../../lib/auth';
+import { getToken } from '../../lib/auth';
 import { createPaymentIntent } from '../../lib/api';
 
 export default function WorldPassPayDemo() {
@@ -26,8 +26,8 @@ export default function WorldPassPayDemo() {
 
     try {
       setLoading(true);
-      const session = getSession();
-      if (!session?.token) {
+      const token = getToken();
+      if (!token) {
         navigate('/login');
         return;
       }
@@ -37,7 +37,7 @@ export default function WorldPassPayDemo() {
 
       // Create payment intent
       const result = await createPaymentIntent(
-        session.token,
+        token,
         amount_minor,
         'USD',
         description || 'WorldPass Payment',

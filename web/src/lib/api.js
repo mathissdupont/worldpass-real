@@ -285,14 +285,17 @@ export async function rotateIssuerApiKey(token) {
   return r.json();
 }
 
-export async function issueCredential(apiKey, vc, token) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['X-Token'] = token;
+export async function issueCredential(vc) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   
   const r = await fetch('/api/issuer/issue', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ api_key: apiKey, vc })
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ vc })
   });
   if (!r.ok) {
     const err = await r.json();
@@ -301,14 +304,34 @@ export async function issueCredential(apiKey, vc, token) {
   return r.json();
 }
 
-export async function revokeCredential(apiKey, vcId, token) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['X-Token'] = token;
+export async function getIssuedCredentials() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const r = await fetch('/api/issuer/credentials', {
+    method: 'GET',
+    headers: {
+      'X-Token': token
+    }
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'fetch_failed');
+  }
+  return r.json();
+}
+
+export async function revokeCredential(vcId) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   
   const r = await fetch('/api/issuer/revoke', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ api_key: apiKey, vc_id: vcId })
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ vc_id: vcId })
   });
   if (!r.ok) {
     const err = await r.json();

@@ -1119,6 +1119,52 @@ async def issuer_revoke(
     return IssuerRevokeResp(status="revoked")
 
 
+@app.get(f"{API}/issuer/credentials")
+async def get_issuer_credentials(
+    x_token: Optional[str] = Header(None),
+    db=Depends(get_db)
+):
+    """Get all credentials issued by this issuer"""
+    if not x_token:
+        raise HTTPException(status_code=401, detail="authentication_required")
+    
+    try:
+        payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        issuer_id = payload.get("issuer_id")
+        if not issuer_id or payload.get("role") != "issuer":
+            raise HTTPException(status_code=401, detail="invalid_token")
+    except:
+        raise HTTPException(status_code=401, detail="invalid_token")
+    
+    issuer = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (issuer_id,))
+    if not issuer or issuer["status"] != "approved":
+        raise HTTPException(status_code=403, detail="issuer_not_approved")
+    
+    # Get all issued credentials
+    rows = await db.execute_fetchall(
+        """
+        SELECT vc_id, subject_did, recipient_id, credential_type, created_at, updated_at
+        FROM issued_vcs 
+        WHERE issuer_id=? 
+        ORDER BY created_at DESC
+        """,
+        (issuer_id,)
+    )
+    
+    credentials = []
+    for row in rows:
+        credentials.append({
+            "vc_id": row["vc_id"],
+            "subject_did": row["subject_did"],
+            "recipient_id": row["recipient_id"],
+            "credential_type": row["credential_type"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]
+        })
+    
+    return {"ok": True, "credentials": credentials}
+
+
 # ---------- public revoke & status ----------
 def _sha256(s: str) -> str:
   return hashlib.sha256(s.encode()).hexdigest()

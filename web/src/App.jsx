@@ -15,7 +15,7 @@ import Settings from "./pages/Settings";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
-import IssuerConsole from "./pages/issuer/Console";
+import IssuerConsole from "./pages/issuer/ConsoleNew";
 import IssuerDashboard from "./pages/issuer/Dashboard";
 import IssuerCredentials from "./pages/issuer/Credentials";
 import IssuerTemplates from "./pages/issuer/Templates";
