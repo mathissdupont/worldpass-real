@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getIssuerProfile } from "@/lib/api";
 
-function NavItem({ to, icon, label, badge }) {
+function NavItem({ to, icon, label, badge, onClick }) {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
         isActive
           ? "bg-[color:var(--brand)] text-white shadow-md"
@@ -94,7 +95,24 @@ export default function IssuerLayout({ children }) {
         <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-[color:var(--panel)] border-r border-[color:var(--border)] flex flex-col transition-transform duration-300 z-40 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}>
-          {/* Logo & Org Name */}
+          {/* Mobile close button */}
+          <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[color:var(--border)]">
+            <div className="flex items-center gap-3">
+              <img src="/worldpass_logo.svg" alt="WorldPass" className="h-8 w-8 dark:invert" />
+              <span className="font-semibold text-[color:var(--text)]">Menu</span>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-[color:var(--panel-2)] text-[color:var(--text)]"
+              aria-label="Close menu"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Logo & Org Name - Desktop only */}
           <div className="hidden lg:flex items-center gap-3 px-6 py-6 border-b border-[color:var(--border)]">
             <img src="/worldpass_logo.svg" alt="WorldPass" className="h-10 w-10 dark:invert" />
             <div className="flex-1 min-w-0">
@@ -105,16 +123,21 @@ export default function IssuerLayout({ children }) {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <NavItem to="/issuer/dashboard" icon="📊" label="Dashboard" />
-            <NavItem to="/issuer/console" icon="✨" label="Kimlik Oluştur" />
-            <NavItem to="/issuer/credentials" icon="📋" label="Kimlik Geçmişi" />
-            <NavItem to="/issuer/templates" icon="📄" label="Şablonlar" />
-            <NavItem to="/issuer/webhooks" icon="⚡" label="Webhooks" />
-            <NavItem to="/issuer/settings" icon="⚙️" label="Ayarlar" />
+            <NavItem to="/issuer/dashboard" icon="📊" label="Dashboard" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console" icon="✨" label="Kimlik Oluştur" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/credentials" icon="📋" label="Kimlik Geçmişi" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/templates" icon="📄" label="Şablonlar" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/webhooks" icon="⚡" label="Webhooks" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/settings" icon="⚙️" label="Ayarlar" onClick={() => setSidebarOpen(false)} />
           </nav>
 
           {/* User Footer */}
           <div className="p-4 border-t border-[color:var(--border)]">
+            {/* Show issuer name on mobile */}
+            <div className="lg:hidden p-3 rounded-xl bg-[color:var(--brand)]/10 mb-3">
+              <div className="text-xs text-[color:var(--muted)] mb-0.5">Kuruluş</div>
+              <div className="text-sm font-semibold text-[color:var(--text)] truncate">{issuer.name}</div>
+            </div>
             <div className="p-3 rounded-xl bg-[color:var(--panel-2)] mb-2">
               <div className="text-xs text-[color:var(--muted)] mb-0.5">Giriş Yapıldı</div>
               <div className="text-sm font-medium text-[color:var(--text)] truncate">{issuer.email}</div>
