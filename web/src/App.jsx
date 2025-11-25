@@ -34,16 +34,16 @@ import TransactionsPage from "./pages/pay/TransactionsPage";
 import { getSession } from "./lib/auth";
 import { listOrgs } from "./lib/issuerStore.js";
 
-export default function App(){
+export default function App() {
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(()=>{
-    apiHealth().then(setHealth).catch(()=>setHealth({ok:false}))
-  },[]);
+  useEffect(() => {
+    apiHealth().then(setHealth).catch(() => setHealth({ ok: false }));
+  }, []);
 
   // Kullanıcı rollerini org’lardan türet
-  const user = useMemo(()=>{
+  const user = useMemo(() => {
     const email = getSession()?.email;
     if (!email) return null;
 
@@ -52,13 +52,17 @@ export default function App(){
 
     // issuer rolü: org_admin veya issuer_operator olarak listelenmişse
     const isIssuer = orgs.some(o =>
-      o?.operators?.some(op => op.email === email && (op.role === "org_admin" || op.role === "issuer_operator"))
+      o?.operators?.some(
+        op =>
+          op.email === email &&
+          (op.role === "org_admin" || op.role === "issuer_operator"),
+      ),
     );
     if (isIssuer) roles.push("issuer");
 
     // admin rolü örneği
     const isAdmin = orgs.some(o =>
-      o?.operators?.some(op => op.email === email && op.role === "admin")
+      o?.operators?.some(op => op.email === email && op.role === "admin"),
     );
     if (isAdmin) roles.push("admin");
 
@@ -82,7 +86,10 @@ export default function App(){
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <NavBar health={health} user={user} />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 transition-all duration-300" id="main">
+      <div
+        className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 transition-all duration-300"
+        id="main"
+      >
         <Routes>
           <Route path="/" element={<Navigate to="/account" replace />} />
 
@@ -100,7 +107,7 @@ export default function App(){
             path="/account"
             element={
               <ProtectedRoute>
-                <Account/>
+                <Account />
               </ProtectedRoute>
             }
           />
@@ -109,7 +116,7 @@ export default function App(){
             path="/profile"
             element={
               <ProtectedRoute>
-                <Profile/>
+                <Profile />
               </ProtectedRoute>
             }
           />
@@ -119,7 +126,7 @@ export default function App(){
             path="/pay/demo"
             element={
               <ProtectedRoute>
-                <WorldPassPayDemo/>
+                <WorldPassPayDemo />
               </ProtectedRoute>
             }
           />
@@ -128,7 +135,7 @@ export default function App(){
             path="/pay/return"
             element={
               <ProtectedRoute>
-                <PaymentResult/>
+                <PaymentResult />
               </ProtectedRoute>
             }
           />
@@ -137,18 +144,18 @@ export default function App(){
             path="/account/payments"
             element={
               <ProtectedRoute>
-                <TransactionsPage/>
+                <TransactionsPage />
               </ProtectedRoute>
             }
           />
 
-          {/* Sertifika verme: sadece issuer rolüne açık */
+          {/* Sertifika verme: sadece issuer rolüne açık */}
           <Route
             path="/issue"
             element={
               <RoleRoute user={user} roles="issuer">
                 <ProtectedRoute>
-                  <Issue/>
+                  <Issue />
                 </ProtectedRoute>
               </RoleRoute>
             }
@@ -158,7 +165,7 @@ export default function App(){
             path="/credentials"
             element={
               <ProtectedRoute>
-                <Credentials/>
+                <Credentials />
               </ProtectedRoute>
             }
           />
@@ -166,7 +173,7 @@ export default function App(){
             path="/present"
             element={
               <ProtectedRoute>
-                <Present/>
+                <Present />
               </ProtectedRoute>
             }
           />
@@ -174,7 +181,7 @@ export default function App(){
             path="/settings"
             element={
               <ProtectedRoute>
-                <Settings/>
+                <Settings />
               </ProtectedRoute>
             }
           />
@@ -182,30 +189,75 @@ export default function App(){
             path="/tools/wpt-editor-pro"
             element={
               <ProtectedRoute>
-                <WPTEditorPro/>
+                <WPTEditorPro />
               </ProtectedRoute>
             }
           />
 
           {/* Issuer Routes - Wrapped in IssuerLayout */}
-          <Route path="/issuer/dashboard" element={<IssuerLayout><IssuerDashboard /></IssuerLayout>} />
-          <Route path="/issuer/credentials" element={<IssuerLayout><IssuerCredentials /></IssuerLayout>} />
-          <Route path="/issuer/templates" element={<IssuerLayout><IssuerTemplates /></IssuerLayout>} />
-          <Route path="/issuer/webhooks" element={<IssuerLayout><IssuerWebhooks /></IssuerLayout>} />
-          <Route path="/issuer/settings" element={<IssuerLayout><IssuerSettings /></IssuerLayout>} />
-          <Route path="/issuer/console" element={<IssuerLayout><IssuerConsole /></IssuerLayout>} />
+          <Route
+            path="/issuer/dashboard"
+            element={
+              <IssuerLayout>
+                <IssuerDashboard />
+              </IssuerLayout>
+            }
+          />
+          <Route
+            path="/issuer/credentials"
+            element={
+              <IssuerLayout>
+                <IssuerCredentials />
+              </IssuerLayout>
+            }
+          />
+          <Route
+            path="/issuer/templates"
+            element={
+              <IssuerLayout>
+                <IssuerTemplates />
+              </IssuerLayout>
+            }
+          />
+          <Route
+            path="/issuer/webhooks"
+            element={
+              <IssuerLayout>
+                <IssuerWebhooks />
+              </IssuerLayout>
+            }
+          />
+          <Route
+            path="/issuer/settings"
+            element={
+              <IssuerLayout>
+                <IssuerSettings />
+              </IssuerLayout>
+            }
+          />
+          <Route
+            path="/issuer/console"
+            element={
+              <IssuerLayout>
+                <IssuerConsole />
+              </IssuerLayout>
+            }
+          />
           <Route
             path="/admin/issuers"
             element={
               <RoleRoute user={user} roles="admin">
                 <ProtectedRoute>
-                  <AdminIssuers/>
+                  <AdminIssuers />
                 </ProtectedRoute>
               </RoleRoute>
             }
           />
 
-          <Route path="*" element={<div className="p-4">{t("app.not_found")}</div>} />
+          <Route
+            path="*"
+            element={<div className="p-4">{t("app.not_found")}</div>}
+          />
         </Routes>
       </div>
     </div>
