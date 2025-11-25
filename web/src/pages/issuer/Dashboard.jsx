@@ -110,8 +110,8 @@ export default function IssuerDashboard() {
     }
 
     Promise.all([
-      getIssuerProfile(token),
-      getIssuerStats(token)
+      getIssuerProfile(),
+      getIssuerStats()
     ])
       .then(([profileResp, statsResp]) => {
         setIssuer(profileResp.issuer);

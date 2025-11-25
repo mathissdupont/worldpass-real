@@ -116,7 +116,9 @@ export async function loginIssuer(data) {
   return r.json();
 }
 
-export async function getIssuerProfile(token) {
+export async function getIssuerProfile() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/profile', {
     method: 'GET',
     headers: { 'X-Token': token }
@@ -140,7 +142,9 @@ export async function updateIssuerProfile(data) {
   return r.json();
 }
 
-export async function getIssuerStats(token) {
+export async function getIssuerStats() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/stats', {
     method: 'GET',
     headers: { 'X-Token': token }
@@ -308,8 +312,10 @@ export async function verifyIssuerDomain(issuerId, method) {
   return r.json();
 }
 
-export async function rotateIssuerApiKey(token) {
-  const r = await fetch('/api/issuer/api-key', {
+export async function rotateIssuerApiKey() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const r = await fetch('/api/issuer/api-key/rotate', {
     method: 'POST',
     headers: { 'X-Token': token }
   });
