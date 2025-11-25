@@ -12,10 +12,10 @@ export default function IssuerSidebar({ issuer }) {
   
   const navigation = [
     { name: 'Dashboard', href: '/issuer/console', icon: FiHome },
-    { name: 'Credentials', href: '/issuer/console/credentials', icon: FiFileText },
-    { name: 'Templates', href: '/issuer/console/templates', icon: FiLayers },
-    { name: 'API & Webhooks', href: '/issuer/console/api', icon: FiCode },
-    { name: 'Settings', href: '/issuer/console/settings', icon: FiSettings },
+    { name: 'Credentials', href: '/issuer/credentials', icon: FiFileText },
+    { name: 'Templates', href: '/issuer/templates', icon: FiLayers },
+    { name: 'Webhooks', href: '/issuer/webhooks', icon: FiCode },
+    { name: 'Settings', href: '/issuer/settings', icon: FiSettings },
   ];
 
   const isActive = (href) => {
@@ -30,14 +30,21 @@ export default function IssuerSidebar({ issuer }) {
       <div className="p-6 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 truncate">{issuer.name}</h2>
         <p className="text-xs text-gray-500 mt-1">{issuer.email}</p>
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
             issuer.status === 'approved' 
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+              : issuer.status === 'verified'
+              ? 'bg-blue-50 text-blue-700 border border-blue-200'
               : 'bg-amber-50 text-amber-700 border border-amber-200'
           }`}>
-            {issuer.status === 'approved' ? '✓ Approved' : '⏱ Pending'}
+            {issuer.status === 'approved' ? '✓ Approved' : issuer.status === 'verified' ? '✓ Verified' : '⏱ Pending'}
           </span>
+          {issuer.meta?.domain_verified && (
+            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              🌐 Domain OK
+            </span>
+          )}
         </div>
       </div>
 

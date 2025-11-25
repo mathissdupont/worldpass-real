@@ -29,6 +29,7 @@ export default function IssuerTemplates() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'table'
+  const [jsonError, setJsonError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -119,6 +120,7 @@ export default function IssuerTemplates() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
+    setJsonError(null);
     setSaving(true);
 
     try {
@@ -145,12 +147,33 @@ export default function IssuerTemplates() {
     } catch (err) {
       console.error(err);
       if (err instanceof SyntaxError) {
-        setFormError("Invalid JSON in schema data");
+        setJsonError("Geçersiz JSON formatı: " + err.message);
+        setFormError("JSON şeması geçersiz");
       } else {
         setFormError(err.message);
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const formatJson = () => {
+    try {
+      const parsed = JSON.parse(formData.schema_data);
+      setFormData({ ...formData, schema_data: JSON.stringify(parsed, null, 2) });
+      setJsonError(null);
+    } catch (err) {
+      setJsonError("Geçersiz JSON: " + err.message);
+    }
+  };
+
+  const minifyJson = () => {
+    try {
+      const parsed = JSON.parse(formData.schema_data);
+      setFormData({ ...formData, schema_data: JSON.stringify(parsed) });
+      setJsonError(null);
+    } catch (err) {
+      setJsonError("Geçersiz JSON: " + err.message);
     }
   };
 
@@ -524,16 +547,40 @@ export default function IssuerTemplates() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Şema Yapısı (JSON) <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  required
-                  value={formData.schema_data}
-                  onChange={(e) => setFormData({ ...formData, schema_data: e.target.value })}
-                  rows={12}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50"
-                  placeholder={`{
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Şema Yapısı (JSON) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={formatJson}
+                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                    >
+                      Formatla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={minifyJson}
+                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                    >
+                      Küçült
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <textarea
+                    required
+                    value={formData.schema_data}
+                    onChange={(e) => {
+                      setFormData({ ...formData, schema_data: e.target.value });
+                      setJsonError(null);
+                    }}
+                    rows={12}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 ${
+                      jsonError ? 'border-rose-300' : 'border-gray-300'
+                    }`}
+                    placeholder={`{
   "type": "object",
   "properties": {
     "name": {"type": "string"},
@@ -542,7 +589,13 @@ export default function IssuerTemplates() {
   },
   "required": ["name", "studentId"]
 }`}
-                />
+                  />
+                  {jsonError && (
+                    <div className="absolute bottom-2 left-2 right-2 bg-rose-50 border border-rose-200 rounded px-2 py-1">
+                      <p className="text-xs text-rose-700">{jsonError}</p>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-start gap-2 mt-2 text-xs text-gray-500">
                   <svg className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
