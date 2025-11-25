@@ -1034,6 +1034,7 @@ async def issuer_issue(
         raise HTTPException(status_code=401, detail="authentication_required")
         
     # Allow issuance if issuer is fully approved OR domain verified (status 'verified')
+    print(f"[DEBUG] Issuer ID={issuer['id']}, Status={issuer['status']}, Name={issuer['name']}")
     if issuer["status"] not in ("approved", "verified"):
         raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
