@@ -18,6 +18,13 @@ export function getToken(){
 
 export function setToken(token){
   localStorage.setItem(KEY_TOKEN, token);
+  
+  // Also save to chrome.storage.local if extension is available
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({ worldpass_token: token }).catch(() => {
+      // Silently fail if not in extension context
+    });
+  }
 }
 
 export function isAuthed(){ return !!getSession()?.email; }
@@ -35,6 +42,13 @@ export function setSession({ email, token }){
 export function clearSession(){ 
   localStorage.removeItem(KEY_SESSION); 
   localStorage.removeItem(KEY_TOKEN);
+  
+  // Also remove from chrome.storage.local if extension is available
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.remove(['worldpass_token', 'worldpass_credentials', 'last_sync']).catch(() => {
+      // Silently fail if not in extension context
+    });
+  }
 }
 
 export async function registerUser({ email, firstName, lastName, password, did }) {

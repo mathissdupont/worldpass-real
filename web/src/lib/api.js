@@ -1,5 +1,10 @@
 import { getToken } from './auth';
 
+// Helper to get issuer token
+function getIssuerToken() {
+  return localStorage.getItem('issuer_token');
+}
+
 export async function apiHealth(){
   const r = await fetch('/api/health');
   return r.json();
@@ -117,7 +122,7 @@ export async function loginIssuer(data) {
 }
 
 export async function getIssuerProfile() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/profile', {
     method: 'GET',
@@ -128,7 +133,7 @@ export async function getIssuerProfile() {
 }
 
 export async function updateIssuerProfile(data) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/me', {
     method: 'PATCH',
@@ -143,7 +148,7 @@ export async function updateIssuerProfile(data) {
 }
 
 export async function getIssuerStats() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/stats', {
     method: 'GET',
@@ -154,7 +159,7 @@ export async function getIssuerStats() {
 }
 
 export async function listIssuerCredentials(params = {}) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const searchParams = new URLSearchParams();
   if (params.page) searchParams.set('page', params.page);
@@ -174,7 +179,7 @@ export async function listIssuerCredentials(params = {}) {
 }
 
 export async function getIssuerCredentialDetail(vcId) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/credentials/${vcId}`, {
     method: 'GET',
@@ -185,7 +190,7 @@ export async function getIssuerCredentialDetail(vcId) {
 }
 
 export async function listIssuerTemplates() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/templates', {
     method: 'GET',
@@ -196,7 +201,7 @@ export async function listIssuerTemplates() {
 }
 
 export async function createIssuerTemplate(template) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/templates', {
     method: 'POST',
@@ -211,7 +216,7 @@ export async function createIssuerTemplate(template) {
 }
 
 export async function updateIssuerTemplate(templateId, updates) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/templates/${templateId}`, {
     method: 'PATCH',
@@ -226,7 +231,7 @@ export async function updateIssuerTemplate(templateId, updates) {
 }
 
 export async function deleteIssuerTemplate(templateId) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/templates/${templateId}`, {
     method: 'DELETE',
@@ -237,7 +242,7 @@ export async function deleteIssuerTemplate(templateId) {
 }
 
 export async function listIssuerWebhooks() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/webhooks', {
     method: 'GET',
@@ -248,7 +253,7 @@ export async function listIssuerWebhooks() {
 }
 
 export async function createIssuerWebhook(webhook) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/webhooks', {
     method: 'POST',
@@ -263,7 +268,7 @@ export async function createIssuerWebhook(webhook) {
 }
 
 export async function updateIssuerWebhook(webhookId, updates) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/webhooks/${webhookId}`, {
     method: 'PATCH',
@@ -278,7 +283,7 @@ export async function updateIssuerWebhook(webhookId, updates) {
 }
 
 export async function deleteIssuerWebhook(webhookId) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/webhooks/${webhookId}`, {
     method: 'DELETE',
@@ -289,7 +294,7 @@ export async function deleteIssuerWebhook(webhookId) {
 }
 
 export async function testIssuerWebhook(webhookId) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch(`/api/issuer/webhooks/${webhookId}/test`, {
     method: 'POST',
@@ -313,7 +318,7 @@ export async function verifyIssuerDomain(issuerId, method) {
 }
 
 export async function rotateIssuerApiKey() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/api-key/rotate', {
     method: 'POST',

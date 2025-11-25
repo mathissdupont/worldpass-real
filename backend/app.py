@@ -1455,7 +1455,7 @@ async def generate_backup_codes(user=Depends(_get_current_user), db=Depends(get_
 @limiter.limit("3/minute")
 async def request_email_verification(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
     """Request email verification link"""
-    if user.get("email_verified"):
+    if user["email_verified"]:
         return VerifyEmailResp(ok=True, message="already_verified")
         
     token = secrets.token_urlsafe(32)
@@ -1556,7 +1556,7 @@ async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_
     """
     try:
         # Validate user has DID
-        if not user.get("did"):
+        if not user["did"]:
             raise HTTPException(status_code=400, detail="no_did")
         
         # Query profile from database
@@ -1566,7 +1566,7 @@ async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_
         )
         
         # Return empty profile if not found
-        if not profile or not profile.get("profile_data"):
+        if not profile or not profile["profile_data"]:
             return UserProfileDataResp(ok=True, profile_data={})
         
         # Parse and decrypt profile data
@@ -1611,7 +1611,7 @@ async def save_user_profile_data(
     """
     try:
         # Validate user has DID
-        if not user.get("did"):
+        if not user["did"]:
             raise HTTPException(status_code=400, detail="no_did")
         
         # Validate profile_data exists

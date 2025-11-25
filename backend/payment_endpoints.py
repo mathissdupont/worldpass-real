@@ -71,7 +71,7 @@ async def create_payment_intent(
     now = int(time.time())
     
     # Use DID if available, otherwise use user ID
-    user_identifier = user.get("did") or str(user["id"])
+    user_identifier = user["did"] if user["did"] else str(user["id"])
     
     # Create transaction record
     cursor = await db.execute(
@@ -173,7 +173,7 @@ async def list_user_transactions(
     Optional query param:
     - status: filter by status (pending/success/failed)
     """
-    user_identifier = user.get("did") or str(user["id"])
+    user_identifier = user["did"] if user["did"] else str(user["id"])
     
     # Build query
     if status:
