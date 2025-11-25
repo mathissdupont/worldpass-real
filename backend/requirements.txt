@@ -12,5 +12,6 @@ slowapi==0.1.9
 python-multipart
 httpx
 pytest
+pytest-asyncio
 dnspython
 pyotp

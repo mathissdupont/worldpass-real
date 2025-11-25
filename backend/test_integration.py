@@ -6,11 +6,18 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
+# Use file-based database for standalone test (in-memory doesn't persist between connections)
+TEST_DB_PATH = '/tmp/test_integration_standalone.db'
+
+# Clean up any existing test database
+if os.path.exists(TEST_DB_PATH):
+    os.remove(TEST_DB_PATH)
+
 # Set test environment variables
 os.environ['VC_ENCRYPTION_KEY'] = 'test-key-for-integration-test-12345'
-os.environ['SQLITE_PATH'] = ':memory:'  # Use in-memory database for testing
+os.environ['SQLITE_PATH'] = TEST_DB_PATH
 os.environ['JWT_SECRET'] = 'test-jwt-secret-key-12345'
-os.environ['ADMIN_PASS_HASH'] = '$2b$12$test'
+os.environ['ADMIN_PASS_HASH'] = '$2b$12$rV305vOf0QA17Bq1o4WrPOzsfWpI7y9cSviK5zl3JHcEXqLRjDq4u'
 
 import asyncio
 from fastapi.testclient import TestClient
@@ -240,3 +247,7 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        # Clean up test database
+        if os.path.exists(TEST_DB_PATH):
+            os.remove(TEST_DB_PATH)
