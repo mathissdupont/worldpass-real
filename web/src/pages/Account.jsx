@@ -1,5 +1,6 @@
 // src/pages/Account.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useIdentity } from "../lib/identityContext";
 import { loadProfile, saveProfile } from "../lib/storage";
 import VisualIDCardVertical from "../components/VisualIDCardVertical";
@@ -56,6 +57,7 @@ function initials(name){
 
 export default function Account(){
   const { identity, displayName, setDisplayName } = useIdentity();
+  const navigate = useNavigate();
   const [nameInput, setNameInput] = useState(displayName || "");
   const [msg, setMsg] = useState(null);
   const [showDid, setShowDid] = useState(false);
@@ -200,11 +202,13 @@ export default function Account(){
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Visual ID Card */}
         <Card title={t('identity_card')}>
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center px-2 sm:px-4">
             {hasDid ? (
               <>
-                <VisualIDCardVertical did={identity.did} name={displayName} />
-                <p className="text-xs text-[color:var(--muted)] mt-3 text-center">
+                <div className="w-full max-w-[min(100%,380px)]">
+                  <VisualIDCardVertical did={identity.did} name={displayName} />
+                </div>
+                <p className="text-xs text-[color:var(--muted)] mt-4 text-center max-w-sm">
                   {t('qr_description')}
                 </p>
               </>
@@ -239,6 +243,64 @@ export default function Account(){
               >
                 {t('save')}
               </Button>
+            </div>
+          </Card>
+
+          {/* Profile Link Card */}
+          <Card>
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[color:var(--text)] mb-1">Profil Bilgileri</h3>
+                <p className="text-sm text-[color:var(--muted)] mb-3">
+                  Sosyal medya hesaplarınızı ve iletişim bilgilerinizi kimliğinize ekleyin
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={() => navigate('/profile')}
+                  className="w-full sm:w-auto"
+                >
+                  Profili Düzenle
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* WorldPass Pay Card */}
+          <Card>
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[color:var(--text)] mb-1">WorldPass Pay</h3>
+                <p className="text-sm text-[color:var(--muted)] mb-3">
+                  Minimal payment integration demo - Create and manage transactions
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate('/pay/demo')}
+                    className="flex-1 sm:flex-none"
+                  >
+                    💳 New Payment
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/account/payments')}
+                    className="flex-1 sm:flex-none"
+                  >
+                    View Transactions
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
 

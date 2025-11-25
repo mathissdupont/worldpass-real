@@ -449,31 +449,31 @@ export default function IssuerConsole(){
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* HEADER / PROFILE */}
-      <div className="bg-white rounded-2xl border p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[color:var(--panel)] rounded-2xl border border-[color:var(--border)] p-4 md:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{issuer.name}</h1>
-          <div className="text-sm text-gray-500 flex items-center gap-3 mt-1">
+          <h1 className="text-xl md:text-2xl font-bold text-[color:var(--text)]">{issuer.name}</h1>
+          <div className="text-xs md:text-sm text-[color:var(--muted)] flex flex-wrap items-center gap-2 md:gap-3 mt-1">
             <span>{issuer.domain}</span>
-            <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-            <span>{issuer.email}</span>
-            <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+            <span className="w-1 h-1 rounded-full bg-[color:var(--border)]"></span>
+            <span className="break-all">{issuer.email}</span>
+            <span className="w-1 h-1 rounded-full bg-[color:var(--border)]"></span>
             <span className={issuer.status === "approved" ? "text-emerald-600" : "text-amber-600"}>
               {issuer.status === "approved" ? "Onaylı" : "Beklemede"}
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={handleRotateKey}
-            className="px-4 py-2 rounded-xl border hover:bg-gray-50 text-sm font-medium"
+            className="px-4 py-2 rounded-xl border border-[color:var(--border)] hover:bg-[color:var(--panel-2)] text-sm font-medium text-[color:var(--text)] transition-colors"
           >
             API Anahtarı Oluştur
           </button>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium text-gray-700"
+            className="px-4 py-2 rounded-xl bg-[color:var(--panel-2)] hover:bg-[color:var(--panel-3)] text-sm font-medium text-[color:var(--text)] transition-colors"
           >
             Çıkış Yap
           </button>
@@ -481,15 +481,15 @@ export default function IssuerConsole(){
       </div>
 
       {apiKey && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <h3 className="text-emerald-800 font-medium mb-2">Yeni API Anahtarınız</h3>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 bg-white p-3 rounded border border-emerald-200 font-mono text-sm break-all">
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+          <h3 className="text-emerald-800 dark:text-emerald-300 font-medium mb-2">Yeni API Anahtarınız</h3>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <code className="flex-1 bg-white dark:bg-black p-3 rounded border border-emerald-200 dark:border-emerald-800 font-mono text-xs sm:text-sm break-all text-[color:var(--text)]">
               {apiKey}
             </code>
             <button
               onClick={() => copyToClipboard(apiKey)}
-              className="px-3 py-3 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+              className="px-3 py-3 rounded bg-emerald-100 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-700 font-medium transition-colors"
             >
               Kopyala
             </button>
@@ -500,33 +500,33 @@ export default function IssuerConsole(){
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 md:gap-6">
         {/* LEFT */}
-        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-6 shadow-sm relative">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[color:var(--text)]">{t('org_console.title')}</h2>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-4 md:p-6 shadow-sm relative">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <h2 className="text-base md:text-lg font-semibold text-[color:var(--text)]">{t('org_console.title')}</h2>
             {flash && <Pill tone={flash.tone}>{flash.text}</Pill>}
           </div>
 
           {/* TEMPLATE SOURCE */}
-          <div className="mt-6">
-            <div className="flex items-center justify_between">
-              <h3 className="font-semibold text-[color:var(--text)]">{t('org_console.template_format_label')}</h3>
+          <div className="mt-4 md:mt-6">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm md:text-base font-semibold text-[color:var(--text)]">{t('org_console.template_format_label')}</h3>
               <Badge tone="info">{mode==="wpt" ? "WPT" : mode==="wpml" ? "WPML" : "JSON"}</Badge>
             </div>
             <p className="text-xs text-[color:var(--muted)] mt-1">{t('org_console.template_format_desc')}</p>
 
             {/* meta */}
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
               <div><Label text={t('org_console.template_key')}/><Input value={tplKey} onChange={e=>setTplKey(e.target.value)} /></div>
               <div><Label text={t('org_console.template_name')}/><Input value={tplName} onChange={e=>setTplName(e.target.value)} /></div>
             </div>
 
             {/* toolbar */}
-            <div className="mt-3 grid sm:grid-cols-3 gap-2">
-              <button onClick={()=>setEditorOpen(true)} className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]">{t('org_console.design_in_editor')}</button>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              <button onClick={()=>setEditorOpen(true)} className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm text-[color:var(--text)] transition-colors">{t('org_console.design_in_editor')}</button>
 
-              <label className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] cursor-pointer text-center">
+              <label className="px-3 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] cursor-pointer text-center text-sm text-[color:var(--text)] transition-colors">
                 {t('org_console.load_wpt')}
                 <input type="file" accept=".wpt,text/plain" onChange={onUploadWPT} className="hidden" />
               </label>
@@ -625,34 +625,36 @@ export default function IssuerConsole(){
         {/* RIGHT */}
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-0 shadow-sm flex flex-col">
           {/* sticky header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[color:var(--border)] bg-[color:var(--panel)]/95 backdrop-blur">
+          <div className="sticky top-0 z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 md:px-6 py-4 border-b border-[color:var(--border)] bg-[color:var(--panel)]/95 backdrop-blur">
             <div>
-              <h3 className="font-semibold text-[color:var(--text)]">Sertifika Oluştur</h3>
+              <h3 className="text-sm md:text-base font-semibold text-[color:var(--text)]">Sertifika Oluştur</h3>
               <div className="text-xs text-[color:var(--muted)] mt-0.5">
                 Kaynak: {mode==="wpt" && wptParsed ? `WPT – ${wptParsed.meta.name}` :
                          mode==="wpml" && selectedPresetIdx>=0 ? `Hazır Taslak #${selectedPresetIdx+1}` :
                          "Elle yazılmış JSON"}
               </div>
             </div>
-            <button
-              disabled={!canIssue}
-              onClick={issue}
-              className="px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-50 hover:opacity-90"
-              title={canIssue ? "Oluştur & indir" : "Eksik alanlar veya imza anahtarı yok"}
-            >
-              Oluştur & İndir
-            </button>
-            <button
-              disabled={!canIssue}
-              onClick={handleSendToUser}
-              className="ml-2 px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50 hover:opacity-90"
-              title={canIssue ? "Kullanıcıya Gönder" : "Eksik alanlar veya imza anahtarı yok"}
-            >
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                disabled={!canIssue}
+                onClick={issue}
+                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-50 hover:opacity-90 text-sm transition-opacity"
+                title={canIssue ? "Oluştur & indir" : "Eksik alanlar veya imza anahtarı yok"}
+              >
+                Oluştur & İndir
+              </button>
+              <button
+                disabled={!canIssue}
+                onClick={handleSendToUser}
+                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50 hover:opacity-90 text-sm transition-opacity"
+                title={canIssue ? "Kullanıcıya Gönder" : "Eksik alanlar veya imza anahtarı yok"}
+              >
               Kullanıcıya Gönder
             </button>
+            </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {mode !== "manual" ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

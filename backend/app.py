@@ -46,6 +46,8 @@ from core.vc import verify_vc
 from core.vc_crypto import VCEncryptor, generate_encryption_key
 from oauth_endpoints import router as oauth_router
 from issuer_endpoints import router as issuer_router
+from payment_endpoints import router as payment_router
+from mock_provider_routes import router as mock_provider_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -1338,6 +1340,12 @@ app.include_router(oauth_router)
 # Mount Issuer Console router
 app.include_router(issuer_router)
 
+# Mount Payment router
+app.include_router(payment_router, prefix="/api")
+
+# Mount Mock Payment Provider
+app.include_router(mock_provider_router)
+
 # ---------- simple VC verify (no presentation) ----------
 @app.post(f"{API}/vc/verify", response_model=VerifyResp)
 async def vc_verify_simple(body: VerifyReq, db=Depends(get_db)):
@@ -1488,3 +1496,60 @@ async def confirm_password_reset(body: ResetPasswordReq, db=Depends(get_db)):
     await db.commit()
     
     return ResetPasswordResp(ok=True, message="password_reset_success")
+
+
+# ---------- User Profile Data Endpoints ----------
+@app.get(f"{API}/user/profile-data", response_model=UserProfileDataResp)
+async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_db)):
+    """Get user's profile data (email, instagram, etc.)"""
+    if not user.get("did"):
+        raise HTTPException(status_code=400, detail="no_did")
+    
+    profile = await db.execute_fetchone(
+        "SELECT profile_data FROM user_profiles WHERE did=?",
+        (user["did"],)
+    )
+    
+    if not profile:
+        return UserProfileDataResp(ok=True, profile_data={})
+    
+    try:
+        profile_data = json.loads(profile["profile_data"])
+        return UserProfileDataResp(ok=True, profile_data=profile_data)
+    except Exception as e:
+        print(f"Error parsing profile data: {e}")
+        return UserProfileDataResp(ok=True, profile_data={})
+
+
+@app.post(f"{API}/user/profile-data", response_model=UserProfileDataResp)
+async def save_user_profile_data(
+    body: UserProfileDataReq,
+    user=Depends(_get_current_user),
+    db=Depends(get_db)
+):
+    """Save user's profile data"""
+    if not user.get("did"):
+        raise HTTPException(status_code=400, detail="no_did")
+    
+    now = int(time.time())
+    profile_json = json.dumps(body.profile_data)
+    
+    # Check if profile exists
+    existing = await db.execute_fetchone(
+        "SELECT id FROM user_profiles WHERE did=?",
+        (user["did"],)
+    )
+    
+    if existing:
+        await db.execute(
+            "UPDATE user_profiles SET profile_data=?, updated_at=? WHERE did=?",
+            (profile_json, now, user["did"])
+        )
+    else:
+        await db.execute(
+            "INSERT INTO user_profiles (did, profile_data, created_at, updated_at) VALUES (?,?,?,?)",
+            (user["did"], profile_json, now, now)
+        )
+    
+    await db.commit()
+    return UserProfileDataResp(ok=True, profile_data=body.profile_data)

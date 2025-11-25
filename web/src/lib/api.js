@@ -335,3 +335,53 @@ export async function disable2FA(token) {
   if (!r.ok) throw new Error('disable_2fa_failed');
   return r.json();
 }
+
+// User Profile Data API
+export async function getUserProfileData(token) {
+  const r = await fetch('/api/user/profile-data', {
+    method: 'GET',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('get_profile_data_failed');
+  return r.json();
+}
+
+export async function saveUserProfileData(token, profileData) {
+  const r = await fetch('/api/user/profile-data', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ profile_data: profileData })
+  });
+  if (!r.ok) throw new Error('save_profile_data_failed');
+  return r.json();
+}
+
+// Payment API
+export async function createPaymentIntent(token, amount_minor, currency, description, return_url) {
+  const r = await fetch('/api/payment/intent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ amount_minor, currency, description, return_url })
+  });
+  if (!r.ok) throw new Error('create_payment_intent_failed');
+  return r.json();
+}
+
+export async function listTransactions(token, status = null) {
+  const url = status 
+    ? `/api/payment/transactions?status=${status}`
+    : '/api/payment/transactions';
+    
+  const r = await fetch(url, {
+    method: 'GET',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('list_transactions_failed');
+  return r.json();
+}

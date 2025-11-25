@@ -31,6 +31,14 @@ class RevokeReq(BaseModel):
 
 class RevokeResp(BaseModel):
     status: str
+
+class UserProfileDataReq(BaseModel):
+    profile_data: Dict[str, Any]
+
+class UserProfileDataResp(BaseModel):
+    ok: bool
+    profile_data: Optional[Dict[str, Any]] = None
+
 class IssuerRegisterReq(BaseModel):
     name: str
     email: str

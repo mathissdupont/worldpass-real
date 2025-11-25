@@ -7,6 +7,7 @@ import { t } from "./lib/i18n";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Account from "./pages/Account";
+import Profile from "./pages/Profile";
 import Issue from "./pages/Issue";
 import Verify from "./pages/Verify";
 import Credentials from "./pages/Credentials";
@@ -15,17 +16,20 @@ import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 import IssuerConsole from "./pages/issuer/Console";
-import IssuerDashboard from "./pages/issuer/console/Dashboard";
-import IssuerCredentials from "./pages/issuer/console/Credentials";
-import IssuerCredentialDetail from "./pages/issuer/console/CredentialDetail";
-import IssuerTemplates from "./pages/issuer/console/Templates";
-import IssuerAPIWebhooks from "./pages/issuer/console/APIWebhooks";
-import IssuerSettings from "./pages/issuer/console/Settings";
+import IssuerDashboard from "./pages/issuer/Dashboard";
+import IssuerCredentials from "./pages/issuer/Credentials";
+import IssuerTemplates from "./pages/issuer/Templates";
+import IssuerSettings from "./pages/issuer/Settings";
+import IssuerWebhooks from "./pages/issuer/Webhooks";
+import IssuerLayout from "./components/IssuerLayout";
 import Verifier from "./pages/Verifier";
 import Present from "./pages/Present";
 import WPTEditorPro from "@/pages/tools/WPTEditorPRO.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/RoleRoute";
+import WorldPassPayDemo from "./pages/pay/WorldPassPayDemo";
+import PaymentResult from "./pages/pay/PaymentResult";
+import TransactionsPage from "./pages/pay/TransactionsPage";
 
 import { getSession } from "./lib/auth";
 import { listOrgs } from "./lib/issuerStore.js";
@@ -101,7 +105,44 @@ export default function App(){
             }
           />
 
-          {/* Sertifika verme: sadece issuer rolüne açık */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile/>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Payment Routes */}
+          <Route
+            path="/pay/demo"
+            element={
+              <ProtectedRoute>
+                <WorldPassPayDemo/>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/pay/return"
+            element={
+              <ProtectedRoute>
+                <PaymentResult/>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/account/payments"
+            element={
+              <ProtectedRoute>
+                <TransactionsPage/>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Sertifika verme: sadece issuer rolüne açık */
           <Route
             path="/issue"
             element={
@@ -146,14 +187,13 @@ export default function App(){
             }
           />
 
-          {/* Role-protected */}
-          <Route path="/issuer/console" element={<IssuerDashboard />} />
-          <Route path="/issuer/console/credentials" element={<IssuerCredentials />} />
-          <Route path="/issuer/console/credentials/:vcId" element={<IssuerCredentialDetail />} />
-          <Route path="/issuer/console/templates" element={<IssuerTemplates />} />
-          <Route path="/issuer/console/api" element={<IssuerAPIWebhooks />} />
-          <Route path="/issuer/console/settings" element={<IssuerSettings />} />
-          <Route path="/issuer/console-legacy" element={<IssuerConsole />} />
+          {/* Issuer Routes - Wrapped in IssuerLayout */}
+          <Route path="/issuer/dashboard" element={<IssuerLayout><IssuerDashboard /></IssuerLayout>} />
+          <Route path="/issuer/credentials" element={<IssuerLayout><IssuerCredentials /></IssuerLayout>} />
+          <Route path="/issuer/templates" element={<IssuerLayout><IssuerTemplates /></IssuerLayout>} />
+          <Route path="/issuer/webhooks" element={<IssuerLayout><IssuerWebhooks /></IssuerLayout>} />
+          <Route path="/issuer/settings" element={<IssuerLayout><IssuerSettings /></IssuerLayout>} />
+          <Route path="/issuer/console" element={<IssuerLayout><IssuerConsole /></IssuerLayout>} />
           <Route
             path="/admin/issuers"
             element={

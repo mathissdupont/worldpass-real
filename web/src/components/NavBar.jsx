@@ -29,6 +29,7 @@ function Icon({ name, className="h-4 w-4", label }){
   
   switch(name){
     case "account": return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 20c2.2-3.6 13.8-3.6 16 0"/></svg>;
+    case "profile": return <svg {...common}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
     case "issue":   return <svg {...common}><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><rect x="4" y="17" width="16" height="4" rx="1"/></svg>;
     case "verify":  return <svg {...common}><path d="M20 6l-11 11-5-5"/></svg>;
     case "list":    return <svg {...common}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>;
@@ -83,6 +84,7 @@ export default function NavBar({ health, user, features }) {
 
   const navItems = [
     { to: "/account",           label: t('my_account'),         icon: "account" },
+    { to: "/profile",           label: "Profil Bilgileri",      icon: "profile" },
     { to: "/verify",            label: t('verify_credential'),  icon: "verify" },
     { to: "/credentials",       label: t('my_credentials'),     icon: "list" },
     { to: "/present",           label: t('present_credential'), icon: "present" },

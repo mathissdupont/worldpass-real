@@ -71,6 +71,34 @@ CREATE TABLE IF NOT EXISTS user_vcs (
 CREATE INDEX IF NOT EXISTS idx_user_vcs_user_id ON user_vcs(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_vcs_vc_id ON user_vcs(vc_id);
 
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  did TEXT NOT NULL UNIQUE,
+  profile_data TEXT NOT NULL,   -- JSON: encrypted profile data
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_did ON user_profiles(did);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,           -- user DID or user ID
+  amount_minor INTEGER NOT NULL,   -- amount in minor units (cents/kuruş)
+  currency TEXT NOT NULL DEFAULT 'TRY',
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',  -- 'pending' | 'success' | 'failed'
+  provider TEXT NOT NULL DEFAULT 'mock',
+  provider_tx_id TEXT,             -- external provider transaction ID
+  return_url TEXT,                 -- frontend callback URL
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_tx_id ON transactions(provider_tx_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+
 CREATE TABLE IF NOT EXISTS issuers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
