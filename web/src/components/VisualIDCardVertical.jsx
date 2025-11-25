@@ -75,10 +75,7 @@ export default function VisualIDCardVertical({ did, name }) {
     // Load profile data from backend
     const loadProfile = async () => {
       try {
-        const token = getSession()?.token;
-        if (!token) return;
-        
-        const response = await getUserProfileData(token);
+        const response = await getUserProfileData();
         if (response.ok && response.profile_data) {
           setProfileData(response.profile_data);
         }
