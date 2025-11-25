@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Open WorldPass button
   document.getElementById('open-worldpass').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173/account' }); // Change to production URL
+    chrome.tabs.create({ url: 'worldpass-beta.heptapusgroup.com/account' }); // Change to production URL
   });
 });
 
