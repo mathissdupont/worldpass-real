@@ -1,7 +1,7 @@
 // Modern Issuer Console - Clean & Responsive
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getIssuerProfile, issueCredential, getIssuedCredentials } from '../../lib/api';
+import { getIssuerProfile, issueCredential, getIssuedCredentials, listIssuerTemplates } from '../../lib/api';
 
 export default function IssuerConsole() {
   const navigate = useNavigate();
@@ -17,13 +17,31 @@ export default function IssuerConsole() {
   const [issueError, setIssueError] = useState('');
   const [issueSuccess, setIssueSuccess] = useState('');
   
+  // Templates
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  
   // Issued credentials
   const [issuedVCs, setIssuedVCs] = useState([]);
   const [loadingVCs, setLoadingVCs] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    loadTemplates();
   }, []);
+
+  async function loadTemplates() {
+    try {
+      setLoadingTemplates(true);
+      const data = await listIssuerTemplates();
+      setTemplates(data.templates || []);
+    } catch (err) {
+      console.error('Load templates error:', err);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }
 
   async function loadProfile() {
     try {
@@ -87,9 +105,9 @@ export default function IssuerConsole() {
 
       // Build VC
       const vc = {
-        "@context": ["https://www.w3.org/2018/credentials/v1"],
-        type: ["VerifiableCredential", credentialType],
-        issuer: profile.did,
+        '@context': ['https://www.w3.org/2018/credentials/v1'],
+        type: ['VerifiableCredential', credentialType],
+        issuer: issuer.did,
         issuanceDate: new Date().toISOString(),
         credentialSubject: {
           id: recipientDID,
@@ -98,12 +116,14 @@ export default function IssuerConsole() {
         jti: `vc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
 
-      await issueCredential(vc);
+      const token = localStorage.getItem('issuer_token');
+      await issueCredential(null, vc, token, selectedTemplate?.id || null);
       
       setIssueSuccess('Credential issued successfully!');
       setRecipientDID('');
       setCredentialType('');
       setCredentialData('{}');
+      setSelectedTemplate(null);
       
       // Reload issued credentials if on that tab
       if (activeTab === 'issued') {
@@ -194,15 +214,12 @@ export default function IssuerConsole() {
               Issued Credentials
             </button>
             <button
-              onClick={() => setActiveTab('templates')}
-              className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'templates'
-                  ? 'text-[color:var(--brand)] border-b-2 border-[color:var(--brand)]'
-                  : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
-              }`}
+              onClick={() => navigate('/issuer/templates')}
+              className="px-4 py-3 text-sm font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors whitespace-nowrap"
             >
-              Templates
+              Manage Templates →
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -215,6 +232,52 @@ export default function IssuerConsole() {
               <h2 className="text-xl font-semibold text-[color:var(--text)] mb-6">Issue New Credential</h2>
               
               <form onSubmit={handleIssueCredential} className="space-y-6">
+                {/* Template Selection */}
+                {templates.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
+                      Use Template (Optional)
+                    </label>
+                    <select
+                      value={selectedTemplate?.id || ''}
+                      onChange={(e) => {
+                        const template = templates.find(t => t.id === parseInt(e.target.value));
+                        setSelectedTemplate(template || null);
+                        if (template) {
+                          setCredentialType(template.vc_type);
+                          // Pre-fill with template schema if available
+                          if (template.schema_json || template.schema_data) {
+                            const schema = template.schema_json || template.schema_data;
+                            const example = {};
+                            if (schema.properties) {
+                              Object.keys(schema.properties).forEach(key => {
+                                example[key] = '';
+                              });
+                            }
+                            setCredentialData(JSON.stringify(example, null, 2));
+                          }
+                        }
+                      }}
+                      className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all"
+                    >
+                      <option value="">No template (manual entry)</option>
+                      {templates.filter(t => t.is_active).map(template => (
+                        <option key={template.id} value={template.id}>
+                          {template.name} - {template.vc_type}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedTemplate && (
+                      <div className="mt-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-400">
+                          ✓ Using template: <span className="font-semibold">{selectedTemplate.name}</span>
+                          {selectedTemplate.description && ` - ${selectedTemplate.description}`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Recipient DID */}
                 <div>
                   <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
@@ -357,12 +420,6 @@ export default function IssuerConsole() {
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === 'templates' && (
-          <div className="text-center py-12 bg-[color:var(--panel)] rounded-xl border border-[color:var(--border)]">
-            <p className="text-[color:var(--muted)]">Templates feature coming soon</p>
           </div>
         )}
       </div>

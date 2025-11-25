@@ -329,7 +329,7 @@ export async function rotateIssuerApiKey() {
 }
 
 export async function issueCredential(api_key, vc, token, template_id) {
-  const authToken = token || getToken();
+  const authToken = token || getIssuerToken();
   if (!authToken && !api_key) throw new Error('Not authenticated');
   
   const body = { vc };
@@ -352,7 +352,7 @@ export async function issueCredential(api_key, vc, token, template_id) {
 }
 
 export async function getIssuedCredentials() {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   
   const r = await fetch('/api/issuer/credentials', {
@@ -369,7 +369,7 @@ export async function getIssuedCredentials() {
 }
 
 export async function revokeCredential(vcId) {
-  const token = getToken();
+  const token = getIssuerToken();
   if (!token) throw new Error('Not authenticated');
   
   const r = await fetch('/api/issuer/revoke', {
