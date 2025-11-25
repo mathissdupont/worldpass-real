@@ -1549,29 +1549,52 @@ async def confirm_password_reset(body: ResetPasswordReq, db=Depends(get_db)):
 # ---------- User Profile Data Endpoints ----------
 @app.get(f"{API}/user/profile-data", response_model=UserProfileDataResp)
 async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_db)):
-    """Get user's profile data (email, instagram, etc.) - decrypts sensitive fields"""
-    if not user.get("did"):
-        raise HTTPException(status_code=400, detail="no_did")
+    """
+    Get user's profile data (email, instagram, etc.) - decrypts sensitive fields
     
-    profile = await db.execute_fetchone(
-        "SELECT profile_data FROM user_profiles WHERE did=?",
-        (user["did"],)
-    )
-    
-    if not profile:
-        return UserProfileDataResp(ok=True, profile_data={})
-    
+    Returns: { ok: true, profile_data: { ... } }
+    """
     try:
-        profile_data = json.loads(profile["profile_data"])
+        # Validate user has DID
+        if not user.get("did"):
+            raise HTTPException(status_code=400, detail="no_did")
         
-        # Decrypt sensitive fields
-        encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
-        decrypted_data = encryptor.decrypt_profile_data(profile_data)
+        # Query profile from database
+        profile = await db.execute_fetchone(
+            "SELECT profile_data FROM user_profiles WHERE did=?",
+            (user["did"],)
+        )
         
-        return UserProfileDataResp(ok=True, profile_data=decrypted_data)
+        # Return empty profile if not found
+        if not profile or not profile.get("profile_data"):
+            return UserProfileDataResp(ok=True, profile_data={})
+        
+        # Parse and decrypt profile data
+        try:
+            profile_data = json.loads(profile["profile_data"])
+            
+            # Decrypt sensitive fields
+            encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
+            decrypted_data = encryptor.decrypt_profile_data(profile_data)
+            
+            return UserProfileDataResp(ok=True, profile_data=decrypted_data)
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON decode error for DID {user['did']}: {e}")
+            return UserProfileDataResp(ok=True, profile_data={})
+        except Exception as e:
+            print(f"❌ Decryption error for DID {user['did']}: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return raw data if decryption fails (backward compatibility)
+            return UserProfileDataResp(ok=True, profile_data=profile_data if 'profile_data' in locals() else {})
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error parsing/decrypting profile data: {e}")
-        return UserProfileDataResp(ok=True, profile_data={})
+        print(f"❌ Unexpected error in get_user_profile_data: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"internal_error: {str(e)}")
 
 
 @app.post(f"{API}/user/profile-data", response_model=UserProfileDataResp)
@@ -1580,41 +1603,77 @@ async def save_user_profile_data(
     user=Depends(_get_current_user),
     db=Depends(get_db)
 ):
-    """Save user's profile data - encrypts sensitive fields (passwords, etc.)"""
-    if not user.get("did"):
-        raise HTTPException(status_code=400, detail="no_did")
+    """
+    Save user's profile data - encrypts sensitive fields (passwords, etc.)
     
+    Accepts: { profile_data: { email: str, instagram: str, instagram_password: str, ... } }
+    Returns: { ok: true, profile_data: { ... } }
+    """
     try:
+        # Validate user has DID
+        if not user.get("did"):
+            raise HTTPException(status_code=400, detail="no_did")
+        
+        # Validate profile_data exists
+        if not body.profile_data:
+            raise HTTPException(status_code=400, detail="profile_data_required")
+        
         # Encrypt sensitive fields before saving
-        encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
-        encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
+        try:
+            encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
+            encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
+        except Exception as e:
+            print(f"❌ Encryption error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"encryption_failed: {str(e)}")
         
         now = int(time.time())
         profile_json = json.dumps(encrypted_data)
         
         # Check if profile exists
-        existing = await db.execute_fetchone(
-            "SELECT id FROM user_profiles WHERE did=?",
-            (user["did"],)
-        )
-        
-        if existing:
-            await db.execute(
-                "UPDATE user_profiles SET profile_data=?, updated_at=? WHERE did=?",
-                (profile_json, now, user["did"])
+        try:
+            existing = await db.execute_fetchone(
+                "SELECT id FROM user_profiles WHERE did=?",
+                (user["did"],)
             )
-        else:
-            await db.execute(
-                "INSERT INTO user_profiles (did, profile_data, created_at, updated_at) VALUES (?,?,?,?)",
-                (user["did"], profile_json, now, now)
-            )
+        except Exception as e:
+            print(f"❌ Database query error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"db_query_failed: {str(e)}")
         
-        await db.commit()
+        # Insert or update profile
+        try:
+            if existing:
+                await db.execute(
+                    "UPDATE user_profiles SET profile_data=?, updated_at=? WHERE did=?",
+                    (profile_json, now, user["did"])
+                )
+                print(f"✅ Updated profile for DID: {user['did']}")
+            else:
+                await db.execute(
+                    "INSERT INTO user_profiles (did, profile_data, created_at, updated_at) VALUES (?,?,?,?)",
+                    (user["did"], profile_json, now, now)
+                )
+                print(f"✅ Created profile for DID: {user['did']}")
+            
+            await db.commit()
+        except Exception as e:
+            print(f"❌ Database commit error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"db_commit_failed: {str(e)}")
         
-        # Return decrypted data to client (same as what they sent)
+        # Return decrypted data to client (same as what they sent, unencrypted)
         return UserProfileDataResp(ok=True, profile_data=body.profile_data)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
-        print(f"Error saving profile data: {e}")
+        # Catch any other unexpected errors
+        print(f"❌ Unexpected error in save_user_profile_data: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"save_failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"internal_error: {str(e)}")
