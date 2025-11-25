@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "WorldPass API"
     API_PREFIX: str = "/api"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    SQLITE_PATH: str = os.getenv("SQLITE_PATH", "worldpass.db")
+    SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/worldpass.db")
     CHALLENGE_TTL_SECONDS: int = 180
     ADMIN_USER: str = os.getenv("ADMIN_USER", "admin")
     ADMIN_PASS_HASH: str = os.getenv("ADMIN_PASS_HASH", "$2b$12$rV305vOf0QA17Bq1o4WrPOzsfWpI7y9cSviK5zl3JHcEXqLRjDq4u")  # bcrypt hash

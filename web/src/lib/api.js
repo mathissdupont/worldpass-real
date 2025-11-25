@@ -372,7 +372,9 @@ export async function revokeCredential(vcId) {
   return r.json();
 }
 
-export async function setup2FA(token) {
+export async function setup2FA() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/auth/2fa/setup', {
     method: 'POST',
     headers: { 'X-Token': token }
@@ -381,7 +383,9 @@ export async function setup2FA(token) {
   return r.json();
 }
 
-export async function enable2FA(token, secret, code) {
+export async function enable2FA(secret, code) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/auth/2fa/enable', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Token': token },
@@ -391,7 +395,9 @@ export async function enable2FA(token, secret, code) {
   return r.json();
 }
 
-export async function disable2FA(token) {
+export async function disable2FA() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/auth/2fa/disable', {
     method: 'POST',
     headers: { 'X-Token': token }
@@ -401,7 +407,9 @@ export async function disable2FA(token) {
 }
 
 // User Profile Data API
-export async function getUserProfileData(token) {
+export async function getUserProfileData() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/user/profile-data', {
     method: 'GET',
     headers: { 'X-Token': token }
@@ -410,7 +418,9 @@ export async function getUserProfileData(token) {
   return r.json();
 }
 
-export async function saveUserProfileData(token, profileData) {
+export async function saveUserProfileData(profileData) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/user/profile-data', {
     method: 'POST',
     headers: {
@@ -428,7 +438,9 @@ export async function saveUserProfileData(token, profileData) {
 }
 
 // Payment API
-export async function createPaymentIntent(token, amount_minor, currency, description, return_url) {
+export async function createPaymentIntent(amount_minor, currency, description, return_url) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/payment/intent', {
     method: 'POST',
     headers: {
@@ -441,7 +453,9 @@ export async function createPaymentIntent(token, amount_minor, currency, descrip
   return r.json();
 }
 
-export async function listTransactions(token, status = null) {
+export async function listTransactions(status = null) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
   const url = status 
     ? `/api/payment/transactions?status=${status}`
     : '/api/payment/transactions';

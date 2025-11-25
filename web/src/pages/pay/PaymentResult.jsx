@@ -22,7 +22,7 @@ export default function PaymentResult() {
         }
 
         // Fetch all transactions and find the one we need
-        const result = await listTransactions(token);
+        const result = await listTransactions();
         const tx = result.transactions.find((t) => t.id === parseInt(txId));
         
         if (tx) {

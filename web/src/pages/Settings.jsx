@@ -313,7 +313,7 @@ export default function Settings() {
       // Disable
       if (confirm("Disable 2FA?")) {
         try {
-          await disable2FA(token);
+          await disable2FA();
           setOtpEnabled(false);
           setToast({ type: "info", text: "2FA disabled." });
           await saveProfileLocal({ otpEnabled: false });
@@ -325,7 +325,7 @@ export default function Settings() {
     } else {
       // Enable - Start Setup
       try {
-        const res = await setup2FA(token);
+        const res = await setup2FA();
         setSecret(res.secret);
         const url = await QRCode.toDataURL(res.otpauth_url);
         setQrCodeUrl(url);
@@ -342,7 +342,7 @@ export default function Settings() {
     if (!token) return setToast({ type: "err", text: "Please login first" });
 
     try {
-      await enable2FA(token, secret, otpCode);
+      await enable2FA(secret, otpCode);
       setOtpEnabled(true);
       setShow2FASetup(false);
       setOtpCode('');

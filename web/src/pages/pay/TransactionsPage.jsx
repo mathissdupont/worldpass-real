@@ -20,7 +20,7 @@ export default function TransactionsPage() {
         }
 
         const filterStatus = filter === 'all' ? null : filter;
-        const result = await listTransactions(token, filterStatus);
+        const result = await listTransactions(filterStatus);
         setTransactions(result.transactions || []);
       } catch (err) {
         console.error('Failed to fetch transactions:', err);

@@ -243,6 +243,13 @@ async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     await conn.close()
 
 async def init_db():
+    import os
+    # Ensure the directory exists
+    db_path = settings.SQLITE_PATH
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    
     async with aiosqlite.connect(settings.SQLITE_PATH) as conn:
         await conn.executescript(SCHEMA_SQL)
         await conn.commit()

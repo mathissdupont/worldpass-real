@@ -188,13 +188,7 @@ export default function Profile() {
     // Load profile data from backend
     const loadProfile = async () => {
       try {
-        const token = getSession()?.token;
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-        
-        const response = await getUserProfileData(token);
+        const response = await getUserProfileData();
         if (response.ok && response.profile_data) {
           setProfileData(response.profile_data);
         }
@@ -214,10 +208,7 @@ export default function Profile() {
 
   const saveToBackend = async (data) => {
     try {
-      const token = getToken();
-      if (!token) throw new Error("No auth token");
-      
-      const response = await saveUserProfileData(token, data);
+      const response = await saveUserProfileData(data);
       if (response.ok) {
         setProfileData(data);
         return true;

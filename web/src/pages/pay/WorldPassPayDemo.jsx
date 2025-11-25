@@ -37,7 +37,6 @@ export default function WorldPassPayDemo() {
 
       // Create payment intent
       const result = await createPaymentIntent(
-        token,
         amount_minor,
         'USD',
         description || 'WorldPass Payment',
