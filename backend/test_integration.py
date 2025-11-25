@@ -4,10 +4,11 @@ Integration test for encrypted VC storage API endpoints
 """
 import sys
 import os
+import tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Use file-based database for standalone test (in-memory doesn't persist between connections)
-TEST_DB_PATH = '/tmp/test_integration_standalone.db'
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), 'test_integration_standalone.db')
 
 # Clean up any existing test database
 if os.path.exists(TEST_DB_PATH):

@@ -6,12 +6,13 @@ This file sets up test environment variables and fixtures for all tests.
 import pytest
 import os
 import sys
+import tempfile
 
 # Ensure backend modules are importable
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Use a file-based database for testing to ensure consistency
-TEST_DB_PATH = '/tmp/worldpass_test.db'
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), 'worldpass_test.db')
 
 # Set test environment variables BEFORE any backend imports
 os.environ['VC_ENCRYPTION_KEY'] = 'test-key-for-integration-test-12345'
@@ -53,9 +54,9 @@ def client():
         yield test_client
 
 
-# Configure pytest-asyncio to use session scope
+# Configure pytest markers
 def pytest_configure(config):
-    """Configure pytest with asyncio settings"""
+    """Register pytest markers for async tests"""
     config.addinivalue_line(
         "markers", "asyncio: mark test as an async test."
     )
