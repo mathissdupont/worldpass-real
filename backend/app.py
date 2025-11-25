@@ -30,7 +30,7 @@ from schemas import (
     UserVCListResp, UserVCItem,
     UserVCDeleteReq, UserVCDeleteResp,
     UserProfileUpdateReq, UserProfileResp,
-    UserProfileDataResp,
+    UserProfileDataReq, UserProfileDataResp,
     UserDeleteResp,
     TwoFASetupResp, TwoFAEnableReq, TwoFAEnableResp, TwoFADisableResp,
     BackupCodesResp, VerifyEmailReq, VerifyEmailResp,
