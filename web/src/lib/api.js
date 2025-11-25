@@ -1,3 +1,5 @@
+import { getToken } from './auth';
+
 export async function apiHealth(){
   const r = await fetch('/api/health');
   return r.json();
@@ -27,7 +29,10 @@ export async function verifyVC(vcObj, challenge, presenter_did=null){
 }
 
 // Template management API
-export async function createTemplate(token, template) {
+export async function createTemplate(template) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  
   const r = await fetch('/api/user/templates', {
     method: 'POST',
     headers: {
@@ -40,7 +45,10 @@ export async function createTemplate(token, template) {
   return r.json();
 }
 
-export async function listTemplates(token) {
+export async function listTemplates() {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  
   const r = await fetch('/api/user/templates', {
     method: 'GET',
     headers: {
