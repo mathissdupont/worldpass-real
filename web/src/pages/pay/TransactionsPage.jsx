@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSession } from '../../lib/auth';
+import { getToken } from '../../lib/auth';
 import { listTransactions } from '../../lib/api';
 
 export default function TransactionsPage() {
@@ -13,14 +13,14 @@ export default function TransactionsPage() {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const session = getSession();
-        if (!session?.token) {
+        const token = getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
 
         const filterStatus = filter === 'all' ? null : filter;
-        const result = await listTransactions(session.token, filterStatus);
+        const result = await listTransactions(token, filterStatus);
         setTransactions(result.transactions || []);
       } catch (err) {
         console.error('Failed to fetch transactions:', err);

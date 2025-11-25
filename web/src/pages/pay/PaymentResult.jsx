@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getSession } from '../../lib/auth';
+import { getToken } from '../../lib/auth';
 import { listTransactions } from '../../lib/api';
 
 export default function PaymentResult() {
@@ -15,14 +15,14 @@ export default function PaymentResult() {
   useEffect(() => {
     const fetchTransaction = async () => {
       try {
-        const session = getSession();
-        if (!session?.token) {
+        const token = getToken();
+        if (!token) {
           navigate('/login');
           return;
         }
 
         // Fetch all transactions and find the one we need
-        const result = await listTransactions(session.token);
+        const result = await listTransactions(token);
         const tx = result.transactions.find((t) => t.id === parseInt(txId));
         
         if (tx) {
