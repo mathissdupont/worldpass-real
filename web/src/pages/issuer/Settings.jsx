@@ -94,7 +94,7 @@ export default function IssuerSettings() {
 
     const token = localStorage.getItem("issuer_token");
     try {
-      const resp = await rotateIssuerApiKey(token);
+      const resp = await rotateIssuerApiKey();
       setApiKey(resp.api_key);
       setShowApiKey(true);
       alert("Yeni API anahtarı oluşturuldu. Lütfen güvenli bir yere kaydedin.");

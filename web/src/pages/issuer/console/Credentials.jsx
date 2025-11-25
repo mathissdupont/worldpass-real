@@ -42,7 +42,7 @@ export default function IssuerCredentials() {
 
   const loadIssuerProfile = async (token) => {
     try {
-      const profileResp = await getIssuerProfile(token);
+      const profileResp = await getIssuerProfile();
       setIssuer(profileResp.issuer);
     } catch (err) {
       console.error(err);
