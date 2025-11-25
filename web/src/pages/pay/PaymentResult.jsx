@@ -77,10 +77,10 @@ export default function PaymentResult() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-[color:var(--bg)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading transaction details...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--brand)] mx-auto mb-4"></div>
+          <p className="text-[color:var(--muted)]">Loading transaction details...</p>
         </div>
       </div>
     );
@@ -90,53 +90,53 @@ export default function PaymentResult() {
     <div className={`min-h-screen bg-gradient-to-br ${config.bgColor} flex items-center justify-center px-4 py-8`}>
       <div className="max-w-md w-full">
         {/* Result Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-[color:var(--panel)] rounded-2xl shadow-2xl p-6 sm:p-8">
           {/* Icon */}
           <div className={`w-20 h-20 ${config.iconBg} rounded-full flex items-center justify-center mx-auto mb-6`}>
             <span className="text-4xl">{config.icon}</span>
           </div>
 
           {/* Title */}
-          <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+          <h1 className="text-2xl font-bold text-[color:var(--text)] text-center mb-2">
             {config.title}
           </h1>
 
           {/* Message */}
-          <p className="text-gray-600 text-center mb-6">
+          <p className="text-[color:var(--muted)] text-center mb-6">
             {config.message}
           </p>
 
           {/* Transaction Details */}
           {transaction && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-6 space-y-3">
+            <div className="bg-[color:var(--panel-2)] rounded-xl p-4 sm:p-6 mb-6 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Transaction ID</span>
-                <span className="text-sm font-mono text-gray-900">#{transaction.id}</span>
+                <span className="text-sm font-medium text-[color:var(--muted)]">Transaction ID</span>
+                <span className="text-sm font-mono text-[color:var(--text)]">#{transaction.id}</span>
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Amount</span>
-                <span className="text-lg font-bold text-gray-900">
+                <span className="text-sm font-medium text-[color:var(--muted)]">Amount</span>
+                <span className="text-lg font-bold text-[color:var(--text)]">
                   ${(transaction.amount_minor / 100).toFixed(2)} {transaction.currency.toUpperCase()}
                 </span>
               </div>
 
               {transaction.description && (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-500">Description</span>
-                  <span className="text-sm text-gray-900">{transaction.description}</span>
+                  <span className="text-sm font-medium text-[color:var(--muted)]">Description</span>
+                  <span className="text-sm text-[color:var(--text)]">{transaction.description}</span>
                 </div>
               )}
 
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Status</span>
+                <span className="text-sm font-medium text-[color:var(--muted)]">Status</span>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                     transaction.status === 'success'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-[color:var(--success)]/20 text-[color:var(--success)]'
                       : transaction.status === 'pending'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-red-100 text-red-700'
+                      ? 'bg-[color:var(--warning)]/20 text-[color:var(--warning)]'
+                      : 'bg-[color:var(--danger)]/20 text-[color:var(--danger)]'
                   }`}
                 >
                   {transaction.status.toUpperCase()}
@@ -144,8 +144,8 @@ export default function PaymentResult() {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-500">Date</span>
-                <span className="text-sm text-gray-900">
+                <span className="text-sm font-medium text-[color:var(--muted)]">Date</span>
+                <span className="text-sm text-[color:var(--text)]">
                   {new Date(transaction.created_at * 1000).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -162,14 +162,14 @@ export default function PaymentResult() {
           <div className="space-y-3">
             <button
               onClick={() => navigate('/account/payments')}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg"
+              className="w-full bg-[color:var(--brand)] text-white py-3 rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg"
             >
               View All Transactions
             </button>
 
             <button
               onClick={() => navigate('/account')}
-              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+              className="w-full bg-[color:var(--panel-2)] text-[color:var(--text)] py-3 rounded-xl font-semibold hover:bg-[color:var(--panel-3)] transition-colors"
             >
               Back to Account
             </button>

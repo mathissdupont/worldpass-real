@@ -65,15 +65,15 @@ export default function WorldPassPayDemo() {
         </div>
 
         {/* Payment Form Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-[color:var(--panel)] rounded-2xl shadow-2xl p-6 sm:p-8">
           <form onSubmit={handleCreatePayment} className="space-y-6">
             {/* Amount Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
                 Amount (USD)
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted)] text-lg">
                   $
                 </span>
                 <input
@@ -82,7 +82,7 @@ export default function WorldPassPayDemo() {
                   min="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-lg"
+                  className="w-full pl-8 pr-4 py-3 border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] rounded-xl focus:ring-2 focus:ring-[color:var(--brand-2)] focus:border-transparent text-lg"
                   placeholder="0.00"
                   required
                   disabled={loading}
@@ -92,14 +92,14 @@ export default function WorldPassPayDemo() {
 
             {/* Description Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
                 Description (Optional)
               </label>
               <input
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] rounded-xl focus:ring-2 focus:ring-[color:var(--brand-2)] focus:border-transparent"
                 placeholder="What is this payment for?"
                 maxLength={200}
                 disabled={loading}
@@ -108,8 +108,8 @@ export default function WorldPassPayDemo() {
 
             {/* Error Message */}
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="p-4 bg-[color:var(--danger)]/10 border border-[color:var(--danger)]/30 rounded-xl">
+                <p className="text-sm text-[color:var(--danger)]">{error}</p>
               </div>
             )}
 
@@ -117,7 +117,7 @@ export default function WorldPassPayDemo() {
             <button
               type="submit"
               disabled={loading || !amount}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="w-full bg-[color:var(--brand)] text-white py-4 rounded-xl font-semibold text-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -145,7 +145,7 @@ export default function WorldPassPayDemo() {
             </button>
 
             {/* Info Text */}
-            <div className="text-center text-sm text-gray-500 pt-4">
+            <div className="text-center text-sm text-[color:var(--muted)] pt-4">
               <p>This is a demo payment using a mock provider.</p>
               <p className="mt-1">No real transactions will be processed.</p>
             </div>
