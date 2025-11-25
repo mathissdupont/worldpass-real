@@ -387,7 +387,11 @@ export async function saveUserProfileData(token, profileData) {
     },
     body: JSON.stringify({ profile_data: profileData })
   });
-  if (!r.ok) throw new Error('save_profile_data_failed');
+  if (!r.ok) {
+    const errorText = await r.text();
+    console.error('Profile save error:', errorText);
+    throw new Error(`save_profile_data_failed: ${errorText}`);
+  }
   return r.json();
 }
 

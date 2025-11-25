@@ -1584,31 +1584,37 @@ async def save_user_profile_data(
     if not user.get("did"):
         raise HTTPException(status_code=400, detail="no_did")
     
-    # Encrypt sensitive fields before saving
-    encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
-    encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
-    
-    now = int(time.time())
-    profile_json = json.dumps(encrypted_data)
-    
-    # Check if profile exists
-    existing = await db.execute_fetchone(
-        "SELECT id FROM user_profiles WHERE did=?",
-        (user["did"],)
-    )
-    
-    if existing:
-        await db.execute(
-            "UPDATE user_profiles SET profile_data=?, updated_at=? WHERE did=?",
-            (profile_json, now, user["did"])
+    try:
+        # Encrypt sensitive fields before saving
+        encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
+        encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
+        
+        now = int(time.time())
+        profile_json = json.dumps(encrypted_data)
+        
+        # Check if profile exists
+        existing = await db.execute_fetchone(
+            "SELECT id FROM user_profiles WHERE did=?",
+            (user["did"],)
         )
-    else:
-        await db.execute(
-            "INSERT INTO user_profiles (did, profile_data, created_at, updated_at) VALUES (?,?,?,?)",
-            (user["did"], profile_json, now, now)
-        )
-    
-    await db.commit()
-    
-    # Return decrypted data to client (same as what they sent)
-    return UserProfileDataResp(ok=True, profile_data=body.profile_data)
+        
+        if existing:
+            await db.execute(
+                "UPDATE user_profiles SET profile_data=?, updated_at=? WHERE did=?",
+                (profile_json, now, user["did"])
+            )
+        else:
+            await db.execute(
+                "INSERT INTO user_profiles (did, profile_data, created_at, updated_at) VALUES (?,?,?,?)",
+                (user["did"], profile_json, now, now)
+            )
+        
+        await db.commit()
+        
+        # Return decrypted data to client (same as what they sent)
+        return UserProfileDataResp(ok=True, profile_data=body.profile_data)
+    except Exception as e:
+        print(f"Error saving profile data: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"save_failed: {str(e)}")
