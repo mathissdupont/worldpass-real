@@ -3,21 +3,25 @@ import { useState, useEffect } from "react";
 import { useIdentity } from "../lib/identityContext";
 import { Button, Input, Card } from "../components/ui";
 import { getUserProfileData, saveUserProfileData } from "../lib/api";
-import { getSession } from "../lib/auth";
+import { getSession, getToken } from "../lib/auth";
 
 const PROFILE_FIELDS = [
   { id: "email", label: "Email", icon: "📧", type: "email", placeholder: "ornek@email.com" },
   { id: "phone", label: "Telefon", icon: "📱", type: "tel", placeholder: "+90 555 123 4567" },
   { id: "instagram", label: "Instagram", icon: "📷", type: "text", placeholder: "@kullaniciadi" },
+  { id: "instagram_password", label: "Instagram Şifresi", icon: "🔐", type: "password", placeholder: "••••••••", secure: true },
   { id: "twitter", label: "Twitter/X", icon: "🐦", type: "text", placeholder: "@kullaniciadi" },
+  { id: "twitter_password", label: "Twitter Şifresi", icon: "🔐", type: "password", placeholder: "••••••••", secure: true },
   { id: "linkedin", label: "LinkedIn", icon: "💼", type: "text", placeholder: "linkedin.com/in/..." },
   { id: "github", label: "GitHub", icon: "💻", type: "text", placeholder: "@kullaniciadi" },
+  { id: "github_password", label: "GitHub Şifresi", icon: "🔐", type: "password", placeholder: "••••••••", secure: true },
   { id: "website", label: "Website", icon: "🌐", type: "url", placeholder: "https://..." },
   { id: "bio", label: "Bio", icon: "📝", type: "textarea", placeholder: "Kendiniz hakkında kısa bilgi..." },
 ];
 
 function ProfileFieldCard({ field, value, onChange, onSave, onRemove, isEditing, setIsEditing }) {
   const [localValue, setLocalValue] = useState(value || "");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSave = () => {
     onSave(field.id, localValue);
@@ -68,6 +72,33 @@ function ProfileFieldCard({ field, value, onChange, onSave, onRemove, isEditing,
             rows={3}
             className="w-full px-3 py-2 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent resize-none text-sm"
           />
+        ) : field.type === "password" ? (
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              placeholder={field.placeholder}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors"
+              title={showPassword ? "Gizle" : "Göster"}
+            >
+              {showPassword ? (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              )}
+            </button>
+          </div>
         ) : (
           <Input
             type={field.type}
@@ -94,9 +125,30 @@ function ProfileFieldCard({ field, value, onChange, onSave, onRemove, isEditing,
         <div className="text-2xl">{field.icon}</div>
         <div className="flex-1 min-w-0">
           <div className="text-xs text-[color:var(--muted)] mb-1">{field.label}</div>
-          <div className="text-sm text-[color:var(--text)] break-all">{value}</div>
+          <div className="text-sm text-[color:var(--text)] break-all font-mono">
+            {field.type === "password" ? "••••••••" : value}
+          </div>
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {field.type === "password" && (
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(value);
+                  console.log("Şifre panoya kopyalandı");
+                } catch (err) {
+                  console.error("Kopyalama hatası:", err);
+                }
+              }}
+              className="p-2 rounded-lg hover:bg-[color:var(--panel-2)] text-[color:var(--text)]"
+              title="Kopyala"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => {
               setLocalValue(value);
@@ -162,7 +214,7 @@ export default function Profile() {
 
   const saveToBackend = async (data) => {
     try {
-      const token = getSession()?.token;
+      const token = getToken();
       if (!token) throw new Error("No auth token");
       
       const response = await saveUserProfileData(token, data);

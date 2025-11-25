@@ -45,6 +45,7 @@ from schemas import (
 from core.crypto_ed25519 import Ed25519Signer, b64u_d
 from core.vc import verify_vc
 from core.vc_crypto import VCEncryptor, generate_encryption_key
+from core.profile_crypto import get_profile_encryptor
 from oauth_endpoints import router as oauth_router
 from issuer_endpoints import router as issuer_router
 from payment_endpoints import router as payment_router
@@ -1502,7 +1503,7 @@ async def confirm_password_reset(body: ResetPasswordReq, db=Depends(get_db)):
 # ---------- User Profile Data Endpoints ----------
 @app.get(f"{API}/user/profile-data", response_model=UserProfileDataResp)
 async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_db)):
-    """Get user's profile data (email, instagram, etc.)"""
+    """Get user's profile data (email, instagram, etc.) - decrypts sensitive fields"""
     if not user.get("did"):
         raise HTTPException(status_code=400, detail="no_did")
     
@@ -1516,9 +1517,14 @@ async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_
     
     try:
         profile_data = json.loads(profile["profile_data"])
-        return UserProfileDataResp(ok=True, profile_data=profile_data)
+        
+        # Decrypt sensitive fields
+        encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
+        decrypted_data = encryptor.decrypt_profile_data(profile_data)
+        
+        return UserProfileDataResp(ok=True, profile_data=decrypted_data)
     except Exception as e:
-        print(f"Error parsing profile data: {e}")
+        print(f"Error parsing/decrypting profile data: {e}")
         return UserProfileDataResp(ok=True, profile_data={})
 
 
@@ -1528,12 +1534,16 @@ async def save_user_profile_data(
     user=Depends(_get_current_user),
     db=Depends(get_db)
 ):
-    """Save user's profile data"""
+    """Save user's profile data - encrypts sensitive fields (passwords, etc.)"""
     if not user.get("did"):
         raise HTTPException(status_code=400, detail="no_did")
     
+    # Encrypt sensitive fields before saving
+    encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
+    encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
+    
     now = int(time.time())
-    profile_json = json.dumps(body.profile_data)
+    profile_json = json.dumps(encrypted_data)
     
     # Check if profile exists
     existing = await db.execute_fetchone(
@@ -1553,4 +1563,6 @@ async def save_user_profile_data(
         )
     
     await db.commit()
+    
+    # Return decrypted data to client (same as what they sent)
     return UserProfileDataResp(ok=True, profile_data=body.profile_data)

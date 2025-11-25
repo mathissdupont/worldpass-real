@@ -639,6 +639,72 @@ export default function Settings() {
         </div>
       </Section>
 
+      {/* Browser Extension */}
+      <Section
+        title="Browser Extension"
+        desc="Connect WorldPass AutoFill extension for password auto-fill on websites"
+        icon={
+          <svg className="h-5 w-5 text-[color:var(--brand)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 text-3xl">🔐</div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-[color:var(--text)] mb-1">WorldPass AutoFill</h4>
+                <p className="text-xs text-[color:var(--muted)] mb-3">
+                  Install our browser extension to automatically fill passwords on Instagram, Twitter, GitHub and more.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <a 
+                    href="/extension" 
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--brand)] text-white text-sm hover:opacity-90 transition-opacity"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download Extension
+                  </a>
+                  <button 
+                    onClick={() => {
+                      const token = getToken();
+                      if (token) {
+                        // Copy token to clipboard for manual extension setup
+                        navigator.clipboard.writeText(token);
+                        setToast({ type: 'ok', text: 'Token copied! Paste in extension settings.' });
+                        setTimeout(() => setToast(null), 3000);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)] text-sm hover:bg-[color:var(--panel-2)] transition-colors"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                    </svg>
+                    Copy Token
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-xs text-[color:var(--muted)] space-y-1">
+            <p>• Extension syncs your passwords securely from WorldPass</p>
+            <p>• Passwords are encrypted on server with Fernet encryption</p>
+            <p>• Works on Chrome, Firefox, and Edge</p>
+            <p>• Auto-fills login forms on supported websites</p>
+          </div>
+        </div>
+      </Section>
+
       {/* Preferences */}
       <Section
         title={t('general_settings')}

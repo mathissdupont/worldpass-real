@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     VC_ENCRYPTION_KEY: str = os.getenv("VC_ENCRYPTION_KEY", "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE=")
     
+    # Profile Data Encryption - Used to encrypt sensitive profile data (passwords, etc.)
+    # Same format as VC_ENCRYPTION_KEY
+    PROFILE_ENCRYPTION_KEY: str = os.getenv("PROFILE_ENCRYPTION_KEY", os.getenv("VC_ENCRYPTION_KEY", "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE="))
+    
     # Public URL for email links (Frontend URL)
     APP_URL: str = os.getenv("APP_URL", "http://localhost:5173")
     
@@ -60,6 +64,9 @@ class Settings(BaseSettings):
         
         if self.VC_ENCRYPTION_KEY == "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE=":
             issues.append("⚠️  VC_ENCRYPTION_KEY is using default value")
+        
+        if self.PROFILE_ENCRYPTION_KEY == "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE=":
+            issues.append("⚠️  PROFILE_ENCRYPTION_KEY is using default value")
         
         if self.PAYMENT_WEBHOOK_SECRET == "mock_webhook_secret_change_in_production":
             issues.append("⚠️  PAYMENT_WEBHOOK_SECRET is using default value")
