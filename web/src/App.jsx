@@ -18,7 +18,7 @@ import IssuerLogin from "./pages/issuer/Login";
 import IssuerConsole from "./pages/issuer/ConsoleNew";
 import IssuerDashboard from "./pages/issuer/Dashboard";
 import IssuerCredentials from "./pages/issuer/Credentials";
-import IssuerTemplates from "./pages/issuer/Templates";
+import IssuerTemplates from "./pages/issuer/console/Templates";
 import IssuerSettings from "./pages/issuer/Settings";
 import IssuerWebhooks from "./pages/issuer/Webhooks";
 import IssuerLayout from "./components/IssuerLayout";
@@ -105,11 +105,7 @@ export default function App() {
         />
         <Route
           path="/issuer/templates"
-          element={
-            <IssuerLayout>
-              <IssuerTemplates />
-            </IssuerLayout>
-          }
+          element={<IssuerTemplates />}
         />
         <Route
           path="/issuer/webhooks"

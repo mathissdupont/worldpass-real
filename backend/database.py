@@ -322,7 +322,9 @@ async def _run_migrations(conn: aiosqlite.Connection):
         ("updated_at", "ALTER TABLE issued_vcs ADD COLUMN updated_at INTEGER"),
         ("payload_hash", "ALTER TABLE issued_vcs ADD COLUMN payload_hash TEXT"),
         ("template_id", "ALTER TABLE issued_vcs ADD COLUMN template_id INTEGER REFERENCES issuer_templates(id) ON DELETE SET NULL"),
-    ]    for column_name, alter_sql in issued_vcs_migrations:
+    ]
+    
+    for column_name, alter_sql in issued_vcs_migrations:
         if column_name not in issued_vcs_column_names:
             try:
                 await conn.execute(alter_sql)
