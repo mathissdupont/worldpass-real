@@ -82,25 +82,23 @@ export default function NavBar({ health, user, features }) {
   const navg = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Sadeleştirilmiş menü - kullanıcı odaklı
   const navItems = [
-    { to: "/account",           label: t('my_account'),         icon: "account" },
-    { to: "/profile",           label: "Profil Bilgileri",      icon: "profile" },
-    { to: "/verify",            label: t('verify_credential'),  icon: "verify" },
-    { to: "/credentials",       label: t('my_credentials'),     icon: "list" },
-    { to: "/present",           label: t('present_credential'), icon: "present" },
-    { to: "/settings",          label: t('settings'),           icon: "settings" },
-    { to: "/issuer/register",   label: t('issuer_register'),    icon: "shield",  roles: ["issuer"] },
-    { to: "/issuer/console",    label: t('issuer_console'),     icon: "issue",   roles: ["issuer"] },
-    { to: "/admin/issuers",     label: t('admin'),              icon: "admin",   roles: ["admin"] },
+    { to: "/account",           label: "Hesabım",                icon: "account" },
+    { to: "/credentials",       label: "Kimlik Bilgilerim",      icon: "list" },
+    { to: "/verify",            label: "Doğrula",                icon: "verify" },
+    { to: "/settings",          label: "Ayarlar",                icon: "settings" },
+    { to: "/issuer/console",    label: "Kuruluş Paneli",         icon: "shield",  roles: ["issuer"] },
+    { to: "/admin/issuers",     label: "Yönetici",               icon: "admin",   roles: ["admin"] },
   ];
 
   const leftMenu = authed
     ? navItems.filter(i => hasAccess(i, user, features))
     : [
-        {to:"/login",    label:t('user_login'),       icon:"login"},
-        {to:"/register", label:t('user_register'),    icon:"register"},
-        {to:"/issuer/login", label:t('issuer_login') || "Kurum Girişi", icon:"shield"},
-        {to:"/verify",   label:t('verify_credential'), icon:"verify"},
+        {to:"/login",        label:"Giriş",              icon:"login"},
+        {to:"/register",     label:"Kayıt Ol",           icon:"register"},
+        {to:"/issuer/login", label:"Kurum Girişi",       icon:"shield"},
+        {to:"/verify",       label:"Doğrula",            icon:"verify"},
       ];
 
   const logout = ()=>{
