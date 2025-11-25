@@ -163,7 +163,7 @@ export default function IssuerLayout({ children }) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 p-6 lg:p-8">
           {children}
         </main>
       </div>

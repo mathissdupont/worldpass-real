@@ -85,22 +85,78 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
-      <NavBar health={health} user={user} />
-      <div
-        className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 transition-all duration-300"
-        id="main"
-      >
-        <Routes>
-          <Route path="/" element={<Navigate to="/account" replace />} />
+      <Routes>
+        {/* Issuer Routes - Full page layout with their own navigation */}
+        <Route
+          path="/issuer/dashboard"
+          element={
+            <IssuerLayout>
+              <IssuerDashboard />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/credentials"
+          element={
+            <IssuerLayout>
+              <IssuerCredentials />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/templates"
+          element={
+            <IssuerLayout>
+              <IssuerTemplates />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/webhooks"
+          element={
+            <IssuerLayout>
+              <IssuerWebhooks />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/settings"
+          element={
+            <IssuerLayout>
+              <IssuerSettings />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/console"
+          element={
+            <IssuerLayout>
+              <IssuerConsole />
+            </IssuerLayout>
+          }
+        />
 
-          {/* Public */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/verifier" element={<Verifier />} />
-          {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
-          <Route path="/issuer/register" element={<IssuerRegister />} />
-          <Route path="/issuer/login" element={<IssuerLogin />} />
+        {/* All other routes with NavBar */}
+        <Route
+          path="*"
+          element={
+            <>
+              <NavBar health={health} user={user} />
+              <div
+                className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 transition-all duration-300"
+                id="main"
+              >
+                <Routes>
+                  <Route path="/" element={<Navigate to="/account" replace />} />
+
+                  {/* Public */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/verify" element={<Verify />} />
+                  <Route path="/verifier" element={<Verifier />} />
+                  {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
+                  <Route path="/issuer/register" element={<IssuerRegister />} />
+                  <Route path="/issuer/login" element={<IssuerLogin />} />
 
           {/* Protected (oturum + DID gerekli) */}
           <Route
@@ -194,72 +250,27 @@ export default function App() {
             }
           />
 
-          {/* Issuer Routes - Wrapped in IssuerLayout */}
-          <Route
-            path="/issuer/dashboard"
-            element={
-              <IssuerLayout>
-                <IssuerDashboard />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/issuer/credentials"
-            element={
-              <IssuerLayout>
-                <IssuerCredentials />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/issuer/templates"
-            element={
-              <IssuerLayout>
-                <IssuerTemplates />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/issuer/webhooks"
-            element={
-              <IssuerLayout>
-                <IssuerWebhooks />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/issuer/settings"
-            element={
-              <IssuerLayout>
-                <IssuerSettings />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/issuer/console"
-            element={
-              <IssuerLayout>
-                <IssuerConsole />
-              </IssuerLayout>
-            }
-          />
-          <Route
-            path="/admin/issuers"
-            element={
-              <RoleRoute user={user} roles="admin">
-                <ProtectedRoute>
-                  <AdminIssuers />
-                </ProtectedRoute>
-              </RoleRoute>
-            }
-          />
+                  <Route
+                    path="/admin/issuers"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminIssuers />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
 
-          <Route
-            path="*"
-            element={<div className="p-4">{t("app.not_found")}</div>}
-          />
-        </Routes>
-      </div>
+                  <Route
+                    path="*"
+                    element={<div className="p-4">{t("app.not_found")}</div>}
+                  />
+                </Routes>
+              </div>
+            </>
+          }
+        />
+      </Routes>
     </div>
   );
 }

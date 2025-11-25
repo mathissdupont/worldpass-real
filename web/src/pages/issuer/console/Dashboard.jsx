@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import IssuerLayout from "@/components/issuer/IssuerLayout";
 import StatCard from "@/components/issuer/StatCard";
 import DataTable from "@/components/issuer/DataTable";
 import { getIssuerProfile, getIssuerStats, listIssuerCredentials } from "@/lib/api";
@@ -125,13 +124,12 @@ export default function IssuerDashboard() {
   ];
 
   return (
-    <IssuerLayout issuer={issuer}>
-      <div className="space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Overview of your issuer activity</p>
-        </div>
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-[color:var(--text)]">Dashboard</h1>
+        <p className="text-[color:var(--muted)] mt-1">Overview of your issuer activity</p>
+      </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -213,6 +211,6 @@ export default function IssuerDashboard() {
           </div>
         </div>
       </div>
-    </IssuerLayout>
+    </div>
   );
 }

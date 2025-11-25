@@ -1,7 +1,7 @@
 // src/pages/issuer/Dashboard.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getIssuerProfile, getIssuerStats } from "@/lib/api";
+import { getIssuerStats } from "@/lib/api";
 
 function StatCard({ title, value, subtitle, icon, trend, trendLabel, color = "blue" }) {
   const colorMap = {
@@ -98,51 +98,28 @@ function RecentActivity({ activities }) {
 
 export default function IssuerDashboard() {
   const navigate = useNavigate();
-  const [issuer, setIssuer] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("issuer_token");
-    if (!token) {
-      navigate("/issuer/login");
-      return;
-    }
-
-    Promise.all([
-      getIssuerProfile(),
-      getIssuerStats()
-    ])
-      .then(([profileResp, statsResp]) => {
-        setIssuer(profileResp.issuer);
+    getIssuerStats()
+      .then(statsResp => {
         setStats(statsResp);
         setLoading(false);
       })
       .catch(err => {
         console.error(err);
-        localStorage.removeItem("issuer_token");
-        navigate("/issuer/login");
+        setLoading(false);
       });
-  }, [navigate]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[color:var(--brand)] border-r-transparent"></div>
-          <div className="mt-4 text-[color:var(--muted)]">Yükleniyor...</div>
-        </div>
-      </div>
-    );
-  }
+  }, []);
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-[color:var(--text)]">
-            Hoş geldin, {issuer?.name || "Kuruluş"} 👋
+            Dashboard 👋
           </h1>
           <p className="text-sm text-[color:var(--muted)] mt-1">
             Dijital kimlik bilgisi yönetim paneliniz
