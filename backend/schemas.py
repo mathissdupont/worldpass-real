@@ -99,6 +99,7 @@ class IssuerListItem(BaseModel):
 class IssuerIssueReq(BaseModel):
     api_key: Optional[str] = None
     vc: Dict[str, Any]  # imzalanmış VC (issuer kendi anahtarıyla imzalar) veya imzasız (ileride HSM modülü ile imzalatılabilir)
+    template_id: Optional[int] = None  # optional reference to issuer_templates for validation
 
 class IssuerIssueResp(BaseModel):
     ok: bool
@@ -395,3 +396,5 @@ class RecipientLookupResp(BaseModel):
     vc_id: Optional[str] = None
     subject_did: Optional[str] = None
     vc_payload: Optional[Dict[str, Any]] = None
+    payload_hash: Optional[str] = None
+    template_id: Optional[int] = None

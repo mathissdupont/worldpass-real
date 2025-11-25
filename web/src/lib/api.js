@@ -328,17 +328,21 @@ export async function rotateIssuerApiKey() {
   return r.json();
 }
 
-export async function issueCredential(vc) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+export async function issueCredential(api_key, vc, token, template_id) {
+  const authToken = token || getToken();
+  if (!authToken && !api_key) throw new Error('Not authenticated');
+  
+  const body = { vc };
+  if (api_key) body.api_key = api_key;
+  if (template_id) body.template_id = template_id;
   
   const r = await fetch('/api/issuer/issue', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Token': token
+      'X-Token': authToken
     },
-    body: JSON.stringify({ vc })
+    body: JSON.stringify(body)
   });
   if (!r.ok) {
     const err = await r.json();

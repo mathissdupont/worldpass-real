@@ -970,6 +970,37 @@ async def admin_approve_issuer(body: ApproveIssuerReq, db=Depends(get_db)):
     return ApproveIssuerResp(api_key=api_key)
 
 
+@app.post(
+    f"{API}/admin/migrations/backfill-payload-hash",
+    dependencies=[Depends(_require_admin)],
+)
+async def admin_backfill_payload_hash(db=Depends(get_db)):
+    """Admin endpoint: backfill payload_hash for issued_vcs with null hash"""
+    rows = await db.execute_fetchall(
+        "SELECT id, payload FROM issued_vcs WHERE payload_hash IS NULL OR payload_hash = ''"
+    )
+    
+    updated = 0
+    for row in rows:
+        try:
+            payload_json = row["payload"]
+            # Recompute canonical hash
+            vc = json.loads(payload_json)
+            canonical = json.dumps(vc, sort_keys=True, separators=(",", ":"))
+            payload_hash = hashlib.sha256(canonical.encode()).hexdigest()
+            
+            await db.execute(
+                "UPDATE issued_vcs SET payload=?, payload_hash=? WHERE id=?",
+                (canonical, payload_hash, row["id"])
+            )
+            updated += 1
+        except Exception as e:
+            print(f"Failed to backfill row {row['id']}: {e}")
+    
+    await db.commit()
+    return {"ok": True, "updated": updated}
+
+
 async def _get_approved_issuer_by_key(db, api_key: str):
     h = _sha256(api_key)
     row = await db.execute_fetchone(
@@ -1002,13 +1033,36 @@ async def issuer_issue(
     if not issuer:
         raise HTTPException(status_code=401, detail="authentication_required")
         
-        # Allow issuance if issuer is fully approved OR domain verified (status 'verified')
-        if issuer["status"] not in ("approved", "verified"):
-            raise HTTPException(status_code=403, detail="issuer_not_authorized")
+    # Allow issuance if issuer is fully approved OR domain verified (status 'verified')
+    if issuer["status"] not in ("approved", "verified"):
+        raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
     vc = body.vc
     if vc.get("issuer") != (issuer["did"] or ""):
         raise HTTPException(status_code=400, detail="issuer_did_mismatch")
+
+    # Optional template validation
+    template_id = body.template_id
+    if template_id:
+        template = await db.execute_fetchone(
+            "SELECT * FROM issuer_templates WHERE id=? AND issuer_id=? AND is_active=1",
+            (template_id, issuer["id"])
+        )
+        if not template:
+            raise HTTPException(status_code=404, detail="template_not_found_or_inactive")
+        
+        # Basic validation: check vc_type matches
+        schema_json = json.loads(template["schema_json"])
+        expected_type = template["vc_type"]
+        vc_types = vc.get("type", [])
+        if isinstance(vc_types, list):
+            if expected_type not in vc_types:
+                raise HTTPException(status_code=400, detail=f"vc_type_mismatch: expected {expected_type}")
+        else:
+            if vc_types != expected_type:
+                raise HTTPException(status_code=400, detail=f"vc_type_mismatch: expected {expected_type}")
+        
+        # TODO: Deeper JSON schema validation using jsonschema library (optional enhancement)
 
     jti = vc.get("jti") or f"vc-{int(time.time())}"
     now = int(time.time())
@@ -1029,8 +1083,8 @@ async def issuer_issue(
         credential_type = str(vc_types) if vc_types else "Unknown"
 
     await db.execute(
-        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, payload_hash, credential_type, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, payload_hash, credential_type, template_id, created_at, updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?)",
         (
             jti,
             issuer["id"],
@@ -1039,6 +1093,7 @@ async def issuer_issue(
             payload_json,
             payload_hash,
             credential_type,
+            template_id,
             now,
             now,
         ),
@@ -1085,6 +1140,20 @@ async def issuer_issue(
                 print(f"Failed to auto-add VC to user wallet: {e}")
 
     await db.commit()
+    
+    # Dispatch webhook event (async, non-blocking)
+    try:
+        await _dispatch_webhooks(db, issuer["id"], "credential.issued", {
+            "vc_id": jti,
+            "subject_did": subject_did,
+            "recipient_id": recipient_id,
+            "credential_type": credential_type,
+            "template_id": template_id,
+            "issued_at": now
+        })
+    except Exception as e:
+        print(f"Webhook dispatch failed: {e}")
+    
     return IssuerIssueResp(ok=True, vc_id=jti, recipient_id=recipient_id)
 
 
@@ -1126,6 +1195,16 @@ async def issuer_revoke(
         (now, body.vc_id),
     )
     await db.commit()
+    
+    # Dispatch webhook event for revocation
+    try:
+        await _dispatch_webhooks(db, issuer["id"], "credential.revoked", {
+            "vc_id": body.vc_id,
+            "revoked_at": now
+        })
+    except Exception as e:
+        print(f"Webhook dispatch failed: {e}")
+    
     return IssuerRevokeResp(status="revoked")
 
 
@@ -1153,7 +1232,7 @@ async def get_issuer_credentials(
     # Get all issued credentials
     rows = await db.execute_fetchall(
         """
-        SELECT vc_id, subject_did, recipient_id, credential_type, created_at, updated_at
+        SELECT vc_id, subject_did, recipient_id, credential_type, payload_hash, template_id, created_at, updated_at
         FROM issued_vcs 
         WHERE issuer_id=? 
         ORDER BY created_at DESC
@@ -1168,6 +1247,8 @@ async def get_issuer_credentials(
             "subject_did": row["subject_did"],
             "recipient_id": row["recipient_id"],
             "credential_type": row["credential_type"],
+            "payload_hash": row["payload_hash"],
+            "template_id": row["template_id"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"]
         })
@@ -1182,6 +1263,64 @@ def _sha256(s: str) -> str:
 
 def _gen_api_key() -> str:
   return base64.urlsafe_b64encode(os.urandom(24)).decode().rstrip("=")
+
+
+async def _dispatch_webhooks(db, issuer_id: int, event_type: str, payload: dict):
+    """Dispatch webhook events to registered URLs (non-blocking)"""
+    webhooks = await db.execute_fetchall(
+        "SELECT * FROM issuer_webhooks WHERE issuer_id=? AND event_type=? AND is_active=1",
+        (issuer_id, event_type)
+    )
+    
+    for webhook in webhooks:
+        try:
+            # Build webhook payload
+            webhook_payload = {
+                "event": event_type,
+                "timestamp": int(time.time()),
+                "data": payload
+            }
+            
+            # Optional: HMAC signature if secret exists
+            signature = None
+            if webhook["secret"]:
+                import hmac
+                message = json.dumps(webhook_payload, sort_keys=True)
+                signature = hmac.new(
+                    webhook["secret"].encode(),
+                    message.encode(),
+                    hashlib.sha256
+                ).hexdigest()
+            
+            # Fire-and-forget POST (in production use async task queue like Celery)
+            headers = {"Content-Type": "application/json"}
+            if signature:
+                headers["X-Webhook-Signature"] = signature
+            
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(webhook["url"], json=webhook_payload, headers=headers)
+                
+                # Update delivery stats
+                now = int(time.time())
+                if resp.status_code >= 200 and resp.status_code < 300:
+                    await db.execute(
+                        "UPDATE issuer_webhooks SET last_delivery=?, failure_count=0 WHERE id=?",
+                        (now, webhook["id"])
+                    )
+                else:
+                    await db.execute(
+                        "UPDATE issuer_webhooks SET failure_count=failure_count+1 WHERE id=?",
+                        (webhook["id"],)
+                    )
+                await db.commit()
+        except Exception as e:
+            print(f"Webhook {webhook['id']} delivery failed: {e}")
+            # Increment failure count
+            await db.execute(
+                "UPDATE issuer_webhooks SET failure_count=failure_count+1 WHERE id=?",
+                (webhook["id"],)
+            )
+            await db.commit()
 
 
 @app.post(f"{API}/status/revoke", response_model=RevokeResp)
@@ -1373,7 +1512,7 @@ async def delete_template(request: Request, template_id: int, user=Depends(_get_
 async def lookup_recipient(recipient_id: str, db=Depends(get_db)):
     """Lookup a VC by recipient ID (for QR/NFC scanning)"""
     row = await db.execute_fetchone(
-        "SELECT vc_id, subject_did, payload FROM issued_vcs WHERE recipient_id=?",
+        "SELECT vc_id, subject_did, payload, payload_hash, template_id FROM issued_vcs WHERE recipient_id=?",
         (recipient_id,)
     )
     
@@ -1386,7 +1525,9 @@ async def lookup_recipient(recipient_id: str, db=Depends(get_db)):
             found=True,
             vc_id=row["vc_id"],
             subject_did=row["subject_did"],
-            vc_payload=vc_payload
+            vc_payload=vc_payload,
+            payload_hash=row["payload_hash"],
+            template_id=row["template_id"]
         )
     except Exception:
         return RecipientLookupResp(found=False)

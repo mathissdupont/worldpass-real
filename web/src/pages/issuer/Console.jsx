@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useIdentity } from "@/lib/identityContext";
 import { b64u, ed25519Sign, b64uToBytes } from "@/lib/crypto";
-import { getIssuerProfile, rotateIssuerApiKey, issueCredential, revokeCredential } from "@/lib/api";
+import { getIssuerProfile, rotateIssuerApiKey, issueCredential, revokeCredential, listIssuerTemplates } from "@/lib/api";
 
 import { parseWPML, renderWPML } from "@/lib/wpml";
 import { t } from "@/lib/i18n";
@@ -58,6 +58,11 @@ function Label({ text, required }) {
 }
 
 function Select({ value, onChange, options=[], error, placeholder=t("issuer.console.select_placeholder") }) {
+  // Support both simple string[] and {value,label}[] formats
+  const optionsList = options.map(o => 
+    typeof o === 'string' ? { value: o, label: o } : o
+  );
+  
   return (
     <div className="relative">
       <select
@@ -71,7 +76,7 @@ function Select({ value, onChange, options=[], error, placeholder=t("issuer.cons
         aria-invalid={!!error}
       >
         <option value="">{placeholder}</option>
-        {options.map(v=> <option key={v} value={v}>{v}</option>)}
+        {optionsList.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
       <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9l6 6 6-6"/></svg>
     </div>
@@ -161,11 +166,23 @@ export default function IssuerConsole(){
       .then(resp => {
         setIssuer(resp.issuer);
         setLoadingProfile(false);
+        
+        // Load templates
+        setLoadingTemplates(true);
+        return listIssuerTemplates();
+      })
+      .then(resp => {
+        setAvailableTemplates(resp.templates || []);
+        setLoadingTemplates(false);
       })
       .catch(err => {
         console.error(err);
-        localStorage.removeItem("issuer_token");
-        navigate("/issuer/login");
+        if (err.message.includes('authenticated')) {
+          localStorage.removeItem("issuer_token");
+          navigate("/issuer/login");
+        } else {
+          setLoadingTemplates(false);
+        }
       });
   }, [navigate]);
 
@@ -201,6 +218,11 @@ export default function IssuerConsole(){
   const [wptParsed, setWptParsed] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  
+  // template selection (issuer_templates integration)
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [availableTemplates, setAvailableTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   // template meta
   const [tplKey,setTplKey] = useState("studentCard");
@@ -404,7 +426,7 @@ export default function IssuerConsole(){
       };
       
       const token = localStorage.getItem("issuer_token");
-      const response = await issueCredential(null, signed, token);
+      const response = await issueCredential(null, signed, token, selectedTemplateId);
       
       setOut(JSON.stringify(signed, null, 2));
       
@@ -515,11 +537,42 @@ export default function IssuerConsole(){
             </div>
             <p className="text-xs text-[color:var(--muted)] mt-1">{t('org_console.template_format_desc')}</p>
 
-            {/* meta */}
+            {/* meta + template selector */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
               <div><Label text={t('org_console.template_key')}/><Input value={tplKey} onChange={e=>setTplKey(e.target.value)} /></div>
               <div><Label text={t('org_console.template_name')}/><Input value={tplName} onChange={e=>setTplName(e.target.value)} /></div>
             </div>
+            
+            {/* Template Selector */}
+            {availableTemplates.length > 0 && (
+              <div className="mt-2">
+                <Label text="Select Template (Optional)" />
+                <Select 
+                  value={selectedTemplateId || ""} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setSelectedTemplateId(val ? parseInt(val) : null);
+                    // Optionally load template schema into tplBody
+                    if (val) {
+                      const tpl = availableTemplates.find(t => t.id === parseInt(val));
+                      if (tpl && tpl.schema_json) {
+                        try {
+                          const schema = JSON.parse(tpl.schema_json);
+                          setTplBody(JSON.stringify(schema, null, 2));
+                          setTplName(tpl.name);
+                          setMode("manual");
+                        } catch (e) {
+                          console.error("Failed to parse template schema:", e);
+                        }
+                      }
+                    }
+                  }}
+                  options={availableTemplates.map(t => ({ value: t.id, label: t.name }))}
+                  placeholder="No template (manual mode)"
+                />
+              </div>
+            )}
+            {loadingTemplates && <p className="text-xs text-[color:var(--muted)] mt-2">Loading templates...</p>}
 
             {/* toolbar */}
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
