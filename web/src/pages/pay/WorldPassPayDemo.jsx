@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSession } from '../lib/auth';
-import { createPaymentIntent } from '../lib/api';
+import { getSession } from '../../lib/auth';
+import { createPaymentIntent } from '../../lib/api';
 
 export default function WorldPassPayDemo() {
   const navigate = useNavigate();

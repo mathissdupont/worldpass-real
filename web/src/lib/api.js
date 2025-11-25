@@ -254,6 +254,15 @@ export async function deleteIssuerWebhook(token, webhookId) {
   return r.json();
 }
 
+export async function testIssuerWebhook(token, webhookId) {
+  const r = await fetch(`/api/issuer/webhooks/${webhookId}/test`, {
+    method: 'POST',
+    headers: { 'X-Token': token }
+  });
+  if (!r.ok) throw new Error('test_webhook_failed');
+  return r.json();
+}
+
 export async function verifyIssuerDomain(issuerId, method) {
   const r = await fetch('/api/issuer/verify-domain', {
     method: 'POST',
