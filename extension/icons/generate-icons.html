@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate WorldPass Icons</title>
+</head>
+<body>
+    <h1>WorldPass Extension Icons Generator</h1>
+    <button onclick="generateIcons()">Generate All Icons</button>
+    <div id="output"></div>
+    
+    <script>
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Gradient background (purple gradient)
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw white lock icon
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = size / 16;
+            
+            // Lock body (rectangle)
+            const lockWidth = size * 0.4;
+            const lockHeight = size * 0.35;
+            const lockX = (size - lockWidth) / 2;
+            const lockY = size * 0.5;
+            
+            ctx.fillRect(lockX, lockY, lockWidth, lockHeight);
+            
+            // Lock shackle (arc)
+            const shackleRadius = size * 0.15;
+            const shackleCenterX = size / 2;
+            const shackleCenterY = lockY - shackleRadius * 0.3;
+            
+            ctx.beginPath();
+            ctx.arc(shackleCenterX, shackleCenterY, shackleRadius, Math.PI, 0, false);
+            ctx.stroke();
+            
+            // Keyhole (small circle)
+            const keyholeRadius = size * 0.06;
+            const keyholeCenterX = size / 2;
+            const keyholeCenterY = lockY + lockHeight * 0.4;
+            
+            ctx.fillStyle = '#667eea';
+            ctx.beginPath();
+            ctx.arc(keyholeCenterX, keyholeCenterY, keyholeRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Small keyhole extension (rectangle)
+            const keyholeExtWidth = size * 0.04;
+            const keyholeExtHeight = size * 0.08;
+            ctx.fillRect(
+                keyholeCenterX - keyholeExtWidth / 2,
+                keyholeCenterY,
+                keyholeExtWidth,
+                keyholeExtHeight
+            );
+            
+            return canvas.toDataURL('image/png');
+        }
+        
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = dataUrl;
+            link.click();
+        }
+        
+        function generateIcons() {
+            const sizes = [
+                { size: 16, name: 'icon16.png' },
+                { size: 48, name: 'icon48.png' },
+                { size: 128, name: 'icon128.png' }
+            ];
+            
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>Generated Icons (right-click to save):</h2>';
+            
+            sizes.forEach(({ size, name }) => {
+                const dataUrl = generateIcon(size);
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.alt = name;
+                img.title = name;
+                img.style.margin = '10px';
+                img.style.border = '2px solid #ccc';
+                output.appendChild(img);
+                
+                // Auto download
+                setTimeout(() => downloadImage(dataUrl, name), 100);
+            });
+        }
+    </script>
+</body>
+</html>
