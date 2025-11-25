@@ -1,14 +1,19 @@
 // Modern Issuer Console - Clean & Responsive
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getIssuerProfile, issueCredential, getIssuedCredentials, listIssuerTemplates } from '../../lib/api';
+import {
+  getIssuerProfile,
+  issueCredential,
+  getIssuedCredentials,
+  listIssuerTemplates,
+} from '../../lib/api';
 
 export default function IssuerConsole() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('issue'); // 'issue' | 'issued' | 'templates'
-  
+  const [activeTab, setActiveTab] = useState('issue'); // 'issue' | 'issued'
+
   // Issue form
   const [recipientDID, setRecipientDID] = useState('');
   const [credentialType, setCredentialType] = useState('');
@@ -16,12 +21,12 @@ export default function IssuerConsole() {
   const [issuing, setIssuing] = useState(false);
   const [issueError, setIssueError] = useState('');
   const [issueSuccess, setIssueSuccess] = useState('');
-  
+
   // Templates
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
-  
+
   // Issued credentials
   const [issuedVCs, setIssuedVCs] = useState([]);
   const [loadingVCs, setLoadingVCs] = useState(false);
@@ -74,6 +79,7 @@ export default function IssuerConsole() {
     if (activeTab === 'issued' && issuedVCs.length === 0) {
       loadIssuedCredentials();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   async function handleIssueCredential(e) {
@@ -81,7 +87,6 @@ export default function IssuerConsole() {
     setIssueError('');
     setIssueSuccess('');
 
-    // Validation
     if (!recipientDID.trim()) {
       setIssueError('Recipient DID is required');
       return;
@@ -91,7 +96,6 @@ export default function IssuerConsole() {
       return;
     }
 
-    // Parse credential data
     let parsedData;
     try {
       parsedData = JSON.parse(credentialData);
@@ -100,32 +104,39 @@ export default function IssuerConsole() {
       return;
     }
 
+    // issuer DID'i profilden çek
+    const issuerDid =
+      profile?.issuer_did || profile?.did || profile?.issuer?.did || null;
+
+    if (!issuerDid) {
+      setIssueError('Issuer DID not found in profile');
+      return;
+    }
+
     try {
       setIssuing(true);
 
-      // Build VC
       const vc = {
         '@context': ['https://www.w3.org/2018/credentials/v1'],
         type: ['VerifiableCredential', credentialType],
-        issuer: issuer.did,
+        issuer: issuerDid,
         issuanceDate: new Date().toISOString(),
         credentialSubject: {
           id: recipientDID,
-          ...parsedData
+          ...parsedData,
         },
-        jti: `vc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        jti: `vc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       };
 
       const token = localStorage.getItem('issuer_token');
       await issueCredential(null, vc, token, selectedTemplate?.id || null);
-      
+
       setIssueSuccess('Credential issued successfully!');
       setRecipientDID('');
       setCredentialType('');
       setCredentialData('{}');
       setSelectedTemplate(null);
-      
-      // Reload issued credentials if on that tab
+
       if (activeTab === 'issued') {
         loadIssuedCredentials();
       }
@@ -141,7 +152,7 @@ export default function IssuerConsole() {
     return (
       <div className="min-h-screen bg-[color:var(--background)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--brand)] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--brand)] mx-auto mb-4" />
           <p className="text-[color:var(--muted)]">Loading...</p>
         </div>
       </div>
@@ -153,7 +164,7 @@ export default function IssuerConsole() {
       <div className="min-h-screen bg-[color:var(--background)] flex items-center justify-center">
         <div className="text-center">
           <p className="text-[color:var(--text)] mb-4">Not authenticated</p>
-          <button 
+          <button
             onClick={() => navigate('/issuer/login')}
             className="px-4 py-2 bg-[color:var(--brand)] text-white rounded-lg"
           >
@@ -171,12 +182,18 @@ export default function IssuerConsole() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-[color:var(--text)]">Issuer Console</h1>
-              <p className="text-sm text-[color:var(--muted)] mt-1">{profile.org_name}</p>
+              <h1 className="text-2xl font-bold text-[color:var(--text)]">
+                Issuer Console
+              </h1>
+              <p className="text-sm text-[color:var(--muted)] mt-1">
+                {profile.org_name}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
-                <span className="text-xs text-emerald-400 font-medium">Active</span>
+                <span className="text-xs text-emerald-400 font-medium">
+                  Active
+                </span>
               </div>
               <button
                 onClick={() => navigate('/account')}
@@ -220,7 +237,6 @@ export default function IssuerConsole() {
               Manage Templates →
             </button>
           </div>
-          </div>
         </div>
       </div>
 
@@ -229,8 +245,10 @@ export default function IssuerConsole() {
         {activeTab === 'issue' && (
           <div className="max-w-3xl mx-auto">
             <div className="bg-[color:var(--panel)] rounded-xl border border-[color:var(--border)] p-6 sm:p-8">
-              <h2 className="text-xl font-semibold text-[color:var(--text)] mb-6">Issue New Credential</h2>
-              
+              <h2 className="text-xl font-semibold text-[color:var(--text)] mb-6">
+                Issue New Credential
+              </h2>
+
               <form onSubmit={handleIssueCredential} className="space-y-6">
                 {/* Template Selection */}
                 {templates.length > 0 && (
@@ -241,37 +259,46 @@ export default function IssuerConsole() {
                     <select
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
-                        const template = templates.find(t => t.id === parseInt(e.target.value));
+                        const id = e.target.value;
+                        const template = templates.find(
+                          (t) => String(t.id) === id,
+                        );
                         setSelectedTemplate(template || null);
                         if (template) {
                           setCredentialType(template.vc_type);
-                          // Pre-fill with template schema if available
-                          if (template.schema_json || template.schema_data) {
-                            const schema = template.schema_json || template.schema_data;
+                          const schema =
+                            template.schema_json || template.schema_data;
+                          if (schema && schema.properties) {
                             const example = {};
-                            if (schema.properties) {
-                              Object.keys(schema.properties).forEach(key => {
-                                example[key] = '';
-                              });
-                            }
-                            setCredentialData(JSON.stringify(example, null, 2));
+                            Object.keys(schema.properties).forEach((key) => {
+                              example[key] = '';
+                            });
+                            setCredentialData(
+                              JSON.stringify(example, null, 2),
+                            );
                           }
                         }
                       }}
                       className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all"
                     >
                       <option value="">No template (manual entry)</option>
-                      {templates.filter(t => t.is_active).map(template => (
-                        <option key={template.id} value={template.id}>
-                          {template.name} - {template.vc_type}
-                        </option>
-                      ))}
+                      {templates
+                        .filter((t) => t.is_active)
+                        .map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} - {template.vc_type}
+                          </option>
+                        ))}
                     </select>
                     {selectedTemplate && (
                       <div className="mt-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <p className="text-xs text-blue-400">
-                          ✓ Using template: <span className="font-semibold">{selectedTemplate.name}</span>
-                          {selectedTemplate.description && ` - ${selectedTemplate.description}`}
+                          ✓ Using template:{' '}
+                          <span className="font-semibold">
+                            {selectedTemplate.name}
+                          </span>
+                          {selectedTemplate.description &&
+                            ` - ${selectedTemplate.description}`}
                         </p>
                       </div>
                     )}
@@ -322,7 +349,7 @@ export default function IssuerConsole() {
                     onChange={(e) => setCredentialData(e.target.value)}
                     rows={8}
                     className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all font-mono text-sm"
-                    placeholder='{\n  "name": "John Doe",\n  "degree": "Bachelor of Science",\n  "graduationDate": "2024-05-15"\n}'
+                    placeholder={`{\n  "name": "John Doe",\n  "degree": "Bachelor of Science",\n  "graduationDate": "2024-05-15"\n}`}
                   />
                   <p className="text-xs text-[color:var(--muted)] mt-1">
                     Additional data to include in credentialSubject
@@ -358,7 +385,9 @@ export default function IssuerConsole() {
         {activeTab === 'issued' && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-[color:var(--text)]">Issued Credentials</h2>
+              <h2 className="text-xl font-semibold text-[color:var(--text)]">
+                Issued Credentials
+              </h2>
               <button
                 onClick={loadIssuedCredentials}
                 disabled={loadingVCs}
@@ -370,12 +399,16 @@ export default function IssuerConsole() {
 
             {loadingVCs ? (
               <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[color:var(--brand)] mx-auto mb-4"></div>
-                <p className="text-[color:var(--muted)]">Loading credentials...</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[color:var(--brand)] mx-auto mb-4" />
+                <p className="text-[color:var(--muted)]">
+                  Loading credentials...
+                </p>
               </div>
             ) : issuedVCs.length === 0 ? (
               <div className="text-center py-12 bg-[color:var(--panel)] rounded-xl border border-[color:var(--border)]">
-                <p className="text-[color:var(--muted)]">No credentials issued yet</p>
+                <p className="text-[color:var(--muted)]">
+                  No credentials issued yet
+                </p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -399,11 +432,14 @@ export default function IssuerConsole() {
                             <span className="font-medium">ID:</span> {vc.vc_id}
                           </p>
                           <p className="text-[color:var(--muted)]">
-                            <span className="font-medium">Subject:</span> {vc.subject_did || 'N/A'}
+                            <span className="font-medium">Subject:</span>{' '}
+                            {vc.subject_did || 'N/A'}
                           </p>
                           <p className="text-[color:var(--muted)]">
                             <span className="font-medium">Issued:</span>{' '}
-                            {new Date(vc.created_at * 1000).toLocaleDateString()}
+                            {new Date(
+                              vc.created_at * 1000,
+                            ).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
