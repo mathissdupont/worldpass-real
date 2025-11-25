@@ -7,6 +7,9 @@
 web/node_modules/
 web/.vite/
 web/dist/
+mobile/node_modules/
+mobile/dist/
+mobile/.expo/
 
 # Python
 __pycache__/
@@ -25,3 +28,7 @@ __pycache__/
 !web/package.json
 !web/package-lock.json
 !web/src/i18n/*.json
+!mobile/package.json
+!mobile/package-lock.json
+!mobile/app.json
+!mobile/tsconfig.json
