@@ -123,7 +123,8 @@ CREATE TABLE IF NOT EXISTS issued_vcs (
   issuer_id INTEGER,
   subject_did TEXT,
   recipient_id TEXT,            -- unique ID for the recipient (for QR/NFC scanning)
-  payload TEXT,                 -- raw VC JSON
+  payload TEXT,                 -- raw VC JSON (canonical, sorted keys)
+  payload_hash TEXT,            -- SHA256(payload canonical JSON)
   credential_type TEXT,         -- extracted from payload for filtering
   created_at INTEGER NOT NULL,
   updated_at INTEGER,
@@ -317,6 +318,7 @@ async def _run_migrations(conn: aiosqlite.Connection):
     issued_vcs_migrations = [
         ("credential_type", "ALTER TABLE issued_vcs ADD COLUMN credential_type TEXT"),
         ("updated_at", "ALTER TABLE issued_vcs ADD COLUMN updated_at INTEGER"),
+      ("payload_hash", "ALTER TABLE issued_vcs ADD COLUMN payload_hash TEXT"),
     ]
     
     for column_name, alter_sql in issued_vcs_migrations:

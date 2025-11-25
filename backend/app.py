@@ -845,6 +845,7 @@ async def issuer_profile(issuer=Depends(_get_current_issuer)):
 
 
 @app.post(f"{API}/issuer/api-key", response_model=IssuerApiKeyResp)
+@app.post(f"{API}/issuer/api-key/rotate", response_model=IssuerApiKeyResp)
 async def issuer_rotate_api_key(issuer=Depends(_get_current_issuer), db=Depends(get_db)):
     if issuer["status"] != "approved":
         raise HTTPException(status_code=403, detail="issuer_not_approved")
@@ -916,7 +917,11 @@ async def issuer_verify_domain(body: IssuerVerifyDomainReq, db=Depends(get_db)):
     
     if verified:
         meta["domain_verified"] = True
-        await db.execute("UPDATE issuers SET meta=? WHERE id=?", (json.dumps(meta), body.issuer_id))
+        # Mark domain as verified; if status still 'pending', transition to 'verified' (distinct from 'approved')
+        new_status_sql = ""
+        if row["status"] == "pending":
+            new_status_sql = ", status='verified'"
+        await db.execute(f"UPDATE issuers SET meta=?{new_status_sql} WHERE id=?", (json.dumps(meta), body.issuer_id))
         await db.commit()
         return IssuerVerifyDomainResp(verified=True, message="verification_success")
     else:
@@ -997,8 +1002,9 @@ async def issuer_issue(
     if not issuer:
         raise HTTPException(status_code=401, detail="authentication_required")
         
-    if issuer["status"] != "approved":
-         raise HTTPException(status_code=403, detail="issuer_not_approved")
+        # Allow issuance if issuer is fully approved OR domain verified (status 'verified')
+        if issuer["status"] not in ("approved", "verified"):
+            raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
     vc = body.vc
     if vc.get("issuer") != (issuer["did"] or ""):
@@ -1006,6 +1012,9 @@ async def issuer_issue(
 
     jti = vc.get("jti") or f"vc-{int(time.time())}"
     now = int(time.time())
+    # Canonical JSON for stable hashing
+    payload_json = json.dumps(vc, sort_keys=True, separators=(",", ":"))
+    payload_hash = hashlib.sha256(payload_json.encode()).hexdigest()
     
     # Generate unique recipient ID for QR/NFC scanning
     recipient_id = base64.urlsafe_b64encode(secrets.token_bytes(12)).decode().rstrip("=")
@@ -1020,14 +1029,15 @@ async def issuer_issue(
         credential_type = str(vc_types) if vc_types else "Unknown"
 
     await db.execute(
-        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, credential_type, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, payload_hash, credential_type, created_at, updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?)",
         (
             jti,
             issuer["id"],
             subject_did,
             recipient_id,
-            json.dumps(vc),
+            payload_json,
+            payload_hash,
             credential_type,
             now,
             now,
