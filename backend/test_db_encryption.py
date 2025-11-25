@@ -13,10 +13,12 @@ os.environ['SQLITE_PATH'] = 'test_vc_db.db'
 import asyncio
 import aiosqlite
 import json
+import pytest
 from core.vc_crypto import VCEncryptor
 from database import init_db, SCHEMA_SQL
 
 
+@pytest.mark.asyncio
 async def test_vc_storage_encryption():
     """Test that VCs are encrypted in database storage"""
     print("Testing VC encryption in database storage...")
@@ -184,6 +186,7 @@ async def test_vc_storage_encryption():
     return True
 
 
+@pytest.mark.asyncio
 async def test_encryption_security():
     """Test that encryption is secure"""
     print("\n\nTesting encryption security...")
