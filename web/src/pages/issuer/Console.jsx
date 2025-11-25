@@ -157,7 +157,7 @@ export default function IssuerConsole(){
       return;
     }
     
-    getIssuerProfile(token)
+    getIssuerProfile()
       .then(resp => {
         setIssuer(resp.issuer);
         setLoadingProfile(false);
@@ -172,8 +172,7 @@ export default function IssuerConsole(){
   const handleRotateKey = async () => {
     if (!confirm("API anahtarını değiştirmek istediğinize emin misiniz? Eski anahtar geçersiz olacak.")) return;
     try {
-      const token = localStorage.getItem("issuer_token");
-      const resp = await rotateIssuerApiKey(token);
+      const resp = await rotateIssuerApiKey();
       setApiKey(resp.api_key);
       alert("Yeni API Anahtarı oluşturuldu. Lütfen güvenli bir yere kaydedin, tekrar gösterilmeyecek.");
     } catch (err) {

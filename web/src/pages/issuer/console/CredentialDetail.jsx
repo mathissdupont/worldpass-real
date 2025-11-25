@@ -32,8 +32,8 @@ export default function IssuerCredentialDetail() {
       setError(null);
 
       const [profileResp, credentialResp] = await Promise.all([
-        getIssuerProfile(token),
-        getIssuerCredentialDetail(token, vcId)
+        getIssuerProfile(),
+        getIssuerCredentialDetail(vcId)
       ]);
 
       setIssuer(profileResp.issuer);

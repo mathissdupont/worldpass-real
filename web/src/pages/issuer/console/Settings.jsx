@@ -36,7 +36,7 @@ export default function IssuerSettings() {
       setLoading(true);
       setError(null);
 
-      const profileResp = await getIssuerProfile(token);
+      const profileResp = await getIssuerProfile();
       const issuerData = profileResp.issuer;
       
       setIssuer(issuerData);

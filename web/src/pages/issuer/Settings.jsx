@@ -56,7 +56,7 @@ export default function IssuerSettings() {
       return;
     }
 
-    getIssuerProfile(token)
+    getIssuerProfile()
       .then((resp) => {
         setIssuer(resp.issuer);
         setName(resp.issuer.name);

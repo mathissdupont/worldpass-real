@@ -54,8 +54,8 @@ export default function IssuerAPIWebhooks() {
       setError(null);
 
       const [profileResp, webhooksResp] = await Promise.all([
-        getIssuerProfile(token),
-        listIssuerWebhooks(token)
+        getIssuerProfile(),
+        listIssuerWebhooks()
       ]);
 
       setIssuer(profileResp.issuer);
@@ -180,8 +180,7 @@ export default function IssuerAPIWebhooks() {
     setGeneratingKey(true);
     setError(null);
     try {
-      const token = localStorage.getItem("issuer_token");
-      const response = await rotateIssuerApiKey(token);
+      const response = await rotateIssuerApiKey();
       setApiKey(response.api_key);
       setShowKeyConfirm(false);
       setApiKeyVisible(true); // Show the key immediately after generation

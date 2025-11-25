@@ -46,8 +46,8 @@ export default function IssuerTemplates() {
       setError(null);
 
       const [profileResp, templatesResp] = await Promise.all([
-        getIssuerProfile(token),
-        listIssuerTemplates(token)
+        getIssuerProfile(),
+        listIssuerTemplates()
       ]);
 
       setIssuer(profileResp.issuer);

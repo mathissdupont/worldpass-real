@@ -31,9 +31,9 @@ export default function IssuerDashboard() {
 
       // Load profile, stats, and recent credentials in parallel
       const [profileResp, statsResp, credentialsResp] = await Promise.all([
-        getIssuerProfile(token),
-        getIssuerStats(token),
-        listIssuerCredentials(token, { page: 1, per_page: 5 })
+        getIssuerProfile(),
+        getIssuerStats(),
+        listIssuerCredentials({ page: 1, per_page: 5 })
       ]);
 
       setIssuer(profileResp.issuer);

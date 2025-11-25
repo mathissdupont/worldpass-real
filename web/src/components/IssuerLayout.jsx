@@ -41,7 +41,7 @@ export default function IssuerLayout({ children }) {
       return;
     }
 
-    getIssuerProfile(token)
+    getIssuerProfile()
       .then((resp) => {
         setIssuer(resp.issuer);
       })
