@@ -42,11 +42,18 @@ export async function removeToken(): Promise<void> {
 }
 
 /**
- * Store session data
+ * Store session data with expiration time
+ * @param session Session data with email and timestamp
+ * @param expiresInDays Number of days until token expires (default: 30)
  */
-export async function setSession(session: { email: string; at: number }): Promise<void> {
+export async function setSession(
+  session: { email: string; at: number }, 
+  expiresInDays: number = 30
+): Promise<void> {
   try {
-    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
+    const expiresAt = Date.now() + (expiresInDays * 24 * 60 * 60 * 1000); // Convert days to milliseconds
+    const sessionWithExpiry = { ...session, expiresAt };
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(sessionWithExpiry));
   } catch (error) {
     console.error('Error storing session:', error);
     throw error;
@@ -56,7 +63,7 @@ export async function setSession(session: { email: string; at: number }): Promis
 /**
  * Retrieve session data
  */
-export async function getSession(): Promise<{ email: string; at: number } | null> {
+export async function getSession(): Promise<{ email: string; at: number; expiresAt: number } | null> {
   try {
     const sessionStr = await SecureStore.getItemAsync(SESSION_KEY);
     return sessionStr ? JSON.parse(sessionStr) : null;
@@ -88,10 +95,22 @@ export async function clearAuth(): Promise<void> {
 }
 
 /**
- * Check if user is authenticated (has valid session)
+ * Check if user is authenticated (has valid, non-expired session)
  */
 export async function isAuthenticated(): Promise<boolean> {
   const token = await getToken();
   const session = await getSession();
-  return !!(token && session?.email);
+  
+  if (!token || !session?.email) {
+    return false;
+  }
+  
+  // Check if session has expired
+  if (session.expiresAt && Date.now() > session.expiresAt) {
+    // Session expired, clear auth data
+    await clearAuth();
+    return false;
+  }
+  
+  return true;
 }

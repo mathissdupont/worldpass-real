@@ -7,6 +7,14 @@ import { API_BASE_URL } from '../constants/config';
 import { getToken } from '../utils/storage';
 
 /**
+ * Helper function to handle API errors consistently
+ */
+async function handleApiError(response: Response, defaultMessage: string): Promise<never> {
+  const error = await response.json().catch(() => ({ detail: defaultMessage }));
+  throw new Error(error.detail || defaultMessage);
+}
+
+/**
  * User login
  * POST /api/user/login
  */
@@ -24,8 +32,7 @@ export async function loginUser(email: string, password: string, otpCode?: strin
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Authentication failed' }));
-    throw new Error(error.detail || 'Authentication failed');
+    await handleApiError(response, 'Authentication failed');
   }
 
   return await response.json();
@@ -49,8 +56,7 @@ export async function fetchUserProfile() {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to fetch profile' }));
-    throw new Error(error.detail || 'Failed to fetch profile');
+    await handleApiError(response, 'Failed to fetch profile');
   }
 
   const data = await response.json();
@@ -103,8 +109,7 @@ export async function updateUserProfile(profileData: {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Failed to update profile' }));
-    throw new Error(error.detail || 'Failed to update profile');
+    await handleApiError(response, 'Failed to update profile');
   }
 
   return await response.json();
