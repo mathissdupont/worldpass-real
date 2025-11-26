@@ -67,6 +67,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 API = settings.API_PREFIX
+ALLOWED_ISSUER_STATUSES = ("approved", "verified")
 signer = Ed25519Signer()
 
 # Initialize VC encryptor with encryption key
@@ -1039,7 +1040,7 @@ async def issuer_issue(
         
     # Allow issuance if issuer is fully approved OR domain verified (status 'verified')
     print(f"[DEBUG] Issuer ID={issuer['id']}, Status={issuer['status']}, Name={issuer['name']}")
-    if issuer["status"] not in ("approved", "verified"):
+    if issuer["status"] not in ALLOWED_ISSUER_STATUSES:
         raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
     vc = body.vc
@@ -1184,8 +1185,8 @@ async def issuer_revoke(
     if not issuer:
         raise HTTPException(status_code=401, detail="authentication_required")
         
-    if issuer["status"] != "approved":
-         raise HTTPException(status_code=403, detail="issuer_not_approved")
+        if issuer["status"] not in ALLOWED_ISSUER_STATUSES:
+            raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
     now = int(time.time())
     row = await db.execute_fetchone(
@@ -1231,8 +1232,8 @@ async def get_issuer_credentials(
         raise HTTPException(status_code=401, detail="invalid_token")
     
     issuer = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (issuer_id,))
-    if not issuer or issuer["status"] != "approved":
-        raise HTTPException(status_code=403, detail="issuer_not_approved")
+    if not issuer or issuer["status"] not in ALLOWED_ISSUER_STATUSES:
+        raise HTTPException(status_code=403, detail="issuer_not_authorized")
     
     # Get all issued credentials
     rows = await db.execute_fetchall(
