@@ -247,6 +247,7 @@ export default function IssuerConsole(){
   const [preview,setPreview] = useState("");
   const [out,setOut] = useState("");
   const [flash, setFlash] = useState(null); // {tone,text}
+  const [recipientId, setRecipientId] = useState(null);
 
   // helpers
   const copyToClipboard = (txt) => navigator.clipboard.writeText(txt).catch(()=>{});
@@ -364,6 +365,10 @@ export default function IssuerConsole(){
     const jti = `vc-${Math.floor(Date.now()/1000)}-${Math.random().toString(36).slice(2,7)}`;
     const vcBody = { ...src, issuer: org.did, issuanceDate: issuance, jti };
 
+    const subjectDid = (vcBody?.credentialSubject?.id || "").trim();
+    if (!subjectDid) throw new Error("Subject DID alanı boş bırakılamaz.");
+    if (!subjectDid.startsWith("did:")) throw new Error("Subject DID formatı geçersiz (did: ile başlamalı).");
+
     const header = { alg:"EdDSA", typ:"JWT" };
     const msg = `${b64uJson(header)}.${b64uJson(vcBody)}`;
     const skBytes = b64uToBytes(identity.sk_b64u);
@@ -382,70 +387,32 @@ export default function IssuerConsole(){
     return { signed, jti };
   }, [buildBodyFromMode, identity, org]);
 
-  const syncWithBackend = useCallback(async (vcSigned, { requireToken = false } = {}) => {
-    const token = localStorage.getItem("issuer_token");
-    if (!token) {
-      if (requireToken) throw new Error("Issuer token bulunamadı. Tekrar giriş yap.");
-      return { synced: false, reason: "missing_token" };
-    }
-    try {
-      const response = await issueCredential(null, vcSigned, token, selectedTemplateId);
-      return { synced: true, response };
-    } catch (error) {
-      if (requireToken) throw error;
-      console.warn("Credential sync failed", error);
-      return { synced: false, error };
-    }
-  }, [selectedTemplateId]);
-
   const issue = useCallback(async () => {
     try {
       setTplErr("");
       setOut("");
-      const { signed, jti } = buildSignedCredential();
-      const sync = await syncWithBackend(signed);
+      setRecipientId(null);
+      setFlash(null);
+      const { signed } = buildSignedCredential();
+      const token = localStorage.getItem("issuer_token");
+      if (!token) throw new Error("Issuer token bulunamadı. Tekrar giriş yap.");
+
+      const response = await issueCredential(null, signed, token, selectedTemplateId);
 
       const pretty = JSON.stringify(signed,null,2);
       setOut(pretty);
-      setRecipientId(sync.response?.recipient_id || null);
+      const newRecipientId = response?.recipient_id || null;
+      setRecipientId(newRecipientId);
 
-      const blob = new Blob([pretty], {type:"application/json"});
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${jti}.wpvc`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-
-      setFlash({
-        tone: sync.synced ? "ok" : "info",
-        text: sync.synced
-          ? "Sertifika indirildi ve issuer konsoluna kaydedildi."
-          : "Sertifika indirildi fakat sunucuya kaydedilemedi. Giriş yapıp tekrar dene."
-      });
-      setTimeout(()=>setFlash(null), 3000);
+      const successMessage = newRecipientId
+        ? t('org_console.credential_issued_success', { recipient_id: newRecipientId })
+        : t('org_console.credential_issued_simple');
+      setFlash({tone:"ok", text: successMessage});
+      setTimeout(()=>setFlash(null), 5000);
     } catch(e) {
       setTplErr(e.message || String(e));
     }
-  }, [buildSignedCredential, syncWithBackend]);
-
-  const handleSendToUser = useCallback(async () => {
-      try {
-        setTplErr(""); setOut("");
-        const { signed } = buildSignedCredential();
-        const sync = await syncWithBackend(signed, { requireToken: true });
-        
-        setOut(JSON.stringify(signed, null, 2));
-        setRecipientId(sync.response?.recipient_id || null);
-        
-        const successMessage = sync.response?.recipient_id 
-          ? t('org_console.credential_issued_success', { recipient_id: sync.response.recipient_id })
-          : t('org_console.credential_issued_simple');
-        setFlash({tone:"ok", text: successMessage});
-        setTimeout(()=>setFlash(null), 5000);
-      } catch(e) {
-        setTplErr(e.message || String(e));
-      }
-    }, [buildSignedCredential, syncWithBackend]);
+  }, [buildSignedCredential, selectedTemplateId]);
 
   const saveTpl = ()=>{
     // TODO: Implement backend save
@@ -696,21 +663,14 @@ export default function IssuerConsole(){
               <button
                 disabled={!canIssue}
                 onClick={issue}
-                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-50 hover:opacity-90 text-sm transition-opacity"
-                title={canIssue ? "Oluştur & indir" : "Eksik alanlar veya imza anahtarı yok"}
+                className="w-full sm:w-auto px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50 hover:opacity-90 text-sm transition-opacity"
+                title={canIssue ? t('org_console.issue_and_send') : "Eksik alanlar veya imza anahtarı yok"}
               >
-                Oluştur & İndir
+                {t('org_console.issue_and_send')}
               </button>
-              <button
-                disabled={!canIssue}
-                onClick={handleSendToUser}
-                className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50 hover:opacity-90 text-sm transition-opacity"
-                title={canIssue ? "Kullanıcıya Gönder" : "Eksik alanlar veya imza anahtarı yok"}
-              >
-              Kullanıcıya Gönder
-            </button>
             </div>
           </div>
+          <p className="px-4 md:px-6 text-xs text-[color:var(--muted)] pb-2">{t('org_console.auto_issue_hint')}</p>
 
           <div className="p-4 md:p-6">
             {mode !== "manual" ? (
@@ -768,6 +728,34 @@ export default function IssuerConsole(){
                     </button>
                   </div>
                 </div>
+                {recipientId && (
+                  <div className="mt-3 p-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] text-sm text-[color:var(--text)]">
+                    <div className="text-xs text-[color:var(--muted)] mb-2">{t('org_console.share_code_hint')}</div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-[color:var(--muted)]">{t('org_console.share_code_title')}</div>
+                        <div className="font-mono text-base">{recipientId}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={()=>copyToClipboard(recipientId)}
+                          className="text-xs px-2 py-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
+                        >
+                          {t('copy')}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const shareUrl = `${window.location.origin}/api/recipient/${recipientId}`;
+                            copyToClipboard(shareUrl);
+                          }}
+                          className="text-xs px-2 py-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)]"
+                        >
+                          {t('org_console.copy_link')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <pre className="mt-2 text-xs font-mono bg-[color:var(--code-bg)] text-[color:var(--code-fg)] border border-[color:var(--code-border)] rounded p-2 max-h-64 overflow-auto">{out}</pre>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
