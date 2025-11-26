@@ -575,29 +575,54 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
     )
     
     vcs = []
+    needs_commit = False
     for row in rows:
+        payload_str = row["vc_payload"] or ""
+        vc_payload = None
+
         try:
             # Decrypt the VC payload
             # Support both encrypted (new) and plain JSON (legacy) formats
-            payload_str = row["vc_payload"]
-            if vc_encryptor.is_encrypted(payload_str):
+            if payload_str and vc_encryptor.is_encrypted(payload_str):
                 vc_payload = vc_encryptor.decrypt_vc(payload_str)
             else:
                 # Legacy plain JSON format
-                vc_payload = json.loads(payload_str)
-            
-            vcs.append(UserVCItem(
-                id=row["id"],
-                vc_id=row["vc_id"],
-                vc_payload=vc_payload,
-                vc_hash=row["vc_hash"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"]
-            ))
+                vc_payload = json.loads(payload_str) if payload_str else None
         except Exception:
-            # Skip VCs that cannot be decrypted/parsed
+            # Payload cannot be decrypted with current key, try to recover from issued_vcs
+            recovery = await db.execute_fetchone(
+                "SELECT payload FROM issued_vcs WHERE vc_id=?",
+                (row["vc_id"],)
+            )
+            if not recovery or not recovery["payload"]:
+                continue
+
+            try:
+                vc_payload = json.loads(recovery["payload"])
+                reencrypted_payload = vc_encryptor.encrypt_vc(vc_payload)
+                await db.execute(
+                    "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE id=?",
+                    (reencrypted_payload, int(time.time()), row["id"])
+                )
+                needs_commit = True
+            except Exception:
+                continue
+
+        if not vc_payload:
             continue
-    
+
+        vcs.append(UserVCItem(
+            id=row["id"],
+            vc_id=row["vc_id"],
+            vc_payload=vc_payload,
+            vc_hash=row["vc_hash"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"]
+        ))
+
+    if needs_commit:
+        await db.commit()
+
     return UserVCListResp(vcs=vcs)
 
 
