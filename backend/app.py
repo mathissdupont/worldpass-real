@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 import os
 
 # Tamamı paket içi relative olsun:
-from settings import settings
-from database import get_db, init_db
-from schemas import (
+from backend.settings import settings
+from backend.database import get_db, init_db
+from backend.schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
@@ -42,14 +42,14 @@ from schemas import (
     RecipientLookupResp,
     IssuerVerifyDomainReq, IssuerVerifyDomainResp,
 )
-from core.crypto_ed25519 import Ed25519Signer, b64u_d
-from core.vc import verify_vc
-from core.vc_crypto import VCEncryptor, generate_encryption_key
-from core.profile_crypto import get_profile_encryptor
-from oauth_endpoints import router as oauth_router
-from issuer_endpoints import router as issuer_router
-from payment_endpoints import router as payment_router
-from mock_provider_routes import router as mock_provider_router
+from backend.core.crypto_ed25519 import Ed25519Signer, b64u_d
+from backend.core.vc import verify_vc
+from backend.core.vc_crypto import VCEncryptor, generate_encryption_key
+from backend.core.profile_crypto import get_profile_encryptor
+from backend.oauth_endpoints import router as oauth_router
+from backend.issuer_endpoints import router as issuer_router
+from backend.payment_endpoints import router as payment_router
+from backend.mock_provider_routes import router as mock_provider_router
 
 import time, secrets, base64
 import hashlib, os, json

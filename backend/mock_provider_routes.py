@@ -9,8 +9,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 
-from settings import settings
-from payment_provider_mock import mock_provider
+from backend.settings import settings
+from backend.payment_provider_mock import mock_provider
 
 router = APIRouter(prefix="/mock-provider", tags=["mock-provider"])
 

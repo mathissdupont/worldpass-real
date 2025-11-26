@@ -8,7 +8,7 @@ In production, replace this with real payment provider integration.
 from typing import Dict, Any
 from urllib.parse import urlencode
 import secrets
-from settings import settings
+from backend.settings import settings
 
 
 class MockPaymentProvider:

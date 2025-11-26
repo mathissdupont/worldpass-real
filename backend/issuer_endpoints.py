@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Optional
 import time
 import json
-from database import get_db
-from schemas import (
+from backend.database import get_db
+from backend.schemas import (
     IssuerUpdateReq,
     IssuerStatsResp,
     IssuerCredentialListReq,
@@ -42,7 +42,7 @@ async def _get_current_issuer_from_dep(x_token: Optional[str] = Header(None), db
     """
     # This will be imported from app.py's _get_current_issuer
     # For now, we'll import it dynamically to avoid circular imports
-    from app import _get_current_issuer
+    from backend.app import _get_current_issuer
     return await _get_current_issuer(x_token=x_token, db=db)
 
 

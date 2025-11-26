@@ -11,8 +11,8 @@ import time
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from database import get_db
-from payment_schemas import (
+from backend.database import get_db
+from backend.payment_schemas import (
     TransactionCreateIntent,
     TransactionRead,
     PaymentIntentResponse,
@@ -20,7 +20,7 @@ from payment_schemas import (
     WebhookResponse,
     TransactionListResponse
 )
-from payment_provider_mock import mock_provider
+from backend.payment_provider_mock import mock_provider
 
 router = APIRouter(prefix="/payment", tags=["payment"])
 limiter = Limiter(key_func=get_remote_address)
@@ -33,7 +33,7 @@ async def _get_current_user_for_payment(x_token: Optional[str] = Header(None), d
     
     # Import here to avoid circular dependency
     from jose import JWTError, jwt
-    from settings import settings
+    from backend.settings import settings
     
     try:
         payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
