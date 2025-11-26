@@ -6,7 +6,7 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { Camera, CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { verifyCredential } from '../lib/api';
 import { addCredential } from '../lib/storage';
@@ -24,7 +24,7 @@ export default function ScannerScreen() {
   const requestCameraPermission = async () => {
     try {
       setRequestingPermission(true);
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     } catch (error) {
       console.warn('Camera permission request failed', error);
@@ -115,10 +115,10 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.container}>
-      <BarCodeScanner
+      <CameraView
         style={StyleSheet.absoluteFillObject}
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{ barCodeTypes: ['qr'] }}
       >
         <View style={styles.overlay}>
           <View style={styles.scanFrame} />
@@ -126,7 +126,7 @@ export default function ScannerScreen() {
             {scanning ? 'Verifying...' : 'Align QR code within frame'}
           </Text>
         </View>
-      </BarCodeScanner>
+      </CameraView>
 
       {scanned && !scanning && (
         <View style={styles.bottomBar}>

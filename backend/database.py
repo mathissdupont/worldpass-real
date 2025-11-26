@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS user_vcs (
   user_id INTEGER NOT NULL,
   vc_id TEXT NOT NULL,          -- jti from VC
   vc_payload TEXT NOT NULL,     -- full VC JSON
+  vc_hash TEXT,                 -- SHA256 canonical hash for quick lookups
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -331,5 +332,17 @@ async def _run_migrations(conn: aiosqlite.Connection):
                 print(f"Migration: Added column {column_name} to issued_vcs table")
             except Exception as e:
                 print(f"Migration warning: Could not add column {column_name} to issued_vcs: {e}")
+
+    # Check and migrate user_vcs table
+    cursor = await conn.execute("PRAGMA table_info(user_vcs)")
+    columns = await cursor.fetchall()
+    user_vcs_column_names = [col[1] for col in columns]
+
+    if "vc_hash" not in user_vcs_column_names:
+      try:
+        await conn.execute("ALTER TABLE user_vcs ADD COLUMN vc_hash TEXT")
+        print("Migration: Added column vc_hash to user_vcs table")
+      except Exception as e:
+        print(f"Migration warning: Could not add column vc_hash to user_vcs: {e}")
 
     await conn.commit()

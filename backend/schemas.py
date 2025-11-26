@@ -231,6 +231,7 @@ class UserVCItem(BaseModel):
     id: int
     vc_id: str
     vc_payload: Dict[str, Any]
+    vc_hash: Optional[str] = None
     created_at: int
     updated_at: int
 

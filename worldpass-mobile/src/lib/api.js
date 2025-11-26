@@ -8,7 +8,8 @@ const LOCAL_API_BASE = Platform.select({
   default: 'http://localhost:8000',
 });
 
-const API_BASE = __DEV__ ? LOCAL_API_BASE : 'https://worldpass.tech';
+const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
+  || (__DEV__ ? LOCAL_API_BASE : 'https://worldpass.tech');
 
 export async function getToken() {
   return await AsyncStorage.getItem('user_token');

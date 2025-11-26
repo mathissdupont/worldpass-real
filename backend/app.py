@@ -530,6 +530,9 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
     now = int(time.time())
     vc = body.vc
     vc_id = vc.get("jti") or vc.get("id") or f"vc-{now}"
+
+    canonical_vc = json.dumps(vc, sort_keys=True, separators=(",", ":"))
+    payload_hash = hashlib.sha256(canonical_vc.encode()).hexdigest()
     
     # Encrypt the VC payload before storing
     try:
@@ -546,14 +549,14 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
     if existing:
         # Update existing VC
         await db.execute(
-            "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE user_id=? AND vc_id=?",
-            (encrypted_payload, now, user["id"], vc_id)
+            "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND vc_id=?",
+            (encrypted_payload, payload_hash, now, user["id"], vc_id)
         )
     else:
         # Insert new VC
         await db.execute(
-            "INSERT INTO user_vcs(user_id, vc_id, vc_payload, created_at, updated_at) VALUES(?,?,?,?,?)",
-            (user["id"], vc_id, encrypted_payload, now, now)
+            "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+            (user["id"], vc_id, encrypted_payload, payload_hash, now, now)
         )
     
     await db.commit()
@@ -566,7 +569,7 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
 async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
     """Get all VCs for current user (decrypted from storage)"""
     rows = await db.execute_fetchall(
-        "SELECT id, vc_id, vc_payload, created_at, updated_at FROM user_vcs WHERE user_id=? ORDER BY created_at DESC",
+        "SELECT id, vc_id, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? ORDER BY created_at DESC",
         (user["id"],)
     )
     
@@ -586,6 +589,7 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
                 id=row["id"],
                 vc_id=row["vc_id"],
                 vc_payload=vc_payload,
+                vc_hash=row["vc_hash"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"]
             ))
@@ -1128,13 +1132,13 @@ async def issuer_issue(
                 )
                 if existing_vc:
                     await db.execute(
-                        "UPDATE user_vcs SET vc_payload=?, updated_at=? WHERE user_id=? AND vc_id=?",
-                        (encrypted_payload, now, user_row["id"], jti)
+                        "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND vc_id=?",
+                        (encrypted_payload, payload_hash, now, user_row["id"], jti)
                     )
                 else:
                     await db.execute(
-                        "INSERT INTO user_vcs(user_id, vc_id, vc_payload, created_at, updated_at) VALUES(?,?,?,?,?)",
-                        (user_row["id"], jti, encrypted_payload, now, now)
+                        "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, created_at, updated_at) VALUES(?,?,?,?,?,?)",
+                        (user_row["id"], jti, encrypted_payload, payload_hash, now, now)
                     )
             except Exception as e:
                 # Log error but don't fail the issuance
