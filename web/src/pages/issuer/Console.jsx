@@ -355,34 +355,59 @@ export default function IssuerConsole(){
     }
   };
 
-  const issue = ()=>{
-    try{
-      setTplErr(""); setOut("");
-      if(!org) throw new Error("Kurum seçili değil.");
-      if(!identity?.sk_b64u) throw new Error("Kurumsal imza anahtarı bulunamadı.");
+  const buildSignedCredential = useCallback(() => {
+    if (!org) throw new Error("Kurum seçili değil.");
+    if (!identity?.sk_b64u) throw new Error("Kurumsal imza anahtarı bulunamadı.");
 
-      const src = buildBodyFromMode();
-      const issuance = new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
-      const jti = `vc-${Math.floor(Date.now()/1000)}-${Math.random().toString(36).slice(2,7)}`;
-      const vcBody = { ...src, issuer: org.did, issuanceDate: issuance, jti };
+    const src = buildBodyFromMode();
+    const issuance = new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
+    const jti = `vc-${Math.floor(Date.now()/1000)}-${Math.random().toString(36).slice(2,7)}`;
+    const vcBody = { ...src, issuer: org.did, issuanceDate: issuance, jti };
 
-      const header = { alg:"EdDSA", typ:"JWT" };
-      const msg = `${b64uJson(header)}.${b64uJson(vcBody)}`;
-      const skBytes = b64uToBytes(identity.sk_b64u);
-      const sigBytes = ed25519Sign(skBytes, enc.encode(msg));
-      const signed = {
-        ...vcBody,
-        proof:{
-          type:"Ed25519Signature2020",
-          created: issuance,
-          proofPurpose:"assertionMethod",
-          verificationMethod:`${org.did}#key-1`,
-          jws: b64u(sigBytes),
-          issuer_pk_b64u: identity.pk_b64u
-        }
-      };
+    const header = { alg:"EdDSA", typ:"JWT" };
+    const msg = `${b64uJson(header)}.${b64uJson(vcBody)}`;
+    const skBytes = b64uToBytes(identity.sk_b64u);
+    const sigBytes = ed25519Sign(skBytes, enc.encode(msg));
+    const signed = {
+      ...vcBody,
+      proof:{
+        type:"Ed25519Signature2020",
+        created: issuance,
+        proofPurpose:"assertionMethod",
+        verificationMethod:`${org.did}#key-1`,
+        jws: b64u(sigBytes),
+        issuer_pk_b64u: identity.pk_b64u
+      }
+    };
+    return { signed, jti };
+  }, [buildBodyFromMode, identity, org]);
+
+  const syncWithBackend = useCallback(async (vcSigned, { requireToken = false } = {}) => {
+    const token = localStorage.getItem("issuer_token");
+    if (!token) {
+      if (requireToken) throw new Error("Issuer token bulunamadı. Tekrar giriş yap.");
+      return { synced: false, reason: "missing_token" };
+    }
+    try {
+      const response = await issueCredential(null, vcSigned, token, selectedTemplateId);
+      return { synced: true, response };
+    } catch (error) {
+      if (requireToken) throw error;
+      console.warn("Credential sync failed", error);
+      return { synced: false, error };
+    }
+  }, [selectedTemplateId]);
+
+  const issue = useCallback(async () => {
+    try {
+      setTplErr("");
+      setOut("");
+      const { signed, jti } = buildSignedCredential();
+      const sync = await syncWithBackend(signed);
+
       const pretty = JSON.stringify(signed,null,2);
       setOut(pretty);
+      setRecipientId(sync.response?.recipient_id || null);
 
       const blob = new Blob([pretty], {type:"application/json"});
       const a = document.createElement("a");
@@ -391,55 +416,36 @@ export default function IssuerConsole(){
       a.click();
       URL.revokeObjectURL(a.href);
 
-      setFlash({tone:"ok", text:"Sertifika oluşturuldu ve indirildi."});
-      setTimeout(()=>setFlash(null), 1500);
-    }catch(e){
-      setTplErr(e.message || String(e));
-    }
-  };
-
-  const handleSendToUser = async () => {
-    try {
-      setTplErr(""); setOut("");
-      if(!org) throw new Error("Kurum seçili değil.");
-      if(!identity?.sk_b64u) throw new Error("Kurumsal imza anahtarı bulunamadı.");
-
-      const src = buildBodyFromMode();
-      const issuance = new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
-      const jti = `vc-${Math.floor(Date.now()/1000)}-${Math.random().toString(36).slice(2,7)}`;
-      const vcBody = { ...src, issuer: org.did, issuanceDate: issuance, jti };
-
-      const header = { alg:"EdDSA", typ:"JWT" };
-      const msg = `${b64uJson(header)}.${b64uJson(vcBody)}`;
-      const skBytes = b64uToBytes(identity.sk_b64u);
-      const sigBytes = ed25519Sign(skBytes, enc.encode(msg));
-      const signed = {
-        ...vcBody,
-        proof:{
-          type:"Ed25519Signature2020",
-          created: issuance,
-          proofPurpose:"assertionMethod",
-          verificationMethod:`${org.did}#key-1`,
-          jws: b64u(sigBytes),
-          issuer_pk_b64u: identity.pk_b64u
-        }
-      };
-      
-      const token = localStorage.getItem("issuer_token");
-      const response = await issueCredential(null, signed, token, selectedTemplateId);
-      
-      setOut(JSON.stringify(signed, null, 2));
-      
-      // Show success with recipient info
-      const successMessage = response.recipient_id 
-        ? t('org_console.credential_issued_success', { recipient_id: response.recipient_id })
-        : t('org_console.credential_issued_simple');
-      setFlash({tone:"ok", text: successMessage});
-      setTimeout(()=>setFlash(null), 5000);
+      setFlash({
+        tone: sync.synced ? "ok" : "info",
+        text: sync.synced
+          ? "Sertifika indirildi ve issuer konsoluna kaydedildi."
+          : "Sertifika indirildi fakat sunucuya kaydedilemedi. Giriş yapıp tekrar dene."
+      });
+      setTimeout(()=>setFlash(null), 3000);
     } catch(e) {
       setTplErr(e.message || String(e));
     }
-  };
+  }, [buildSignedCredential, syncWithBackend]);
+
+  const handleSendToUser = useCallback(async () => {
+      try {
+        setTplErr(""); setOut("");
+        const { signed } = buildSignedCredential();
+        const sync = await syncWithBackend(signed, { requireToken: true });
+        
+        setOut(JSON.stringify(signed, null, 2));
+        setRecipientId(sync.response?.recipient_id || null);
+        
+        const successMessage = sync.response?.recipient_id 
+          ? t('org_console.credential_issued_success', { recipient_id: sync.response.recipient_id })
+          : t('org_console.credential_issued_simple');
+        setFlash({tone:"ok", text: successMessage});
+        setTimeout(()=>setFlash(null), 5000);
+      } catch(e) {
+        setTplErr(e.message || String(e));
+      }
+    }, [buildSignedCredential, syncWithBackend]);
 
   const saveTpl = ()=>{
     // TODO: Implement backend save
