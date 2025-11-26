@@ -452,6 +452,28 @@ export async function saveUserProfileData(profileData) {
   return r.json();
 }
 
+export async function linkUserDid(did) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  if (!did) throw new Error('Missing DID');
+
+  const r = await fetch('/api/user/did-link', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ did })
+  });
+
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || 'link_did_failed');
+  }
+
+  return r.json();
+}
+
 // Payment API
 export async function createPaymentIntent(amount_minor, currency, description, return_url) {
   const token = getToken();

@@ -3,7 +3,18 @@ import { loadProfile, saveProfile } from "./storage";
 
 const KEY_SESSION = "wp_session";
 const KEY_TOKEN = "wp_token";
+export const TOKEN_CHANGED_EVENT = "wp:token-changed";
 const API_BASE = "/api";
+
+function emitTokenChanged(token) {
+  try {
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent(TOKEN_CHANGED_EVENT, { detail: token || null }));
+    }
+  } catch {
+    // ignore
+  }
+}
 
 // --------- public api ----------
 export function getSession(){
@@ -18,6 +29,7 @@ export function getToken(){
 
 export function setToken(token){
   localStorage.setItem(KEY_TOKEN, token);
+  emitTokenChanged(token);
   
   // Also save to chrome.storage.local if extension is available
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -42,6 +54,7 @@ export function setSession({ email, token }){
 export function clearSession(){ 
   localStorage.removeItem(KEY_SESSION); 
   localStorage.removeItem(KEY_TOKEN);
+  emitTokenChanged(null);
   
   // Also remove from chrome.storage.local if extension is available
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {

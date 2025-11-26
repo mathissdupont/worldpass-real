@@ -31,6 +31,7 @@ from backend.schemas import (
     UserVCDeleteReq, UserVCDeleteResp,
     UserProfileUpdateReq, UserProfileResp,
     UserProfileDataReq, UserProfileDataResp,
+    UserDidLinkReq, UserDidLinkResp,
     UserDeleteResp,
     TwoFASetupResp, TwoFAEnableReq, TwoFAEnableResp, TwoFADisableResp,
     BackupCodesResp, VerifyEmailReq, VerifyEmailResp,
@@ -734,6 +735,34 @@ async def user_profile_update(request: Request, body: UserProfileUpdateReq, user
         "otp_enabled": bool(updated_user["otp_enabled"]),
         "email_verified": bool(updated_user["email_verified"]),
     })
+
+
+@app.post(f"{API}/user/did-link", response_model=UserDidLinkResp)
+@limiter.limit("10/minute")
+async def user_link_did(request: Request, body: UserDidLinkReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Attach or update the DID associated with the authenticated user"""
+    did = (body.did or "").strip()
+    if not did or not did.startswith("did:"):
+        raise HTTPException(status_code=400, detail="invalid_did")
+
+    if user["did"] == did:
+        return UserDidLinkResp(ok=True, did=did)
+
+    existing = await db.execute_fetchone(
+        "SELECT id FROM users WHERE did=? AND id!=?",
+        (did, user["id"])
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="did_already_linked")
+
+    now = int(time.time())
+    await db.execute(
+        "UPDATE users SET did=?, updated_at=? WHERE id=?",
+        (did, now, user["id"])
+    )
+    await db.commit()
+
+    return UserDidLinkResp(ok=True, did=did)
 
 
 @app.post(f"{API}/user/delete", response_model=UserDeleteResp)

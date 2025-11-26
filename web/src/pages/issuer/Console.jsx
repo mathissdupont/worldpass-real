@@ -49,15 +49,15 @@ function Badge({ children, tone="default" }){
   return <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs ${map[tone]||map.default}`}>{children}</span>;
 }
 
-function Label({ text, required }) {
+function Label({ text, required, htmlFor }) {
   return (
-    <label className="text-sm text-[color:var(--text)] mb-1 block">
+    <label htmlFor={htmlFor} className="text-sm text-[color:var(--text)] mb-1 block">
       {text}{required && <span className="text-rose-500"> *</span>}
     </label>
   );
 }
 
-function Select({ value, onChange, options=[], error, placeholder=t("issuer.console.select_placeholder") }) {
+function Select({ id, name, value, onChange, options=[], error, placeholder=t("issuer.console.select_placeholder") }) {
   // Support both simple string[] and {value,label}[] formats
   const optionsList = options.map(o => 
     typeof o === 'string' ? { value: o, label: o } : o
@@ -66,6 +66,8 @@ function Select({ value, onChange, options=[], error, placeholder=t("issuer.cons
   return (
     <div className="relative">
       <select
+        id={id}
+        name={name || id}
         value={value ?? ""}
         onChange={onChange}
         className={[
@@ -83,13 +85,16 @@ function Select({ value, onChange, options=[], error, placeholder=t("issuer.cons
   );
 }
 
-function Input({ type="text", value, onChange, placeholder, error }) {
+function Input({ id, name, type="text", value, onChange, placeholder, error, autoComplete }) {
   return (
     <input
+      id={id}
+      name={name || id}
       type={type}
       value={value ?? ""}
       onChange={onChange}
       placeholder={placeholder}
+      autoComplete={autoComplete}
       className={[
         "w-full px-3 py-2 rounded-xl",
         "bg-[color:var(--panel)] text-[color:var(--text)] border outline-none focus:ring-2 focus:ring-[color:var(--brand-2)]",
@@ -100,9 +105,11 @@ function Input({ type="text", value, onChange, placeholder, error }) {
   );
 }
 
-function TextArea({ rows=4, value, onChange, error, disabled, onKeyDown }) {
+function TextArea({ id, name, rows=4, value, onChange, error, disabled, onKeyDown }) {
   return (
     <textarea
+      id={id}
+      name={name || id}
       rows={rows}
       value={value ?? ""}
       onChange={onChange}
@@ -120,27 +127,28 @@ function TextArea({ rows=4, value, onChange, error, disabled, onKeyDown }) {
 }
 
 function Field({ f, value, onChange, error }) {
+  const fieldId = `issuer-field-${f.id}`;
   if (f.type === "textarea") {
     return (
       <div className="col-span-2">
-        <Label text={f.label} required={f.required}/>
-        <TextArea rows={5} value={value} onChange={e=>onChange(e.target.value)} error={error}/>
+        <Label text={f.label} required={f.required} htmlFor={fieldId}/>
+        <TextArea id={fieldId} name={f.id} rows={5} value={value} onChange={e=>onChange(e.target.value)} error={error}/>
       </div>
     );
   }
   if (f.type === "select") {
     return (
       <div>
-        <Label text={f.label} required={f.required}/>
-        <Select value={value} onChange={e=>onChange(e.target.value)} options={Array.isArray(f.values)?f.values:[]} error={error}/>
+        <Label text={f.label} required={f.required} htmlFor={fieldId}/>
+        <Select id={fieldId} name={f.id} value={value} onChange={e=>onChange(e.target.value)} options={Array.isArray(f.values)?f.values:[]} error={error}/>
       </div>
     );
   }
   const mapType = (t)=> (t==="number"||t==="date") ? t : "text";
   return (
     <div>
-      <Label text={f.label} required={f.required}/>
-      <Input type={mapType(f.type)} value={value} onChange={e=>onChange(e.target.value)} placeholder={f.id} error={error}/>
+      <Label text={f.label} required={f.required} htmlFor={fieldId}/>
+      <Input id={fieldId} name={f.id} type={mapType(f.type)} value={value} onChange={e=>onChange(e.target.value)} placeholder={f.id} error={error}/>
     </div>
   );
 }
@@ -248,6 +256,14 @@ export default function IssuerConsole(){
   const [out,setOut] = useState("");
   const [flash, setFlash] = useState(null); // {tone,text}
   const [recipientId, setRecipientId] = useState(null);
+
+  const templateInputIds = useMemo(() => ({
+    tplKey: "issuer-template-key",
+    tplName: "issuer-template-name",
+    templateSelector: "issuer-template-selector",
+    tplBody: "issuer-template-body",
+    presetSelector: "issuer-preset-selector"
+  }), []);
 
   // helpers
   const copyToClipboard = (txt) => navigator.clipboard.writeText(txt).catch(()=>{});
@@ -512,15 +528,23 @@ export default function IssuerConsole(){
 
             {/* meta + template selector */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-              <div><Label text={t('org_console.template_key')}/><Input value={tplKey} onChange={e=>setTplKey(e.target.value)} /></div>
-              <div><Label text={t('org_console.template_name')}/><Input value={tplName} onChange={e=>setTplName(e.target.value)} /></div>
+              <div>
+                <Label htmlFor={templateInputIds.tplKey} text={t('org_console.template_key')}/>
+                <Input id={templateInputIds.tplKey} name="template_key" value={tplKey} onChange={e=>setTplKey(e.target.value)} autoComplete="off" />
+              </div>
+              <div>
+                <Label htmlFor={templateInputIds.tplName} text={t('org_console.template_name')}/>
+                <Input id={templateInputIds.tplName} name="template_name" value={tplName} onChange={e=>setTplName(e.target.value)} autoComplete="off" />
+              </div>
             </div>
             
             {/* Template Selector */}
             {availableTemplates.length > 0 && (
               <div className="mt-2">
-                <Label text="Select Template (Optional)" />
+                <Label htmlFor={templateInputIds.templateSelector} text="Select Template (Optional)" />
                 <Select 
+                  id={templateInputIds.templateSelector}
+                  name="issuer_template_id"
                   value={selectedTemplateId || ""} 
                   onChange={e => {
                     const val = e.target.value;
@@ -572,7 +596,7 @@ export default function IssuerConsole(){
             {showAdvanced && (
               <div className="mt-3">
                 <div className="flex items-center justify-between gap-2">
-                  <Label text={selectedPresetIdx>=0 ? "Hazır taslak gövdesi (salt-okunur)" : "Taslak içeriği (JSON)"} />
+                  <Label htmlFor={templateInputIds.tplBody} text={selectedPresetIdx>=0 ? "Hazır taslak gövdesi (salt-okunur)" : "Taslak içeriği (JSON)"} />
                   <div className="flex items-center gap-2">
                     {preview && (
                       <>
@@ -601,6 +625,8 @@ export default function IssuerConsole(){
                 </div>
 
                 <TextArea
+                  id={templateInputIds.tplBody}
+                  name="template_body"
                   rows={12}
                   value={tplBody}
                   onChange={e=>setTplBody(e.target.value)}
@@ -632,9 +658,11 @@ export default function IssuerConsole(){
 
           {/* PRESET & WPT SEÇİMİ */}
           <div className="mt-6">
-            <Label text="Hazır Taslak (WPML)"/>
+            <Label htmlFor={templateInputIds.presetSelector} text="Hazır Taslak (WPML)"/>
             <div className="relative">
               <select
+                id={templateInputIds.presetSelector}
+                name="preset_template"
                 value={selectedPresetIdx}
                 onChange={e=>loadPreset(Number(e.target.value))}
                 className="w-full appearance-none px-3 py-2 rounded-xl bg-[color:var(--panel)] text-[color:var(--text)] border border-[color:var(--border)] focus:ring-2 focus:ring-[color:var(--brand-2)] outline-none">

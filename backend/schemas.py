@@ -260,6 +260,13 @@ class UserProfileResp(BaseModel):
 class UserDeleteResp(BaseModel):
     ok: bool
 
+class UserDidLinkReq(BaseModel):
+    did: str
+
+class UserDidLinkResp(BaseModel):
+    ok: bool
+    did: str
+
 # Extended Issuer Models for Console
 class IssuerUpdateReq(BaseModel):
     name: Optional[str] = None
