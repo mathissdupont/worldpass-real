@@ -76,7 +76,6 @@ CREATE TABLE IF NOT EXISTS user_vcs (
 
 CREATE INDEX IF NOT EXISTS idx_user_vcs_user_id ON user_vcs(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_vcs_vc_id ON user_vcs(vc_id);
-CREATE INDEX IF NOT EXISTS idx_user_vcs_subject_did ON user_vcs(subject_did);
 
 CREATE TABLE IF NOT EXISTS user_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
