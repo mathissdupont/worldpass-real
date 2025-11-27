@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useIdentity } from '../context/IdentityContext';
 import { generateIdentity, encryptKeystore, bytesToBase64Url } from '../lib/crypto';
 import { saveIdentity as persistIdentity } from '../lib/storage';
@@ -114,7 +115,6 @@ export default function IdentityCreateScreen({ navigation }) {
           {
             text: 'Copy to Clipboard',
             onPress: async () => {
-              const Clipboard = require('expo-clipboard');
               await Clipboard.setStringAsync(keystoreJson);
               Alert.alert('Copied', 'Keystore copied to clipboard');
             },

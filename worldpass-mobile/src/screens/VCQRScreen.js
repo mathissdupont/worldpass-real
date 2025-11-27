@@ -64,8 +64,15 @@ export default function VCQRScreen({ route, navigation }) {
         return;
       }
 
-      // Save credential to a temporary file
-      const fileUri = FileSystem.cacheDirectory + `${credential.jti || 'credential'}.wpvc`;
+      // Sanitize filename to prevent path injection
+      const sanitizeFilename = (str) => {
+        if (!str) return 'credential';
+        // Remove any path traversal characters and special chars
+        return str.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+      };
+      
+      const safeFilename = sanitizeFilename(credential.jti);
+      const fileUri = `${FileSystem.cacheDirectory}${safeFilename}.wpvc`;
       await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(credential, null, 2));
       
       await Sharing.shareAsync(fileUri, {

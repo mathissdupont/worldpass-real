@@ -43,7 +43,16 @@ export default function TransactionsScreen({ navigation }) {
   };
 
   const formatDate = (timestamp) => {
-    const date = new Date(timestamp * 1000);
+    if (!timestamp) return 'N/A';
+    
+    // Handle both seconds and milliseconds timestamps
+    // If timestamp is less than a reasonable millisecond value (year 2000 in ms), assume it's in seconds
+    const timestampMs = timestamp < 946684800000 ? timestamp * 1000 : timestamp;
+    const date = new Date(timestampMs);
+    
+    // Validate the date
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',

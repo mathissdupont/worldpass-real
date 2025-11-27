@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 32, 350);
 const CARD_HEIGHT = CARD_WIDTH * 1.4;
+
+// Memoized QR code component to prevent unnecessary re-renders
+const MemoizedQRCode = memo(function MemoizedQRCode({ value }) {
+  return (
+    <QRCode
+      value={value}
+      size={100}
+      backgroundColor="transparent"
+      color="#fff"
+    />
+  );
+});
 
 export default function VisualIDCard({ did, name, email }) {
   const initials = useMemo(() => {
@@ -63,12 +75,7 @@ export default function VisualIDCard({ did, name, email }) {
         <View style={styles.qrContainer}>
           {did ? (
             <View style={styles.qrWrapper}>
-              <QRCode
-                value={did}
-                size={100}
-                backgroundColor="transparent"
-                color="#fff"
-              />
+              <MemoizedQRCode value={did} />
             </View>
           ) : (
             <View style={styles.qrPlaceholder}>

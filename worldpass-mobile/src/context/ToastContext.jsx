@@ -123,7 +123,12 @@ export function ToastProvider({ children }) {
             <Text style={[styles.message, { color: config.color }]}>
               {toast.message}
             </Text>
-            <TouchableOpacity onPress={hideToast} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity 
+              onPress={hideToast} 
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Close notification"
+              accessibilityRole="button"
+            >
               <Ionicons name="close" size={18} color={config.color} />
             </TouchableOpacity>
           </TouchableOpacity>
