@@ -1,6 +1,7 @@
 // web/src/pages/Present.jsx
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import QRCode from "qrcode";
+import jsQR from "jsqr";
 import { useIdentity } from "../lib/identityContext";
 import { b64u, b64uToBytes } from "../lib/crypto";
 import { getVCs, migrateVCsIfNeeded } from "../lib/storage";
@@ -77,8 +78,10 @@ export default function Present() {
   const reqCanvasRef = useRef(null);
   const reqScanIntervalRef = useRef(null);
   const reqDetectorRef = useRef(null);
+  const reqDetectingRef = useRef(false);
   const reqStreamRef = useRef(null);
   const reqNdefRef = useRef(null);
+  const reqNfcAbortRef = useRef(null);
   const [reqQrScanning, setReqQrScanning] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
 
@@ -156,7 +159,10 @@ export default function Present() {
 
   const handleRequestObject = (obj) => {
     if (!obj || obj.type !== "present" || !obj.challenge) { setMsg({ type: "err", text: t("invalid_request_format") }); return; }
-    setRequest(obj); setMsg({ type: "ok", text: `"${obj.label || t("unnamed")}" isteği alındı.` }); stopRequestQrScan();
+    setRequest(obj);
+    setMsg({ type: "ok", text: `"${obj.label || t("unnamed")}" isteği alındı.` });
+    stopRequestQrScan();
+    stopRequestNfcScan();
   };
 
   const handleRequestScanned = async (raw) => {
@@ -171,47 +177,151 @@ export default function Present() {
     } catch (e) { setMsg({ type: "err", text: t("read_error") + e.message }); }
   };
 
-  const stopRequestQrScan = async () => {
-     try { if (reqScanIntervalRef.current) clearInterval(reqScanIntervalRef.current); if (reqStreamRef.current) reqStreamRef.current.getTracks().forEach(t => t.stop()); if (reqVideoRef.current) reqVideoRef.current.srcObject = null; } catch {}
-     setReqQrScanning(false);
+  const stopRequestQrScan = () => {
+    try {
+      if (reqScanIntervalRef.current) {
+        clearInterval(reqScanIntervalRef.current);
+        reqScanIntervalRef.current = null;
+      }
+      if (reqStreamRef.current) {
+        reqStreamRef.current.getTracks().forEach((track) => track.stop());
+        reqStreamRef.current = null;
+      }
+      if (reqVideoRef.current) reqVideoRef.current.srcObject = null;
+    } catch {}
+    reqDetectorRef.current = null;
+    reqDetectingRef.current = false;
+    setReqQrScanning(false);
   };
+
   const startRequestQrScan = async () => {
     setMsg(null);
-    if (!("BarcodeDetector" in window)) return setMsg({ type: "info", text: t("camera_not_supported") });
+    const hasMedia = typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia;
+    if (!hasMedia) {
+      setMsg({ type: "info", text: t("camera_not_supported") });
+      return;
+    }
     try {
-      reqDetectorRef.current = new BarcodeDetector({ formats: ["qr_code"] });
+      stopRequestQrScan();
+      const canUseDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+      if (canUseDetector) {
+        reqDetectorRef.current = new window.BarcodeDetector({ formats: ["qr_code"] });
+      } else {
+        reqDetectorRef.current = null;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       reqStreamRef.current = stream;
-      if (reqVideoRef.current) { reqVideoRef.current.srcObject = stream; await reqVideoRef.current.play(); }
-      reqScanIntervalRef.current = setInterval(async () => {
+      if (reqVideoRef.current) {
+        reqVideoRef.current.srcObject = stream;
+        await reqVideoRef.current.play();
+      }
+
+      const detectFrame = async () => {
+        if (reqDetectingRef.current) return;
+        if (!reqVideoRef.current || reqVideoRef.current.readyState < 2) return;
+        const canvas = reqCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+
+        canvas.width = reqVideoRef.current.videoWidth;
+        canvas.height = reqVideoRef.current.videoHeight;
+        ctx.drawImage(reqVideoRef.current, 0, 0, canvas.width, canvas.height);
+
+        reqDetectingRef.current = true;
         try {
-           if (!reqVideoRef.current || reqVideoRef.current.readyState < 2) return;
-           const canvas = reqCanvasRef.current || document.createElement("canvas");
-           canvas.width = reqVideoRef.current.videoWidth; canvas.height = reqVideoRef.current.videoHeight;
-           const ctx = canvas.getContext("2d"); ctx.drawImage(reqVideoRef.current, 0, 0, canvas.width, canvas.height);
-           const codes = await reqDetectorRef.current.detect(await createImageBitmap(canvas));
-           if (codes?.length) handleRequestScanned(codes[0].rawValue);
-        } catch {}
-      }, 500);
+          let payload = null;
+          if (
+            reqDetectorRef.current &&
+            typeof window !== "undefined" &&
+            typeof window.createImageBitmap === "function"
+          ) {
+            const bitmap = await window.createImageBitmap(canvas);
+            const codes = await reqDetectorRef.current.detect(bitmap);
+            if (typeof bitmap.close === "function") bitmap.close();
+            if (codes?.length) payload = codes[0].rawValue;
+          }
+
+          if (!payload) {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const manual = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
+            if (manual?.data) payload = manual.data;
+          }
+
+          if (payload) handleRequestScanned(payload);
+        } catch {
+        } finally {
+          reqDetectingRef.current = false;
+        }
+      };
+
+      reqScanIntervalRef.current = window.setInterval(() => {
+        detectFrame();
+      }, 650);
       setReqQrScanning(true);
-    } catch (e) { setMsg({ type: "err", text: e.message }); }
+    } catch (e) {
+      stopRequestQrScan();
+      if (e?.name === "NotAllowedError") {
+        setMsg({ type: "err", text: t("camera_permission_denied") });
+      } else if (e?.name === "NotFoundError" || e?.name === "NotReadableError") {
+        setMsg({ type: "err", text: t("camera_in_use") });
+      } else {
+        setMsg({ type: "err", text: e.message });
+      }
+    }
   };
 
   const startRequestNfcScan = async () => {
-     setMsg(null);
-     if (!("NDEFReader" in window)) return setMsg({type: "info", text: t("nfc_not_supported")});
-     try {
-        const reader = new NDEFReader(); reqNdefRef.current = reader; await reader.scan();
-        reader.onreading = (ev) => {
-           const decoder = new TextDecoder();
-           for(const record of ev.message.records) {
-              if(record.recordType === "text" || record.recordType === "url") { handleRequestScanned(decoder.decode(record.data)); break; }
-           }
-        };
-        setMsg({type: "ok", text: t("nfc_listening")});
-     } catch(e) { setMsg({type:"err", text: e.message}); }
+    setMsg(null);
+    const hasNfc = typeof window !== "undefined" && "NDEFReader" in window;
+    if (!hasNfc) {
+      setMsg({ type: "info", text: t("nfc_not_supported_desc") });
+      return;
+    }
+    const secure =
+      typeof window !== "undefined" &&
+      (window.isSecureContext || window.location.protocol === "https:" || window.location.hostname === "localhost");
+    if (!secure) {
+      setMsg({ type: "info", text: t("nfc_https_required") });
+      return;
+    }
+    try {
+      stopRequestNfcScan();
+      const reader = new NDEFReader();
+      const controller = new AbortController();
+      reqNdefRef.current = reader;
+      reqNfcAbortRef.current = controller;
+      await reader.scan({ signal: controller.signal });
+      reader.onreading = (ev) => {
+        const decoder = new TextDecoder();
+        for (const record of ev.message.records) {
+          if (record.recordType === "text" || record.recordType === "url") {
+            handleRequestScanned(decoder.decode(record.data));
+            break;
+          }
+        }
+      };
+      reader.onreadingerror = () => setMsg({ type: "err", text: t("nfc_read_error") });
+      setMsg({ type: "ok", text: t("nfc_listening") });
+    } catch (e) {
+      if (e?.name === "NotAllowedError") {
+        setMsg({ type: "err", text: t("nfc_permission_denied") });
+      } else {
+        setMsg({ type: "err", text: e.message });
+      }
+    }
   };
-  const stopRequestNfcScan = async () => { try { reqNdefRef.current = null; } catch{} };
+
+  const stopRequestNfcScan = () => {
+    try {
+      if (reqNfcAbortRef.current) {
+        reqNfcAbortRef.current.abort();
+      }
+    } catch {}
+    reqNfcAbortRef.current = null;
+    reqNdefRef.current = null;
+  };
 
   const buildPayload = () => {
     setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
@@ -251,7 +361,17 @@ export default function Present() {
   const writeNfc = async (writeType = "url") => {
      if (!publishedPath) return;
      const full = window.location.origin.replace(/\/$/, "") + "/" + String(publishedPath).replace(/^\//, "");
-     try {
+      const hasWriter = typeof window !== "undefined" && "NDEFWriter" in window;
+      const secure = typeof window !== "undefined" && (window.isSecureContext || window.location.protocol === "https:" || window.location.hostname === "localhost");
+      if (!hasWriter) {
+        setMsg({ type: "info", text: t("nfc_not_supported_desc") });
+        return;
+      }
+      if (!secure) {
+        setMsg({ type: "info", text: t("nfc_https_required") });
+        return;
+      }
+      try {
         setMsg({ type: "info", text: t("nfc_writing") });
         const writer = new NDEFWriter();
         const records = [];
@@ -260,14 +380,18 @@ export default function Present() {
            records.push({ recordType: "url", data: full });
         }
         if (writeType === "json" || writeType === "both") {
-           records.push({ recordType: "text", data: JSON.stringify(out) });
+          records.push({ recordType: "text", data: out });
         }
 
         await writer.write({ records });
         setMsg({ type: "ok", text: t("nfc_write_success") });
-     } catch (e) {
-        setMsg({ type: "err", text: t("nfc_write_error") + ": " + e.message });
-     }
+      } catch (e) {
+        if (e?.name === "NotAllowedError") {
+          setMsg({ type: "err", text: t("nfc_permission_denied") });
+        } else {
+          setMsg({ type: "err", text: t("nfc_write_error") + ": " + e.message });
+        }
+      }
   };
 
   const toggleField = (f) => {
@@ -307,6 +431,12 @@ export default function Present() {
                </div>
                <video ref={reqVideoRef} className={`mt-4 rounded-xl border border-[color:var(--border)] w-full max-w-xs ${reqQrScanning ? "block" : "hidden"}`} playsInline muted />
                <canvas ref={reqCanvasRef} className="hidden" />
+               <p className="mt-4 text-xs text-[color:var(--muted)] text-center max-w-md">
+                 {t("scanner_hint_camera")}
+               </p>
+               <p className="mt-1 text-xs text-[color:var(--muted)] text-center max-w-md">
+                 {t("scanner_hint_nfc")}
+               </p>
              </div>
            ) : (
              <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)] flex items-start justify-between gap-3">

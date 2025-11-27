@@ -249,7 +249,13 @@
     "nfc_timeout": "NFC işlemi zaman aşımına uğradı",
     "nfc_no_data": "NFC etiketinde veri bulunamadı",
     "nfc_invalid_data": "NFC etiketindeki veri geçersiz"
+    "nfc_permission_denied": "Tarayıcı NFC erişimini engelledi. İzin verip tekrar deneyin.",
+    "nfc_https_required": "Web NFC yalnızca HTTPS (veya localhost) ortamında çalışır.",
     ,"scanner_not_supported": "Tarayıcınız kamera tabanlı QR taramayı desteklemiyor."
+    "camera_permission_denied": "Kamera izni reddedildi. Lütfen erişim verip tekrar deneyin.",
+    "camera_in_use": "Kamera kullanılabilir değil. Kamerayı kullanan diğer uygulamaları kapatın.",
+    "scanner_hint_camera": "Kamera iznini verin ve doğrulayıcının QR kodunu kadrajda sabit tutun.",
+    "scanner_hint_nfc": "Web NFC yalnızca HTTPS veya localhost üzerinde Chrome/Edge Android'de çalışır.",
     ,"scanned_payload_loaded": "Taranan içerik yüklendi"
   ,"step2_challenge": "2) Meydan okuma al"
   ,"new_challenge": "Yeni Meydan Okuma"
