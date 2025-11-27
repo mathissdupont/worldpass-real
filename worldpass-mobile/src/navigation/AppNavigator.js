@@ -80,6 +80,11 @@ function AuthStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen
+        name="IdentityImport"
+        component={IdentityImportScreen}
+        options={{ headerShown: true, title: 'Wallet Identity' }}
+      />
     </Stack.Navigator>
   );
 }

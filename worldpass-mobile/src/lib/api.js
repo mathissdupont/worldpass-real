@@ -1,6 +1,7 @@
 // API client for WorldPass backend
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDID } from './storage';
 
 const LOCAL_API_BASE = Platform.select({
   ios: 'http://localhost:8000',
@@ -25,6 +26,12 @@ export async function clearToken() {
 
 export async function apiRequest(endpoint, options = {}) {
   const token = await getToken();
+  let walletDid = null;
+  try {
+    walletDid = await getDID();
+  } catch (err) {
+    console.warn('Failed to read wallet DID', err?.message || err);
+  }
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -32,6 +39,9 @@ export async function apiRequest(endpoint, options = {}) {
   
   if (token) {
     headers['X-Token'] = token;
+  }
+  if (walletDid) {
+    headers['X-Wallet-Did'] = walletDid;
   }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {

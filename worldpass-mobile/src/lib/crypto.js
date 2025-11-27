@@ -5,9 +5,14 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
 import { gcm } from '@noble/ciphers/aes';
 import { randomBytes } from '@noble/ciphers/utils';
+import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { sha256 } from '@noble/hashes/sha2';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
+
+const PBKDF2_ROUNDS = 300000;
+const SUPPORTED_KDFS = ['argon2id', 'pbkdf2-sha256'];
 
 let wasmBinaryPromise = null;
 
@@ -91,11 +96,7 @@ function ensureWasmLoader() {
 
 ensureWasmLoader();
 
-async function deriveKey(password, salt) {
-  if (!password || !salt) {
-    throw new Error('missing_kdf_params');
-  }
-
+async function deriveArgon2Key(password, salt) {
   const params = {
     pass: password,
     salt: toUint8(salt),
@@ -105,7 +106,6 @@ async function deriveKey(password, salt) {
     hashLen: 32,
     type: ArgonType.Argon2id,
   };
-
 
   const result = await argon2Hash(params);
   if (result?.hash instanceof Uint8Array) {
@@ -121,18 +121,54 @@ async function deriveKey(password, salt) {
   throw new Error('argon2_failed');
 }
 
+function derivePbkdfKey(password, salt) {
+  return pbkdf2(sha256, toUint8(password), toUint8(salt), {
+    c: PBKDF2_ROUNDS,
+    dkLen: 32,
+  });
+}
+
+async function deriveKey(password, salt, preference = 'auto') {
+  if (!password || !salt) {
+    throw new Error('missing_kdf_params');
+  }
+
+  const normalized = typeof preference === 'string' ? preference.toLowerCase() : preference;
+  if (normalized && normalized !== 'auto' && !SUPPORTED_KDFS.includes(normalized)) {
+    throw new Error('unsupported_kdf');
+  }
+
+  const canUseArgon = typeof WebAssembly !== 'undefined';
+  if ((normalized === 'auto' || normalized === 'argon2id') && canUseArgon) {
+    try {
+      const key = await deriveArgon2Key(password, salt);
+      return { key, kdf: 'argon2id' };
+    } catch (err) {
+      if (normalized === 'argon2id') {
+        throw err;
+      }
+      console.warn('Argon2 derivation failed, falling back to PBKDF2:', err?.message || err);
+    }
+  } else if (normalized === 'argon2id') {
+    throw new Error('argon2_unavailable');
+  }
+
+  const key = derivePbkdfKey(password, salt);
+  return { key, kdf: 'pbkdf2-sha256' };
+}
+
 export async function encryptKeystore(password, payload) {
   if (!password) throw new Error('missing_password');
   const salt = randomBytes(16);
   const nonce = randomBytes(12);
-  const key = await deriveKey(password, salt);
+  const { key, kdf } = await deriveKey(password, salt, 'auto');
   const aes = gcm(key, nonce);
   const plaintext = enc.encode(JSON.stringify(payload));
   const ciphertext = aes.encrypt(plaintext);
   return {
     kty: 'wpks',
     version: 2,
-    kdf: 'argon2id',
+    kdf,
     salt: bytesToBase64Url(salt),
     nonce: bytesToBase64Url(nonce),
     ct: bytesToBase64Url(ciphertext),
@@ -144,13 +180,14 @@ export async function decryptKeystore(password, blob) {
   if (!blob || typeof blob !== 'object') {
     throw new Error('invalid_keystore');
   }
-  if (blob.kdf && blob.kdf !== 'argon2id') {
+  const requestedKdf = (blob.kdf || 'argon2id').toLowerCase();
+  if (!SUPPORTED_KDFS.includes(requestedKdf)) {
     throw new Error('unsupported_kdf');
   }
   const salt = base64UrlToBytes(blob.salt);
   const nonce = base64UrlToBytes(blob.nonce);
   const ciphertext = base64UrlToBytes(blob.ct);
-  const key = await deriveKey(password, salt);
+  const { key } = await deriveKey(password, salt, requestedKdf);
   const aes = gcm(key, nonce);
   try {
     const plaintext = aes.decrypt(ciphertext);

@@ -85,6 +85,8 @@ export default function IdentityImportScreen() {
         message = 'Password is incorrect for this keystore.';
       } else if (raw === 'unsupported_kdf') {
         message = 'This keystore format is not supported on mobile yet.';
+      } else if (raw === 'argon2_unavailable') {
+        message = 'This keystore was encrypted with Argon2 and iOS cannot run WebAssembly. Import it on the web/CLI once and re-export (PBKDF2) before trying again on this device.';
       }
       setStatus({ type: 'error', message });
     } finally {
