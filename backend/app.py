@@ -32,6 +32,7 @@ from backend.schemas import (
     UserProfileUpdateReq, UserProfileResp,
     UserProfileDataReq, UserProfileDataResp,
     UserDidLinkReq, UserDidLinkResp,
+    UserDidRotateReq, UserDidRotateResp,
     UserDeleteResp,
     TwoFASetupResp, TwoFAEnableReq, TwoFAEnableResp, TwoFADisableResp,
     BackupCodesResp, VerifyEmailReq, VerifyEmailResp,
@@ -69,6 +70,10 @@ app.add_middleware(SlowAPIMiddleware)
 
 API = settings.API_PREFIX
 ALLOWED_ISSUER_STATUSES = ("approved", "verified")
+WALLET_OPTIONAL_ENDPOINTS = {
+    ("POST", f"{API}/user/did-link"),
+    ("GET", f"{API}/user/profile"),
+}
 signer = Ed25519Signer()
 
 # Initialize VC encryptor with encryption key
@@ -351,12 +356,13 @@ async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_
     
     # Create user with display_name
     display_name = f"{body.first_name} {body.last_name}".strip()
+    did_bound_at = now if body.did else None
     cur = await db.execute(
         """
-        INSERT INTO users(email, first_name, last_name, password_hash, did, display_name, theme, avatar, phone, lang, otp_enabled, created_at, updated_at, status)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        INSERT INTO users(email, first_name, last_name, password_hash, did, did_bound_at, display_name, theme, avatar, phone, lang, otp_enabled, created_at, updated_at, status)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         """,
-        (email, body.first_name, body.last_name, password_hash, body.did or "", display_name, "light", "", "", "en", 0, now, now),
+        (email, body.first_name, body.last_name, password_hash, body.did or "", did_bound_at, display_name, "light", "", "", "en", 0, now, now),
     )
     await db.commit()
     user_id = cur.lastrowid
@@ -467,7 +473,12 @@ async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
 
 
 # ---------- helper to get current user from token ----------
-async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(get_db)):
+async def _get_current_user(
+    request: Request,
+    x_token: Optional[str] = Header(None),
+    x_wallet_did: Optional[str] = Header(None),
+    db=Depends(get_db)
+):
     """Get current authenticated user from JWT token"""
     if not x_token:
         raise HTTPException(status_code=401, detail="missing_token")
@@ -484,7 +495,20 @@ async def _get_current_user(x_token: Optional[str] = Header(None), db=Depends(ge
         )
         if not user:
             raise HTTPException(status_code=401, detail="user_not_found")
-        
+        wallet_did = (user["did"] or "").strip()
+        current_path = request.url.path
+        route_key = (request.method.upper(), current_path)
+
+        if wallet_did:
+            if not x_wallet_did:
+                raise HTTPException(status_code=400, detail="wallet_did_required")
+            normalized_wallet = x_wallet_did.strip()
+            if normalized_wallet != wallet_did:
+                raise HTTPException(status_code=403, detail="wallet_did_mismatch")
+        else:
+            if route_key not in WALLET_OPTIONAL_ENDPOINTS:
+                raise HTTPException(status_code=403, detail="user_did_not_linked")
+
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="invalid_token")
@@ -532,6 +556,13 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
     now = int(time.time())
     vc = body.vc
     vc_id = vc.get("jti") or vc.get("id") or f"vc-{now}"
+    subject_did = ((vc.get("credentialSubject") or {}).get("id") or "").strip()
+    expected_did = (user["did"] or "").strip()
+
+    if not subject_did:
+        raise HTTPException(status_code=400, detail="vc_subject_did_missing")
+    if subject_did != expected_did:
+        raise HTTPException(status_code=403, detail="vc_subject_did_mismatch")
 
     canonical_vc = json.dumps(vc, sort_keys=True, separators=(",", ":"))
     payload_hash = hashlib.sha256(canonical_vc.encode()).hexdigest()
@@ -544,21 +575,21 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
     
     # Check if VC already exists for this user
     existing = await db.execute_fetchone(
-        "SELECT id FROM user_vcs WHERE user_id=? AND vc_id=?",
-        (user["id"], vc_id)
+        "SELECT id FROM user_vcs WHERE user_id=? AND subject_did=? AND vc_id=?",
+        (user["id"], subject_did, vc_id)
     )
     
     if existing:
         # Update existing VC
         await db.execute(
-            "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND vc_id=?",
-            (encrypted_payload, payload_hash, now, user["id"], vc_id)
+            "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND subject_did=? AND vc_id=?",
+            (encrypted_payload, payload_hash, now, user["id"], subject_did, vc_id)
         )
     else:
         # Insert new VC
         await db.execute(
-            "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, created_at, updated_at) VALUES(?,?,?,?,?,?)",
-            (user["id"], vc_id, encrypted_payload, payload_hash, now, now)
+            "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, subject_did, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
+            (user["id"], vc_id, encrypted_payload, payload_hash, subject_did, now, now)
         )
     
     await db.commit()
@@ -570,9 +601,10 @@ async def user_vc_add(request: Request, body: UserVCAddReq, user=Depends(_get_cu
 @limiter.limit("30/minute")
 async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
     """Get all VCs for current user (decrypted from storage)"""
+    expected_did = (user["did"] or "").strip()
     rows = await db.execute_fetchall(
-        "SELECT id, vc_id, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? ORDER BY created_at DESC",
-        (user["id"],)
+        "SELECT id, vc_id, subject_did, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? AND subject_did=? ORDER BY created_at DESC",
+        (user["id"], expected_did)
     )
     
     vcs = []
@@ -615,6 +647,7 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
         vcs.append(UserVCItem(
             id=row["id"],
             vc_id=row["vc_id"],
+            subject_did=row["subject_did"] or "",
             vc_payload=vc_payload,
             vc_hash=row["vc_hash"],
             created_at=row["created_at"],
@@ -631,9 +664,10 @@ async def user_vc_list(request: Request, user=Depends(_get_current_user), db=Dep
 @limiter.limit("20/minute")
 async def user_vc_delete(request: Request, body: UserVCDeleteReq, user=Depends(_get_current_user), db=Depends(get_db)):
     """Delete a VC from user's collection"""
+    expected_did = (user["did"] or "").strip()
     await db.execute(
-        "DELETE FROM user_vcs WHERE user_id=? AND vc_id=?",
-        (user["id"], body.vc_id)
+        "DELETE FROM user_vcs WHERE user_id=? AND subject_did=? AND vc_id=?",
+        (user["id"], expected_did, body.vc_id)
     )
     await db.commit()
     return UserVCDeleteResp(ok=True)
@@ -745,8 +779,11 @@ async def user_link_did(request: Request, body: UserDidLinkReq, user=Depends(_ge
     if not did or not did.startswith("did:"):
         raise HTTPException(status_code=400, detail="invalid_did")
 
-    if user["did"] == did:
-        return UserDidLinkResp(ok=True, did=did)
+    current_did = (user["did"] or "").strip()
+    if current_did:
+        if current_did == did:
+            return UserDidLinkResp(ok=True, did=did)
+        raise HTTPException(status_code=409, detail="did_already_set")
 
     existing = await db.execute_fetchone(
         "SELECT id FROM users WHERE did=? AND id!=?",
@@ -757,12 +794,76 @@ async def user_link_did(request: Request, body: UserDidLinkReq, user=Depends(_ge
 
     now = int(time.time())
     await db.execute(
-        "UPDATE users SET did=?, updated_at=? WHERE id=?",
-        (did, now, user["id"])
+        "UPDATE users SET did=?, did_bound_at=?, updated_at=? WHERE id=?",
+        (did, now, now, user["id"])
     )
     await db.commit()
 
     return UserDidLinkResp(ok=True, did=did)
+
+
+@app.post(f"{API}/user/did-rotate", response_model=UserDidRotateResp)
+@limiter.limit("5/minute")
+async def user_rotate_did(request: Request, body: UserDidRotateReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Rotate the DID bound to the current account, revoking stored VCs."""
+    current_did = (user["did"] or "").strip()
+    if not current_did:
+        raise HTTPException(status_code=400, detail="user_did_not_linked")
+
+    new_did = (body.new_did or "").strip()
+    if not new_did or not new_did.startswith("did:"):
+        raise HTTPException(status_code=400, detail="invalid_new_did")
+    if new_did == current_did:
+        raise HTTPException(status_code=400, detail="new_did_same_as_current")
+
+    existing = await db.execute_fetchone(
+        "SELECT id FROM users WHERE did=? AND id!=?",
+        (new_did, user["id"])
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="did_already_linked")
+
+    now = int(time.time())
+    vc_rows = await db.execute_fetchall(
+        "SELECT vc_id FROM user_vcs WHERE user_id=? AND subject_did=?",
+        (user["id"], current_did)
+    )
+    vc_ids = [row["vc_id"] for row in vc_rows]
+    revoked_vc_count = len(vc_ids)
+
+    if revoked_vc_count:
+        await db.execute(
+            "DELETE FROM user_vcs WHERE user_id=? AND subject_did=?",
+            (user["id"], current_did)
+        )
+        await db.executemany(
+            "UPDATE vc_status SET status='revoked', reason=?, updated_at=? WHERE vc_id=?",
+            [("user_did_rotation", now, vc_id) for vc_id in vc_ids]
+        )
+
+    await db.execute(
+        "UPDATE user_profiles SET did=?, updated_at=? WHERE did=?",
+        (new_did, now, current_did)
+    )
+
+    rotation_token = secrets.token_urlsafe(16)
+    await db.execute(
+        "INSERT INTO user_did_rotations(user_id, old_did, new_did, status, rotation_token, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
+        (user["id"], current_did, new_did, "completed", rotation_token, now, now)
+    )
+
+    await db.execute(
+        "UPDATE users SET did=?, did_bound_at=?, pending_did=NULL, pending_did_token=NULL, pending_did_requested_at=NULL, updated_at=? WHERE id=?",
+        (new_did, now, now, user["id"])
+    )
+
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, did_subject, result, meta) VALUES(?,?,?,?,?)",
+        (now, "user_did_rotate", new_did, "ok", json.dumps({"user_id": user["id"], "old_did": current_did, "new_did": new_did, "revoked_vc_count": revoked_vc_count}))
+    )
+
+    await db.commit()
+    return UserDidRotateResp(ok=True, old_did=current_did, new_did=new_did, revoked_vc_count=revoked_vc_count)
 
 
 @app.post(f"{API}/user/delete", response_model=UserDeleteResp)
@@ -774,6 +875,10 @@ async def user_delete(request: Request, user=Depends(_get_current_user), db=Depe
     
     # Delete user templates
     await db.execute("DELETE FROM vc_templates WHERE user_id=?", (user["id"],))
+
+    # Delete profile data bound to DID
+    if user["did"]:
+        await db.execute("DELETE FROM user_profiles WHERE did=?", ((user["did"] or "").strip(),))
     
     # Delete user
     await db.execute("DELETE FROM users WHERE id=?", (user["id"],))
@@ -1132,7 +1237,9 @@ async def issuer_issue(
     
     # Generate unique recipient ID for QR/NFC scanning
     recipient_id = base64.urlsafe_b64encode(secrets.token_bytes(12)).decode().rstrip("=")
-    subject_did = (vc.get("credentialSubject") or {}).get("id", "")
+    subject_did = ((vc.get("credentialSubject") or {}).get("id", "") or "").strip()
+    if not subject_did:
+        raise HTTPException(status_code=400, detail="subject_did_required")
     
     # Extract credential type for filtering
     vc_types = vc.get("type", [])
@@ -1182,18 +1289,18 @@ async def issuer_issue(
                 encrypted_payload = vc_encryptor.encrypt_vc(vc)
                 # Check if VC already exists for this user
                 existing_vc = await db.execute_fetchone(
-                    "SELECT id FROM user_vcs WHERE user_id=? AND vc_id=?",
-                    (user_row["id"], jti)
+                    "SELECT id FROM user_vcs WHERE user_id=? AND subject_did=? AND vc_id=?",
+                    (user_row["id"], subject_did, jti)
                 )
                 if existing_vc:
                     await db.execute(
-                        "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND vc_id=?",
-                        (encrypted_payload, payload_hash, now, user_row["id"], jti)
+                        "UPDATE user_vcs SET vc_payload=?, vc_hash=?, updated_at=? WHERE user_id=? AND subject_did=? AND vc_id=?",
+                        (encrypted_payload, payload_hash, now, user_row["id"], subject_did, jti)
                     )
                 else:
                     await db.execute(
-                        "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, created_at, updated_at) VALUES(?,?,?,?,?,?)",
-                        (user_row["id"], jti, encrypted_payload, payload_hash, now, now)
+                        "INSERT INTO user_vcs(user_id, vc_id, vc_payload, vc_hash, subject_did, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
+                        (user_row["id"], jti, encrypted_payload, payload_hash, subject_did, now, now)
                     )
             except Exception as e:
                 # Log error but don't fail the issuance

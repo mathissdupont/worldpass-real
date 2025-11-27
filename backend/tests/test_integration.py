@@ -74,12 +74,13 @@ def test_full_flow(client):
     # 4. User Register & Login
     user_email = "student@univ.edu"
     user_pass = "securePass123!"
+    user_did = "did:key:z6MktWjP95fMqCMrfNhhY3M78CZQYw17ChQ4fQf7p4pM5sJ"
     resp = client.post("/api/user/register", json={
         "email": user_email,
         "password": user_pass,
         "first_name": "John",
         "last_name": "Doe",
-        "did": "did:key:z6MktWjP95fMqCMrfNhhY3M78CZQYw17ChQ4fQf7p4pM5sJ"
+        "did": user_did
     })
     # If user already exists from previous run, try login
     if resp.status_code == 400 and "email_already_registered" in resp.text:
@@ -93,7 +94,7 @@ def test_full_flow(client):
     })
     assert resp.status_code == 200, f"User login failed: {resp.text}"
     user_token = resp.json()["token"]
-    user_headers = {"x-token": user_token}
+    user_headers = {"x-token": user_token, "x-wallet-did": user_did}
     print("User logged in")
 
     # 5. Issue VC (Auto-add to user wallet)

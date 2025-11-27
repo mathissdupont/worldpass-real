@@ -18,6 +18,26 @@ function getToken() {
   catch { return null; }
 }
 
+function getWalletDid() {
+  try {
+    const stored = localStorage.getItem(IDENTITY_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return parsed?.did || null;
+  } catch (err) {
+    console.warn("Failed to parse wallet identity", err);
+    return null;
+  }
+}
+
+function withWallet(headers = {}) {
+  const walletDid = getWalletDid();
+  if (walletDid) {
+    return { ...headers, "X-Wallet-Did": walletDid };
+  }
+  return headers;
+}
+
 
 // --- MIGRATION (eski anahtardan yenisine taşı) ---
 export async function migrateVCsIfNeeded() {
@@ -50,10 +70,10 @@ export async function migrateVCsIfNeeded() {
             try {
               await fetch(`${API_BASE}/user/vcs/add`, {
                 method: "POST",
-                headers: {
+                headers: withWallet({
                   "Content-Type": "application/json",
                   "X-Token": token,
-                },
+                }),
                 body: JSON.stringify({ vc }),
               });
             } catch (e) {
@@ -97,9 +117,9 @@ export async function getVCs() {
   try {
     const response = await fetch(`${API_BASE}/user/vcs`, {
       method: "GET",
-      headers: {
+      headers: withWallet({
         "X-Token": token,
-      },
+      }),
     });
 
     if (!response.ok) {
@@ -152,10 +172,10 @@ export async function addVC(vc) {
   try {
     const response = await fetch(`${API_BASE}/user/vcs/add`, {
       method: "POST",
-      headers: {
+      headers: withWallet({
         "Content-Type": "application/json",
         "X-Token": token,
-      },
+      }),
       body: JSON.stringify({ vc }),
     });
 
@@ -189,10 +209,10 @@ export async function removeVC(jti) {
   try {
     const response = await fetch(`${API_BASE}/user/vcs/delete`, {
       method: "POST",
-      headers: {
+      headers: withWallet({
         "Content-Type": "application/json",
         "X-Token": token,
-      },
+      }),
       body: JSON.stringify({ vc_id: jti }),
     });
 
@@ -253,9 +273,9 @@ export async function loadProfile() {
   try {
     const response = await fetch(`${API_BASE}/user/profile`, {
       method: "GET",
-      headers: {
+      headers: withWallet({
         "X-Token": token,
-      },
+      }),
     });
 
     if (!response.ok) {
@@ -293,10 +313,10 @@ export async function saveProfile(profile) {
   try {
     const response = await fetch(`${API_BASE}/user/profile`, {
       method: "POST",
-      headers: {
+      headers: withWallet({
         "Content-Type": "application/json",
         "X-Token": token,
-      },
+      }),
       body: JSON.stringify({
         display_name: profile.displayName,
         theme: profile.theme,

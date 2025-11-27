@@ -37,7 +37,11 @@ CREATE TABLE IF NOT EXISTS users (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,  -- bcrypt hash
-  did TEXT,                     -- user's DID
+  did TEXT NOT NULL DEFAULT '', -- user's DID
+  did_bound_at INTEGER,
+  pending_did TEXT,
+  pending_did_token TEXT,
+  pending_did_requested_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive' | 'suspended'
@@ -63,6 +67,7 @@ CREATE TABLE IF NOT EXISTS user_vcs (
   vc_id TEXT NOT NULL,          -- jti from VC
   vc_payload TEXT NOT NULL,     -- full VC JSON
   vc_hash TEXT,                 -- SHA256 canonical hash for quick lookups
+  subject_did TEXT NOT NULL DEFAULT '', -- cached subject DID for enforcement
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -71,6 +76,7 @@ CREATE TABLE IF NOT EXISTS user_vcs (
 
 CREATE INDEX IF NOT EXISTS idx_user_vcs_user_id ON user_vcs(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_vcs_vc_id ON user_vcs(vc_id);
+CREATE INDEX IF NOT EXISTS idx_user_vcs_subject_did ON user_vcs(subject_did);
 
 CREATE TABLE IF NOT EXISTS user_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,6 +195,21 @@ CREATE TABLE IF NOT EXISTS tmp_payloads (
   expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS user_did_rotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  old_did TEXT NOT NULL,
+  new_did TEXT NOT NULL,
+  status TEXT NOT NULL, -- 'completed', 'cancelled'
+  rotation_token TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_did_rotations_user_id ON user_did_rotations(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_did_rotations_status ON user_did_rotations(status);
+
 CREATE TABLE IF NOT EXISTS oauth_clients (
   client_id TEXT PRIMARY KEY,
   client_secret_hash TEXT NOT NULL,
@@ -280,7 +301,11 @@ async def _run_migrations(conn: aiosqlite.Connection):
         ("verification_token", "ALTER TABLE users ADD COLUMN verification_token TEXT"),
         ("reset_token", "ALTER TABLE users ADD COLUMN reset_token TEXT"),
         ("reset_token_expires", "ALTER TABLE users ADD COLUMN reset_token_expires INTEGER"),
-        ("backup_codes", "ALTER TABLE users ADD COLUMN backup_codes TEXT"),
+      ("backup_codes", "ALTER TABLE users ADD COLUMN backup_codes TEXT"),
+      ("did_bound_at", "ALTER TABLE users ADD COLUMN did_bound_at INTEGER"),
+      ("pending_did", "ALTER TABLE users ADD COLUMN pending_did TEXT"),
+      ("pending_did_token", "ALTER TABLE users ADD COLUMN pending_did_token TEXT"),
+      ("pending_did_requested_at", "ALTER TABLE users ADD COLUMN pending_did_requested_at INTEGER"),
     ]
     
     for column_name, alter_sql in migrations:
@@ -291,6 +316,12 @@ async def _run_migrations(conn: aiosqlite.Connection):
             except Exception as e:
                 # Column might already exist due to race condition or previous partial migration
                 print(f"Migration warning: Could not add column {column_name}: {e}")
+
+    # Normalize NULL did values to empty string for legacy rows
+    try:
+      await conn.execute("UPDATE users SET did='' WHERE did IS NULL")
+    except Exception as e:
+      print(f"Migration warning: Could not normalize user did column: {e}")
     
     # Check if password_hash column exists in issuers table
     cursor = await conn.execute("PRAGMA table_info(issuers)")
@@ -344,5 +375,29 @@ async def _run_migrations(conn: aiosqlite.Connection):
         print("Migration: Added column vc_hash to user_vcs table")
       except Exception as e:
         print(f"Migration warning: Could not add column vc_hash to user_vcs: {e}")
+
+    if "subject_did" not in user_vcs_column_names:
+        try:
+            await conn.execute("ALTER TABLE user_vcs ADD COLUMN subject_did TEXT")
+            await conn.execute(
+                """
+                UPDATE user_vcs
+                SET subject_did = COALESCE((SELECT did FROM users WHERE users.id = user_vcs.user_id), '')
+                WHERE subject_did IS NULL
+                """
+            )
+            print("Migration: Added column subject_did to user_vcs table")
+        except Exception as e:
+            print(f"Migration warning: Could not add column subject_did to user_vcs: {e}")
+
+    try:
+        await conn.execute("UPDATE user_vcs SET subject_did='' WHERE subject_did IS NULL")
+    except Exception as e:
+        print(f"Migration warning: Could not normalize subject_did column: {e}")
+
+    # Ensure new indexes exist for DID enforcement tables
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_vcs_subject_did ON user_vcs(subject_did)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_did_rotations_user_id ON user_did_rotations(user_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_did_rotations_status ON user_did_rotations(status)")
 
     await conn.commit()

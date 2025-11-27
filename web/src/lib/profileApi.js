@@ -3,6 +3,26 @@
 
 const API_BASE = "/api";
 
+function getWalletDid() {
+  try {
+    const storedIdentity = localStorage.getItem("worldpass_identity");
+    if (!storedIdentity) return null;
+    const parsed = JSON.parse(storedIdentity);
+    return parsed?.did || null;
+  } catch (err) {
+    console.warn("Failed to read wallet DID", err);
+    return null;
+  }
+}
+
+function withWalletHeaders(headers = {}) {
+  const walletDid = getWalletDid();
+  if (walletDid) {
+    return { ...headers, "X-Wallet-Did": walletDid };
+  }
+  return headers;
+}
+
 // Request deduplication: track in-flight requests
 let pendingUpdateRequest = null;
 let pendingUpdateTimer = null;
@@ -22,9 +42,9 @@ export async function fetchProfile(token) {
 
   const response = await fetch(`${API_BASE}/user/profile`, {
     method: "GET",
-    headers: {
+    headers: withWalletHeaders({
       "X-Token": token,
-    },
+    }),
   });
 
   if (!response.ok) {
@@ -69,10 +89,10 @@ async function updateProfileImmediate(token, patch) {
 
   const response = await fetch(`${API_BASE}/user/profile`, {
     method: "POST",
-    headers: {
+    headers: withWalletHeaders({
       "Content-Type": "application/json",
       "X-Token": token,
-    },
+    }),
     body: JSON.stringify(payload),
   });
 

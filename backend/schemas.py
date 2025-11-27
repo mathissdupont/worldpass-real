@@ -230,6 +230,7 @@ class UserVCAddResp(BaseModel):
 class UserVCItem(BaseModel):
     id: int
     vc_id: str
+    subject_did: str
     vc_payload: Dict[str, Any]
     vc_hash: Optional[str] = None
     created_at: int
@@ -266,6 +267,15 @@ class UserDidLinkReq(BaseModel):
 class UserDidLinkResp(BaseModel):
     ok: bool
     did: str
+
+class UserDidRotateReq(BaseModel):
+    new_did: str
+
+class UserDidRotateResp(BaseModel):
+    ok: bool
+    old_did: str
+    new_did: str
+    revoked_vc_count: int
 
 # Extended Issuer Models for Console
 class IssuerUpdateReq(BaseModel):

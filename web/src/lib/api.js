@@ -5,6 +5,32 @@ function getIssuerToken() {
   return localStorage.getItem('issuer_token');
 }
 
+function getWalletDid() {
+  try {
+    const storedIdentity = localStorage.getItem('worldpass_identity');
+    if (!storedIdentity) return null;
+    const parsed = JSON.parse(storedIdentity);
+    return parsed?.did || null;
+  } catch (err) {
+    console.warn('Failed to read wallet DID from storage', err);
+    return null;
+  }
+}
+
+function attachWalletDid(headers = {}) {
+  const walletDid = getWalletDid();
+  if (walletDid) {
+    return { ...headers, 'X-Wallet-Did': walletDid };
+  }
+  return { ...headers };
+}
+
+function buildUserHeaders(extra = {}) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  return attachWalletDid({ ...extra, 'X-Token': token });
+}
+
 function normalizeProfileDataPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     return payload ?? {};
@@ -52,15 +78,10 @@ export async function verifyVC(vcObj, challenge, presenter_did=null){
 
 // Template management API
 export async function createTemplate(template) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
-  
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
   const r = await fetch('/api/user/templates', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Token': token
-    },
+    headers,
     body: JSON.stringify(template)
   });
   if (!r.ok) throw new Error('create_template_failed');
@@ -68,26 +89,24 @@ export async function createTemplate(template) {
 }
 
 export async function listTemplates() {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
-  
+  const headers = buildUserHeaders();
   const r = await fetch('/api/user/templates', {
     method: 'GET',
-    headers: {
-      'X-Token': token
-    }
+    headers
   });
   if (!r.ok) throw new Error('list_templates_failed');
   return r.json();
 }
 
 export async function updateTemplate(token, templateId, updates) {
+  if (!token) throw new Error('Not authenticated');
+  const headers = attachWalletDid({
+    'Content-Type': 'application/json',
+    'X-Token': token
+  });
   const r = await fetch(`/api/user/templates/${templateId}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Token': token
-    },
+    headers,
     body: JSON.stringify(updates)
   });
   if (!r.ok) throw new Error('update_template_failed');
@@ -95,11 +114,11 @@ export async function updateTemplate(token, templateId, updates) {
 }
 
 export async function deleteTemplate(token, templateId) {
+  if (!token) throw new Error('Not authenticated');
+  const headers = attachWalletDid({ 'X-Token': token });
   const r = await fetch(`/api/user/templates/${templateId}`, {
     method: 'DELETE',
-    headers: {
-      'X-Token': token
-    }
+    headers
   });
   if (!r.ok) throw new Error('delete_template_failed');
   return r.json();
@@ -405,22 +424,20 @@ export async function revokeCredential(vcId) {
 }
 
 export async function setup2FA() {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+  const headers = buildUserHeaders();
   const r = await fetch('/api/auth/2fa/setup', {
     method: 'POST',
-    headers: { 'X-Token': token }
+    headers
   });
   if (!r.ok) throw new Error('setup_2fa_failed');
   return r.json();
 }
 
 export async function enable2FA(secret, code) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
   const r = await fetch('/api/auth/2fa/enable', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Token': token },
+    headers,
     body: JSON.stringify({ secret, code })
   });
   if (!r.ok) throw new Error('enable_2fa_failed');
@@ -428,11 +445,10 @@ export async function enable2FA(secret, code) {
 }
 
 export async function disable2FA() {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+  const headers = buildUserHeaders();
   const r = await fetch('/api/auth/2fa/disable', {
     method: 'POST',
-    headers: { 'X-Token': token }
+    headers
   });
   if (!r.ok) throw new Error('disable_2fa_failed');
   return r.json();
@@ -440,11 +456,10 @@ export async function disable2FA() {
 
 // User Profile Data API
 export async function getUserProfileData() {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+  const headers = buildUserHeaders();
   const r = await fetch('/api/user/profile-data', {
     method: 'GET',
-    headers: { 'X-Token': token }
+    headers
   });
   if (!r.ok) throw new Error('get_profile_data_failed');
   const data = await r.json();
@@ -455,17 +470,13 @@ export async function getUserProfileData() {
 }
 
 export async function saveUserProfileData(profileData) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
   if (!profileData || typeof profileData !== 'object') {
     throw new Error('invalid_profile_data');
   }
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
   const r = await fetch('/api/user/profile-data', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Token': token
-    },
+    headers,
     body: JSON.stringify({ profile_data: profileData })
   });
   if (!r.ok) {
@@ -481,16 +492,12 @@ export async function saveUserProfileData(profileData) {
 }
 
 export async function linkUserDid(did) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
   if (!did) throw new Error('Missing DID');
 
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
   const r = await fetch('/api/user/did-link', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Token': token
-    },
+    headers,
     body: JSON.stringify({ did })
   });
 
@@ -502,16 +509,30 @@ export async function linkUserDid(did) {
   return r.json();
 }
 
+export async function rotateUserDid(newDid) {
+  if (!newDid) throw new Error('Missing DID');
+
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
+  const r = await fetch('/api/user/did-rotate', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ new_did: newDid })
+  });
+
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || 'rotate_did_failed');
+  }
+
+  return r.json();
+}
+
 // Payment API
 export async function createPaymentIntent(amount_minor, currency, description, return_url) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
   const r = await fetch('/api/payment/intent', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Token': token
-    },
+    headers,
     body: JSON.stringify({ amount_minor, currency, description, return_url })
   });
   if (!r.ok) throw new Error('create_payment_intent_failed');
@@ -519,15 +540,13 @@ export async function createPaymentIntent(amount_minor, currency, description, r
 }
 
 export async function listTransactions(status = null) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
   const url = status 
     ? `/api/payment/transactions?status=${status}`
     : '/api/payment/transactions';
-    
+  const headers = buildUserHeaders();
   const r = await fetch(url, {
     method: 'GET',
-    headers: { 'X-Token': token }
+    headers
   });
   if (!r.ok) throw new Error('list_transactions_failed');
   return r.json();

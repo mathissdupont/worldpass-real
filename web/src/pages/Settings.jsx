@@ -388,9 +388,13 @@ export default function Settings() {
     try {
       const token = getToken();
       if (token) {
+        const headers = { "X-Token": token };
+        if (identity?.did) {
+          headers["X-Wallet-Did"] = identity.did;
+        }
         const res = await fetch("/api/user/delete", {
           method: "POST",
-          headers: { "X-Token": token }
+          headers
         });
         if (!res.ok) throw new Error("Failed");
       }
