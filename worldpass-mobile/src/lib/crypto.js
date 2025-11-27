@@ -215,3 +215,33 @@ export async function decryptKeystore(password, blob) {
 export function didFromPublicKey(pkBytes) {
   return `did:key:z${bytesToBase64Url(pkBytes)}`;
 }
+
+/**
+ * Generate a new Ed25519 identity (DID + keypair)
+ * @returns {Promise<{did: string, sk_b64u: string, pk_b64u: string}>}
+ */
+export async function generateIdentity() {
+  // Use noble/ed25519 for key generation
+  const { ed25519 } = await import('@noble/curves/ed25519');
+  
+  // Generate random private key (32 bytes)
+  const privateKey = randomBytes(32);
+  
+  // Derive public key
+  const publicKey = ed25519.getPublicKey(privateKey);
+  
+  // Create DID from public key
+  // Using did:key format with multicodec prefix for Ed25519 (0xed01)
+  const multicodecPrefix = new Uint8Array([0xed, 0x01]);
+  const prefixedPubKey = new Uint8Array(multicodecPrefix.length + publicKey.length);
+  prefixedPubKey.set(multicodecPrefix);
+  prefixedPubKey.set(publicKey, multicodecPrefix.length);
+  
+  const did = `did:key:z${bytesToBase64Url(prefixedPubKey)}`;
+  
+  return {
+    did,
+    sk_b64u: bytesToBase64Url(privateKey),
+    pk_b64u: bytesToBase64Url(publicKey),
+  };
+}

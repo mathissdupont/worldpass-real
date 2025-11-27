@@ -102,12 +102,19 @@ export default function SettingsScreen({ navigation }) {
             icon="person-circle-outline"
             title={user?.name || 'Not logged in'}
             subtitle={user?.email}
+            onPress={() => navigation.navigate('Profile')}
           />
           <SettingItem
             icon="shield-checkmark-outline"
             title="Wallet Identity"
             subtitle={identitySubtitle}
             onPress={handleManageIdentity}
+          />
+          <SettingItem
+            icon="add-circle-outline"
+            title="Create New Identity"
+            subtitle="Generate a new DID"
+            onPress={() => navigation.navigate('IdentityCreate')}
           />
           <SettingItem
             icon="key-outline"
@@ -122,6 +129,12 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Security</Text>
         <View style={styles.card}>
           <SettingItem
+            icon="shield-half-outline"
+            title="Two-Factor Authentication"
+            subtitle="Add extra security to your account"
+            onPress={() => navigation.navigate('TwoFactor')}
+          />
+          <SettingItem
             icon="finger-print-outline"
             title="Biometric Unlock"
             subtitle={biometricAvailable ? 'Use biometrics for wallet access' : 'Not available on this device'}
@@ -132,6 +145,18 @@ export default function SettingsScreen({ navigation }) {
                 disabled={!biometricAvailable}
               />
             }
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Payments</Text>
+        <View style={styles.card}>
+          <SettingItem
+            icon="receipt-outline"
+            title="Transaction History"
+            subtitle="View all your payments"
+            onPress={() => navigation.navigate('Transactions')}
           />
         </View>
       </View>
