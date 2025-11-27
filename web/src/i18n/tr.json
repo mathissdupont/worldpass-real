@@ -256,7 +256,7 @@
     "camera_in_use": "Kamera kullanılabilir değil. Kamerayı kullanan diğer uygulamaları kapatın.",
     "scanner_hint_camera": "Kamera iznini verin ve doğrulayıcının QR kodunu kadrajda sabit tutun.",
     "scanner_hint_nfc": "Web NFC yalnızca HTTPS veya localhost üzerinde Chrome/Edge Android'de çalışır.",
-    ,"scanned_payload_loaded": "Taranan içerik yüklendi"
+    "scanned_payload_loaded": "Taranan içerik yüklendi"
   ,"step2_challenge": "2) Meydan okuma al"
   ,"new_challenge": "Yeni Meydan Okuma"
   ,"nonce_label": "Nonce"
