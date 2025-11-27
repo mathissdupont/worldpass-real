@@ -8,12 +8,31 @@ import { ActivityIndicator, View } from 'react-native';
 import WalletScreen from '../screens/WalletScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import IdentityImportScreen from '../screens/IdentityImportScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const SettingsStack = createNativeStackNavigator();
+
+function SettingsStackScreen() {
+  return (
+    <SettingsStack.Navigator>
+      <SettingsStack.Screen
+        name="SettingsHome"
+        component={SettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <SettingsStack.Screen
+        name="IdentityImport"
+        component={IdentityImportScreen}
+        options={{ title: 'Wallet Identity' }}
+      />
+    </SettingsStack.Navigator>
+  );
+}
 
 function AppTabs() {
   return (
@@ -49,7 +68,7 @@ function AppTabs() {
       />
       <Tab.Screen 
         name="Settings" 
-        component={SettingsScreen}
+        component={SettingsStackScreen}
         options={{ title: 'Settings' }}
       />
     </Tab.Navigator>

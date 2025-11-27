@@ -10,12 +10,17 @@ import { Camera, CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { verifyCredential } from '../lib/api';
 import { addCredential } from '../lib/storage';
+import { useNavigation } from '@react-navigation/native';
+import { useIdentity } from '../context/IdentityContext';
 
 export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
+  const { identity } = useIdentity();
+  const navigation = useNavigation();
+  const walletDid = identity?.did || '';
 
   useEffect(() => {
     requestCameraPermission();
@@ -36,6 +41,20 @@ export default function ScannerScreen() {
 
   const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned || scanning) return;
+    if (!walletDid) {
+      Alert.alert(
+        'Import identity',
+        'You need to import your wallet identity before adding new credentials.',
+        [
+          {
+            text: 'Go to Identity',
+            onPress: () => navigation.navigate('Settings', { screen: 'IdentityImport' }),
+          },
+          { text: 'Cancel', style: 'cancel', onPress: resetScanner },
+        ],
+      );
+      return;
+    }
     
     setScanned(true);
     setScanning(true);
@@ -53,6 +72,16 @@ export default function ScannerScreen() {
 
       // Verify the credential
       const result = await verifyCredential(vcData);
+
+      const subjectDid = vcData?.credentialSubject?.id;
+      if (subjectDid && subjectDid !== walletDid) {
+        Alert.alert(
+          'Wrong identity',
+          'This credential is not issued to your DID.',
+          [{ text: 'OK', onPress: resetScanner }],
+        );
+        return;
+      }
 
       if (result.valid) {
         // Save credential
@@ -88,6 +117,24 @@ export default function ScannerScreen() {
     return (
       <View style={styles.container}>
         <Text style={styles.loadingText}>Requesting camera permission...</Text>
+      </View>
+    );
+  }
+
+  if (!walletDid) {
+    return (
+      <View style={styles.identityContainer}>
+        <Ionicons name="shield-outline" size={72} color="#6366f1" />
+        <Text style={styles.identityTitle}>Import your identity</Text>
+        <Text style={styles.identityText}>
+          Load your .wpkeystore in Settings before scanning credentials.
+        </Text>
+        <TouchableOpacity
+          style={styles.identityButton}
+          onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
+        >
+          <Text style={styles.identityButtonText}>Manage Identity</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -173,6 +220,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 32,
     textAlign: 'center',
+  },
+  identityContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  identityTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  identityText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  identityButton: {
+    backgroundColor: '#4f46e5',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  identityButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   loadingText: {
     color: 'white',

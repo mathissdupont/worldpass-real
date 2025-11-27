@@ -81,6 +81,13 @@ export async function updateUserProfile(updates) {
   });
 }
 
+export async function linkDid(did) {
+  return apiRequest('/api/user/did-link', {
+    method: 'POST',
+    body: JSON.stringify({ did }),
+  });
+}
+
 // Credential APIs
 export async function lookupCredential(recipientId) {
   return apiRequest(`/api/recipient/lookup/${recipientId}`);

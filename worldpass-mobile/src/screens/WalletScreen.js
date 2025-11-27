@@ -12,12 +12,17 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { getCredentials, deleteCredential } from '../lib/storage';
+import { useIdentity } from '../context/IdentityContext';
 
 export default function WalletScreen() {
   const [credentials, setCredentials] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState(null);
+  const { identity } = useIdentity();
+  const navigation = useNavigation();
+  const walletDid = identity?.did || '';
 
   const loadCredentials = async () => {
     try {
@@ -96,6 +101,23 @@ export default function WalletScreen() {
     </View>
   );
 
+  const IdentityBanner = () => (
+    <View style={[styles.identityCard, !walletDid && styles.identityCardWarning]}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.identityLabel}>{walletDid ? 'Active DID' : 'No identity imported'}</Text>
+        <Text style={styles.identityValue} numberOfLines={2}>
+          {walletDid || 'Import your .wpkeystore to unlock wallet features'}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.identityButton}
+        onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
+      >
+        <Text style={styles.identityButtonText}>{walletDid ? 'Manage' : 'Import'}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -103,6 +125,7 @@ export default function WalletScreen() {
         renderItem={renderCredential}
         keyExtractor={(item, index) => item?.jti || item?.id || `${item?.issuer || 'vc'}-${index}`}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={<IdentityBanner />}
         ListEmptyComponent={EmptyState}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -143,6 +166,43 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 32,
+  },
+  identityCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  identityCardWarning: {
+    borderColor: '#fbbf24',
+    backgroundColor: '#fffbeb',
+  },
+  identityLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  identityValue: {
+    fontSize: 14,
+    color: '#111827',
+    marginTop: 4,
+  },
+  identityButton: {
+    backgroundColor: '#4f46e5',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  identityButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   card: {
     backgroundColor: 'white',

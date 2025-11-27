@@ -10,14 +10,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { getDID, clearAllData } from '../lib/storage';
+import * as Clipboard from 'expo-clipboard';
+import { clearAllData } from '../lib/storage';
 import { useAuth } from '../context/AuthContext';
+import { useIdentity } from '../context/IdentityContext';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const { user, signOut, refreshProfile } = useAuth();
-  const [did, setDid] = useState(null);
+  const { identity, linking, error: identityError } = useIdentity();
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const walletDid = identity?.did || '';
+  const identitySubtitle = walletDid
+    ? (identityError ? `Sync issue: ${identityError}` : linking ? 'Syncing DID with your account...' : `${walletDid.slice(0, 30)}...`)
+    : 'Import your .wpkeystore to link a DID';
 
   useEffect(() => {
     loadSettings();
@@ -25,9 +31,6 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const userDid = await getDID();
-      setDid(userDid);
-
       await refreshProfile().catch(() => {});
       const compatible = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
@@ -50,21 +53,30 @@ export default function SettingsScreen() {
             await clearAllData();
             await signOut();
             Alert.alert('Success', 'All data cleared');
-            setDid(null);
           },
         },
       ]
     );
   };
 
-  const handleExportDID = () => {
-    if (!did) {
-      Alert.alert('No DID', 'You have not created a DID yet');
+  const handleManageIdentity = () => {
+    navigation.navigate('IdentityImport');
+  };
+
+  const handleExportDID = async () => {
+    if (!walletDid) {
+      Alert.alert('No DID', 'Import your wallet identity first.');
       return;
     }
-    Alert.alert('Your DID', did, [
-      { text: 'Copy', onPress: () => {} },
-      { text: 'Close' },
+    Alert.alert('Wallet DID', walletDid, [
+      {
+        text: 'Copy',
+        onPress: async () => {
+          await Clipboard.setStringAsync(walletDid);
+        },
+      },
+      { text: 'Manage', onPress: handleManageIdentity },
+      { text: 'Close', style: 'cancel' },
     ]);
   };
 
@@ -92,9 +104,15 @@ export default function SettingsScreen() {
             subtitle={user?.email}
           />
           <SettingItem
+            icon="shield-checkmark-outline"
+            title="Wallet Identity"
+            subtitle={identitySubtitle}
+            onPress={handleManageIdentity}
+          />
+          <SettingItem
             icon="key-outline"
             title="Decentralized ID (DID)"
-            subtitle={did ? `${did.slice(0, 30)}...` : 'No DID created'}
+            subtitle={walletDid ? `${walletDid.slice(0, 30)}...` : 'No DID created'}
             onPress={handleExportDID}
           />
         </View>

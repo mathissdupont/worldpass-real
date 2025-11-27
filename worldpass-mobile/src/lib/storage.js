@@ -3,8 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CREDENTIALS_KEY = 'worldpass_credentials';
-const DID_KEY = 'worldpass_did';
-const PRIVATE_KEY = 'worldpass_private_key';
+const IDENTITY_KEY = 'worldpass_identity_v1';
 
 // Secure storage (for sensitive data)
 export async function saveSecureItem(key, value) {
@@ -19,21 +18,38 @@ export async function deleteSecureItem(key) {
   await SecureStore.deleteItemAsync(key);
 }
 
-// DID management
+// Identity management
+export async function saveIdentity(identity) {
+  await saveSecureItem(IDENTITY_KEY, JSON.stringify(identity));
+}
+
+export async function getIdentity() {
+  const raw = await getSecureItem(IDENTITY_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function clearIdentity() {
+  await deleteSecureItem(IDENTITY_KEY);
+}
+
 export async function saveDID(did) {
-  await saveSecureItem(DID_KEY, did);
+  const current = (await getIdentity()) || {};
+  current.did = did;
+  await saveIdentity(current);
 }
 
 export async function getDID() {
-  return await getSecureItem(DID_KEY);
+  return (await getIdentity())?.did ?? null;
 }
 
 export async function savePrivateKey(privateKey) {
-  await saveSecureItem(PRIVATE_KEY, privateKey);
+  const current = (await getIdentity()) || {};
+  current.sk_b64u = privateKey;
+  await saveIdentity(current);
 }
 
 export async function getPrivateKey() {
-  return await getSecureItem(PRIVATE_KEY);
+  return (await getIdentity())?.sk_b64u ?? null;
 }
 
 // Credentials storage
@@ -60,6 +76,5 @@ export async function deleteCredential(credentialId) {
 
 export async function clearAllData() {
   await AsyncStorage.removeItem(CREDENTIALS_KEY);
-  await deleteSecureItem(DID_KEY);
-  await deleteSecureItem(PRIVATE_KEY);
+  await clearIdentity();
 }
