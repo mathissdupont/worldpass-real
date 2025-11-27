@@ -5,6 +5,23 @@ function getIssuerToken() {
   return localStorage.getItem('issuer_token');
 }
 
+function normalizeProfileDataPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return payload ?? {};
+  }
+
+  if (
+    Object.keys(payload).length === 1 &&
+    payload.profile_data &&
+    typeof payload.profile_data === 'object' &&
+    !Array.isArray(payload.profile_data)
+  ) {
+    return payload.profile_data;
+  }
+
+  return payload;
+}
+
 export async function apiHealth(){
   const r = await fetch('/api/health');
   return r.json();
@@ -430,12 +447,19 @@ export async function getUserProfileData() {
     headers: { 'X-Token': token }
   });
   if (!r.ok) throw new Error('get_profile_data_failed');
-  return r.json();
+  const data = await r.json();
+  return {
+    ...data,
+    profile_data: normalizeProfileDataPayload(data.profile_data) ?? {}
+  };
 }
 
 export async function saveUserProfileData(profileData) {
   const token = getToken();
   if (!token) throw new Error('Not authenticated');
+  if (!profileData || typeof profileData !== 'object') {
+    throw new Error('invalid_profile_data');
+  }
   const r = await fetch('/api/user/profile-data', {
     method: 'POST',
     headers: {
@@ -449,7 +473,11 @@ export async function saveUserProfileData(profileData) {
     console.error('Profile save error:', errorText);
     throw new Error(`save_profile_data_failed: ${errorText}`);
   }
-  return r.json();
+  const data = await r.json();
+  return {
+    ...data,
+    profile_data: normalizeProfileDataPayload(data.profile_data) ?? {}
+  };
 }
 
 export async function linkUserDid(did) {

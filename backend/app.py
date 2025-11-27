@@ -1787,8 +1787,15 @@ async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_
             # Decrypt sensitive fields
             encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
             decrypted_data = encryptor.decrypt_profile_data(profile_data)
+
+            if (
+                isinstance(decrypted_data, dict)
+                and len(decrypted_data) == 1
+                and isinstance(decrypted_data.get("profile_data"), dict)
+            ):
+                decrypted_data = decrypted_data["profile_data"]
             
-            return UserProfileDataResp(ok=True, profile_data=decrypted_data)
+            return UserProfileDataResp(ok=True, profile_data=decrypted_data or {})
         except json.JSONDecodeError as e:
             print(f"❌ JSON decode error for DID {user['did']}: {e}")
             return UserProfileDataResp(ok=True, profile_data={})
@@ -1797,7 +1804,14 @@ async def get_user_profile_data(user=Depends(_get_current_user), db=Depends(get_
             import traceback
             traceback.print_exc()
             # Return raw data if decryption fails (backward compatibility)
-            return UserProfileDataResp(ok=True, profile_data=profile_data if 'profile_data' in locals() else {})
+            fallback = profile_data if 'profile_data' in locals() else {}
+            if (
+                isinstance(fallback, dict)
+                and len(fallback) == 1
+                and isinstance(fallback.get("profile_data"), dict)
+            ):
+                fallback = fallback["profile_data"]
+            return UserProfileDataResp(ok=True, profile_data=fallback or {})
             
     except HTTPException:
         raise
@@ -1829,10 +1843,18 @@ async def save_user_profile_data(
         if not body.profile_data:
             raise HTTPException(status_code=400, detail="profile_data_required")
         
+        profile_payload = body.profile_data or {}
+        if (
+            isinstance(profile_payload, dict)
+            and len(profile_payload) == 1
+            and isinstance(profile_payload.get("profile_data"), dict)
+        ):
+            profile_payload = profile_payload["profile_data"]
+        
         # Encrypt sensitive fields before saving
         try:
             encryptor = get_profile_encryptor(settings.PROFILE_ENCRYPTION_KEY)
-            encrypted_data = encryptor.encrypt_profile_data(body.profile_data)
+            encrypted_data = encryptor.encrypt_profile_data(profile_payload)
         except Exception as e:
             print(f"❌ Encryption error: {e}")
             import traceback
@@ -1877,7 +1899,7 @@ async def save_user_profile_data(
             raise HTTPException(status_code=500, detail=f"db_commit_failed: {str(e)}")
         
         # Return decrypted data to client (same as what they sent, unencrypted)
-        return UserProfileDataResp(ok=True, profile_data=body.profile_data)
+        return UserProfileDataResp(ok=True, profile_data=profile_payload)
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is

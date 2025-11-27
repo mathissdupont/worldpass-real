@@ -112,10 +112,14 @@ export default function Account() {
   }, [activeTab, hasDid]);
 
   const handleSaveProfileField = async (fieldId, value) => {
+    if (!hasDid) {
+      setMsg({ type: "error", text: "Önce DID yükleyin" });
+      return;
+    }
     try {
       const updated = { ...profileData, [fieldId]: value };
-      await saveUserProfileData({ profile_data: updated });
-      setProfileData(updated);
+      const response = await saveUserProfileData(updated);
+      setProfileData(response.profile_data || updated);
       setEditingField(null);
       setMsg({ type: "success", text: "Kaydedildi!" });
     } catch (err) {
@@ -125,11 +129,15 @@ export default function Account() {
   };
 
   const handleRemoveProfileField = async (fieldId) => {
+    if (!hasDid) {
+      setMsg({ type: "error", text: "Önce DID yükleyin" });
+      return;
+    }
     try {
       const updated = { ...profileData };
       delete updated[fieldId];
-      await saveUserProfileData({ profile_data: updated });
-      setProfileData(updated);
+      const response = await saveUserProfileData(updated);
+      setProfileData(response.profile_data || updated);
       setMsg({ type: "success", text: "Silindi" });
     } catch (err) {
       console.error("Remove error:", err);

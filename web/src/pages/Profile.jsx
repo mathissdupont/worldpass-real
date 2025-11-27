@@ -210,7 +210,7 @@ export default function Profile() {
     try {
       const response = await saveUserProfileData(data);
       if (response.ok) {
-        setProfileData(data);
+        setProfileData(response.profile_data || data);
         return true;
       }
       return false;
