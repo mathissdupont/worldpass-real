@@ -9,6 +9,11 @@ import WalletScreen from '../screens/WalletScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import IdentityImportScreen from '../screens/IdentityImportScreen';
+import IdentityCreateScreen from '../screens/IdentityCreateScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import TwoFactorScreen from '../screens/TwoFactorScreen';
+import TransactionsScreen from '../screens/TransactionsScreen';
+import VCQRScreen from '../screens/VCQRScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +21,24 @@ import { useAuth } from '../context/AuthContext';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const SettingsStack = createNativeStackNavigator();
+const WalletStack = createNativeStackNavigator();
+
+function WalletStackScreen() {
+  return (
+    <WalletStack.Navigator>
+      <WalletStack.Screen
+        name="WalletHome"
+        component={WalletScreen}
+        options={{ headerShown: false }}
+      />
+      <WalletStack.Screen
+        name="VCQR"
+        component={VCQRScreen}
+        options={{ title: 'Share Credential' }}
+      />
+    </WalletStack.Navigator>
+  );
+}
 
 function SettingsStackScreen() {
   return (
@@ -28,7 +51,27 @@ function SettingsStackScreen() {
       <SettingsStack.Screen
         name="IdentityImport"
         component={IdentityImportScreen}
-        options={{ title: 'Wallet Identity' }}
+        options={{ title: 'Import Identity' }}
+      />
+      <SettingsStack.Screen
+        name="IdentityCreate"
+        component={IdentityCreateScreen}
+        options={{ title: 'Create Identity' }}
+      />
+      <SettingsStack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: 'Edit Profile' }}
+      />
+      <SettingsStack.Screen
+        name="TwoFactor"
+        component={TwoFactorScreen}
+        options={{ title: 'Two-Factor Authentication' }}
+      />
+      <SettingsStack.Screen
+        name="Transactions"
+        component={TransactionsScreen}
+        options={{ title: 'Transactions' }}
       />
     </SettingsStack.Navigator>
   );
@@ -58,7 +101,7 @@ function AppTabs() {
     >
       <Tab.Screen 
         name="Wallet" 
-        component={WalletScreen}
+        component={WalletStackScreen}
         options={{ title: 'My Credentials' }}
       />
       <Tab.Screen 

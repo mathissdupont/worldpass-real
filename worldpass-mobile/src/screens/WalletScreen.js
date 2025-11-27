@@ -64,13 +64,24 @@ export default function WalletScreen() {
   const renderCredential = ({ item }) => (
     <TouchableOpacity style={styles.card} onPress={() => setSelectedCredential(item)}>
       <View style={styles.cardHeader}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.cardType}>{item.type[item.type.length - 1]}</Text>
           <Text style={styles.cardIssuer}>Issued by: {item.issuer}</Text>
         </View>
-        <TouchableOpacity onPress={() => handleDelete(item)}>
-          <Ionicons name="trash-outline" size={24} color="#ef4444" />
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('VCQR', { credential: item })}
+          >
+            <Ionicons name="qr-code-outline" size={20} color="#4f46e5" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleDelete(item)}
+          >
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardLabel}>Holder:</Text>
@@ -220,6 +231,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
   },
   cardType: {
     fontSize: 18,
