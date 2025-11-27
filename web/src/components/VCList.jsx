@@ -27,26 +27,37 @@ function Badge({ tone="neutral", children }) {
 
 export default function VCList({ onRevoke }) {
   const [list, setList] = useState([]);
-  const [filter, setFilter] = useState("");          // basit arama
-  const [qrOf, setQrOf] = useState(null);            // { jti, issuer, dataUrl }
-  const [previewJti, setPreviewJti] = useState(null); // JSON toggle
-  const [msg, setMsg] = useState(null);              // {type, text}
+  const [filter, setFilter] = useState("");
+  const [activeType, setActiveType] = useState("all");
+  const [qrOf, setQrOf] = useState(null);
+  const [previewJti, setPreviewJti] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const vcs = await loadVCs();
+        if (!cancelled) {
+          setList(safeSort(vcs));
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err?.message || t('unable_to_fetch_credentials'));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  (async () => {
-    const vcs = await loadVCs();   // <-- Artık Promise çözülüyor
-    if (!cancelled) {
-      setList(safeSort(vcs));      // <-- Artık gerçek array
-    }
-  })();
 
-  return () => { cancelled = true; };
-}, []);
-
-
-  const filtered = useMemo(() => {
+  const textFiltered = useMemo(() => {
     if (!filter.trim()) return list;
     const q = filter.trim().toLowerCase();
     return list.filter(v => {
@@ -60,6 +71,29 @@ export default function VCList({ onRevoke }) {
       );
     });
   }, [list, filter]);
+
+  const filtered = useMemo(() => {
+    if (activeType === "all") return textFiltered;
+    return textFiltered.filter(vc => getPrimaryType(vc) === activeType);
+  }, [textFiltered, activeType]);
+
+  const typeFacets = useMemo(() => {
+    const counts = new Map();
+    list.forEach(vc => {
+      const primary = getPrimaryType(vc);
+      if (!primary) return;
+      counts.set(primary, (counts.get(primary) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([type, count]) => ({ type, count }));
+  }, [list]);
+
+  const stats = useMemo(() => ({
+    total: list.length,
+    filtered: filtered.length,
+    issuers: new Set(list.map(v => v?.issuer).filter(Boolean)).size,
+  }), [list, filtered]);
 
 function safeSort(arr){
   const list = Array.isArray(arr) ? arr : [];
@@ -113,25 +147,78 @@ async function hardRemove(jti){
   return (
     <section className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold">{t('my_credentials')}</h2>
-          <p className="text-[12px] text-[color:var(--muted)]">{t('credentials_intro')}</p>
+      <div className="flex flex-col gap-4 rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[12px] uppercase tracking-[0.2em] text-[color:var(--muted)]">{t('wallet_overview')}</p>
+            <h2 className="text-xl font-semibold">{t('my_credentials')}</h2>
+            <p className="text-[13px] text-[color:var(--muted)]">{t('credentials_intro')}</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <input
+              value={filter}
+              onChange={(e)=>setFilter(e.target.value)}
+              placeholder={t('search_placeholder')}
+              className="h-10 w-full sm:w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <input
-            value={filter}
-            onChange={(e)=>setFilter(e.target.value)}
-            placeholder={t('search_placeholder')}
-            className="h-9 w-full sm:w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard label={t('total_credentials')} value={stats.total} helper={t('including_archived')} />
+          <StatCard label={t('filtered')} value={stats.filtered} helper={filter ? t('matching_filters') : t('showing_all')} />
+          <StatCard label={t('unique_issuers')} value={stats.issuers} helper={t('issuer_plural')} />
         </div>
+        {typeFacets.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <FilterChip
+              active={activeType === "all"}
+              onClick={() => setActiveType("all")}
+            >
+              {t('all_types')} ({list.length})
+            </FilterChip>
+            {typeFacets.map(({ type, count }) => (
+              <FilterChip
+                key={type}
+                active={activeType === type}
+                onClick={() => setActiveType(type)}
+              >
+                {type} ({count})
+              </FilterChip>
+            ))}
+          </div>
+        )}
       </div>
 
+      {error && (
+        <div className="rounded-[var(--radius)] border border-rose-400/40 bg-rose-500/5 p-3 text-sm text-rose-200">
+          {error}
+        </div>
+      )}
+
       {/* Empty state */}
-      {filtered.length === 0 && (
-        <div className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel-2)] p-6 text-center">
+      {loading && (
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="animate-pulse rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4">
+              <div className="h-5 w-1/3 bg-white/10 rounded mb-2" />
+              <div className="h-4 w-full bg-white/5 rounded mb-1" />
+              <div className="h-4 w-2/3 bg-white/5 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="rounded-[var(--radius)] border border-dashed border-[color:var(--border)] bg-[color:var(--panel-2)] p-6 text-center">
           <div className="text-sm text-[color:var(--muted)]">{t('no_credentials_yet')}</div>
+          {filter && (
+            <button
+              onClick={() => { setFilter(""); setActiveType("all"); }}
+              className="mt-3 text-xs underline text-[color:var(--text)]/80"
+            >
+              {t('clear_filters')}
+            </button>
+          )}
         </div>
       )}
 
@@ -145,75 +232,71 @@ async function hardRemove(jti){
           const issued = vc?.issuanceDate ? new Date(vc.issuanceDate).toLocaleString() : null;
 
           return (
-            <article key={vc?.jti || Math.random()} className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-3 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-[color:var(--text)] break-words">{title}{subjectLabel ? ` — ${subjectLabel}` : ""}</div>
-                  <div className="text-[11px] text-[color:var(--muted)] mt-0.5 break-all">
-                    {issued ? <>{t('issued')}: <time dateTime={vc?.issuanceDate}>{issued}</time> · </> : null}
-                    {t('issuer_label')}: <code className="font-mono">{short(vc?.issuer)}</code>
+            <article key={vc?.jti || Math.random()} className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4 shadow-sm">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-[color:var(--panel-2)] border border-[color:var(--border)] flex items-center justify-center text-sm font-semibold">
+                      {initials(subjectLabel || title)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-sm font-semibold text-[color:var(--text)] break-words">
+                          {title}{subjectLabel ? ` — ${subjectLabel}` : ""}
+                        </div>
+                        {Array.isArray(types) && types.length > 0 && (
+                          <Badge tone="ok">{types.join(", ")}</Badge>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[color:var(--muted)] mt-1 break-all">
+                        {issued ? (
+                          <>
+                            {t('issued')}: <time dateTime={vc?.issuanceDate}>{issued}</time>
+                            <span className="mx-1">·</span>
+                          </>
+                        ) : null}
+                        {t('issuer_label')}: <code className="font-mono">{short(vc?.issuer)}</code>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral">{t('jti_label')}: <code className="font-mono">{short(vc?.jti)}</code></Badge>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <Badge tone="neutral">{t('jti_label')}: <code className="font-mono">{short(vc?.jti)}</code></Badge>
-                    {Array.isArray(types) && types.length>0 && <Badge tone="ok">{types.join(", ")}</Badge>}
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto sm:shrink-0">
-                  <button
-                    onClick={() => showQR(vc)}
-                    className="h-9 px-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
-                  >
-                    {t('show_qr')}
-                  </button>
-                  <button
-                    onClick={() => downloadVC(vc)}
-                    className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
-                  >
-                    {t('download')}
-                  </button>
-                  {vc?.jti && onRevoke && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[color:var(--muted)]">
+                    {vc?.jti && (
+                      <button
+                        onClick={()=>copy(vc.jti, t('jti_copied'))}
+                        className="underline hover:text-[color:var(--text)]"
+                      >
+                        {t('copy_jti')}
+                      </button>
+                    )}
+                    {vc?.issuer && (
+                      <button
+                        onClick={()=>copy(vc.issuer, t('issuer_copied'))}
+                        className="underline hover:text-[color:var(--text)]"
+                      >
+                        {t('copy_issuer')}
+                      </button>
+                    )}
                     <button
-                      onClick={() => onRevoke(vc.jti)}
-                      className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
+                      onClick={()=>setPreviewJti(p => p === vc?.jti ? null : vc?.jti)}
+                      className="underline hover:text-[color:var(--text)]"
                     >
-                      {t('revoke')}
+                      {previewJti === vc?.jti ? t('hide_json') : t('show_json')}
                     </button>
-                  )}
-                  <button
-                    onClick={() => hardRemove(vc?.jti)}
-                    className="h-9 px-3 rounded-lg border border-[color:var(--border)]/80 bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] text-sm"
-                  >
-                    {t('remove')}
-                  </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Secondary row: copy & preview */}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {vc?.jti && (
-                  <button
-                    onClick={()=>copy(vc.jti, t('jti_copied'))}
-                    className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
-                  >
-                    {t('copy_jti')}
-                  </button>
-                )}
-                {vc?.issuer && (
-                  <button
-                    onClick={()=>copy(vc.issuer, t('issuer_copied'))}
-                    className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
-                  >
-                    {t('copy_issuer')}
-                  </button>
-                )}
-                <button
-                  onClick={()=>setPreviewJti(p => p === vc?.jti ? null : vc?.jti)}
-                  className="text-[11px] underline text-[color:var(--text)]/80 hover:text-[color:var(--text)]"
-                >
-                  {previewJti === vc?.jti ? t('hide_json') : t('show_json')}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton icon="qr" label={t('show_qr')} onClick={() => showQR(vc)} />
+                  <ActionButton icon="download" label={t('download')} onClick={() => downloadVC(vc)} />
+                  {vc?.jti && onRevoke && (
+                    <ActionButton icon="revoke" label={t('revoke')} onClick={() => onRevoke(vc.jti)} />
+                  )}
+                  <ActionButton icon="trash" label={t('remove')} onClick={() => hardRemove(vc?.jti)} />
+                </div>
               </div>
 
               {previewJti === vc?.jti && (
@@ -297,4 +380,61 @@ function downloadDataUrl(dataUrl, filename){
       URL.revokeObjectURL(a.href);
     })
     .catch(()=>{/* sessiz */});
+}
+
+function getPrimaryType(vc){
+  const types = Array.isArray(vc?.type) ? vc.type : [vc?.type].filter(Boolean);
+  return types.find(t => t !== "VerifiableCredential") || types[0] || null;
+}
+
+function initials(text){
+  if (!text) return "VC";
+  const parts = text.split(/\s+/).filter(Boolean);
+  if (!parts.length) return text.slice(0,2).toUpperCase();
+  const first = parts[0][0] || "";
+  const last = parts[parts.length - 1][0] || "";
+  return (first + last).toUpperCase();
+}
+
+function StatCard({ label, value, helper }){
+  return (
+    <div className="rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel-2)] p-3">
+      <p className="text-[11px] uppercase tracking-wide text-[color:var(--muted)]">{label}</p>
+      <div className="text-2xl font-semibold text-[color:var(--text)]">{value}</div>
+      <p className="text-[11px] text-[color:var(--muted)]">{helper}</p>
+    </div>
+  );
+}
+
+function FilterChip({ active, children, onClick }){
+  return (
+    <button
+      onClick={onClick}
+      className={cx(
+        "px-3 py-1.5 rounded-full border text-xs whitespace-nowrap",
+        active
+          ? "border-[color:var(--brand)] bg-[color:var(--brand)]/10 text-[color:var(--brand)]"
+          : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)]"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ActionButton({ icon, label, onClick }){
+  return (
+    <button
+      onClick={onClick}
+      className="h-10 px-3 inline-flex items-center gap-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] hover:bg-[color:var(--panel)] text-sm"
+    >
+      <span className="text-[color:var(--muted)]">
+        {icon === "qr" && "◱"}
+        {icon === "download" && "⇩"}
+        {icon === "revoke" && "⚠"}
+        {icon === "trash" && "✕"}
+      </span>
+      {label}
+    </button>
+  );
 }
