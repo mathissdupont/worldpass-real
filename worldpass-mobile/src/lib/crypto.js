@@ -3,10 +3,10 @@ import { Buffer } from 'buffer';
 import { hash as argon2Hash, ArgonType } from 'argon2-browser';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system';
-import { gcm } from '@noble/ciphers/aes';
-import { randomBytes } from '@noble/ciphers/utils';
-import { pbkdf2 } from '@noble/hashes/pbkdf2';
-import { sha256 } from '@noble/hashes/sha2';
+import { gcm } from '@noble/ciphers/aes.js';
+import { randomBytes } from '@noble/ciphers/utils.js';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -41,7 +41,11 @@ export function base64UrlToBytes(str) {
   if (!str || typeof str !== 'string') {
     throw new Error('invalid_base64url');
   }
-  let normalized = str.replace(/-/g, '+').replace(/_/g, '/');
+  let normalized = str.trim();
+  if (!normalized) {
+    throw new Error('invalid_base64url');
+  }
+  normalized = normalized.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
   while (normalized.length % 4) {
     normalized += '=';
   }

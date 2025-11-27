@@ -34,45 +34,65 @@ export function didFromPk(pkBytes){
   return `did:key:z${b64u(pkBytes)}`;
 }
 
-// Argon2id KDF (WASM binary ile)
-async function deriveKey(password, salt /* Uint8Array */){
-  try {
-    // Vite için wasm dosyasını URL’den yüklet
-    const res = await argon2Hash({
-      pass: password,
-      salt, time: 3, mem: 64*1024, parallelism: 2, hashLen: 32,
-      type: ArgonType.Argon2id,
-      wasmPath: argon2WasmURL     // 👈 atob’a düşmez
-    });
-    const keyBytes = new Uint8Array(res.hashHex.match(/.{1,2}/g).map(h=>parseInt(h,16)));
-    return crypto.subtle.importKey('raw', keyBytes, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
-  } catch (e) {
-    // 🔁 Fallback: PBKDF2 (cihaz/eklentiler Argon2’yi bozarsa)
-    const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits(
-      { name:'PBKDF2', hash:'SHA-256', salt, iterations: 200_000 },
-      baseKey, 256
-    );
-    return crypto.subtle.importKey('raw', new Uint8Array(bits), {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+const PBKDF2_ROUNDS = 300_000;
+
+async function derivePbkdf2Key(password, salt) {
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ROUNDS },
+    baseKey,
+    256,
+  );
+  return crypto.subtle.importKey('raw', new Uint8Array(bits), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+async function deriveKey(password, salt /* Uint8Array */, preference = 'auto') {
+  const normalized = (preference || 'auto').toLowerCase();
+  const wantsArgon = normalized === 'argon2id' || (normalized === 'auto' && typeof WebAssembly !== 'undefined');
+
+  if (wantsArgon) {
+    try {
+      const res = await argon2Hash({
+        pass: password,
+        salt,
+        time: 3,
+        mem: 64 * 1024,
+        parallelism: 2,
+        hashLen: 32,
+        type: ArgonType.Argon2id,
+        wasmPath: argon2WasmURL,
+      });
+      const keyBytes = new Uint8Array(res.hashHex.match(/.{1,2}/g).map((h) => parseInt(h, 16)));
+      const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+      return { key: cryptoKey, kdf: 'argon2id' };
+    } catch (err) {
+      if (normalized === 'argon2id') throw err;
+      console.warn('Argon2 derivation failed, falling back to PBKDF2:', err?.message || err);
+    }
   }
+
+  const cryptoKey = await derivePbkdf2Key(password, salt);
+  return { key: cryptoKey, kdf: 'pbkdf2-sha256' };
 }
 
-// Keystore (v2/argon2id + AES-GCM)
-export async function encryptKeystore(password, payloadObj){
+// Keystore (v2 / PBKDF2-SHA256 + AES-GCM)
+export async function encryptKeystore(password, payloadObj) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv   = crypto.getRandomValues(new Uint8Array(12));
-  const key  = await deriveKey(password, salt);
-  const ct   = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(JSON.stringify(payloadObj)));
-  return { kty:'wpks', version:2, kdf:'argon2id', salt: b64u(salt), nonce: b64u(iv), ct: b64u(ct) };
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const { key } = await deriveKey(password, salt, 'pbkdf2-sha256');
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(payloadObj)));
+  return { kty: 'wpks', version: 2, kdf: 'pbkdf2-sha256', salt: b64u(salt), nonce: b64u(iv), ct: b64u(ct) };
 }
 
-export async function decryptKeystore(password, blob){
-  if (blob.kdf && blob.kdf !== 'argon2id') throw new Error('unsupported_kdf');
+export async function decryptKeystore(password, blob) {
+  const requestedKdf = (blob.kdf || 'argon2id').toLowerCase();
+  if (!['argon2id', 'pbkdf2-sha256'].includes(requestedKdf)) throw new Error('unsupported_kdf');
+
   const salt = b64uToBytes(blob.salt);
-  const iv   = b64uToBytes(blob.nonce);
-  const ct   = b64uToBytes(blob.ct);
-  const key  = await deriveKey(password, salt);
-  const pt   = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ct);
+  const iv = b64uToBytes(blob.nonce);
+  const ct = b64uToBytes(blob.ct);
+  const { key } = await deriveKey(password, salt, requestedKdf);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
   return JSON.parse(dec.decode(pt));
 }
 
