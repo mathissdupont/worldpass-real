@@ -7,7 +7,7 @@ import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/stor
 import { getToken } from "../lib/auth";
 import { fetchProfile, updateProfile } from "../lib/profileApi";
 import { setup2FA, enable2FA, disable2FA } from "../lib/api";
-import QRCode from "qrcode";
+import { qrToDataURL } from "../lib/qr";
 
 const API_BASE = "/api";
 
@@ -327,7 +327,7 @@ export default function Settings() {
       try {
         const res = await setup2FA();
         setSecret(res.secret);
-        const url = await QRCode.toDataURL(res.otpauth_url);
+        const url = await qrToDataURL(res.otpauth_url);
         setQrCodeUrl(url);
         setShow2FASetup(true);
       } catch (e) {

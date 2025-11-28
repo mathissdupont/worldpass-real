@@ -221,8 +221,8 @@ export function didFromPublicKey(pkBytes) {
  * @returns {Promise<{did: string, sk_b64u: string, pk_b64u: string}>}
  */
 export async function generateIdentity() {
-  // Use noble/ed25519 for key generation
-  const { ed25519 } = await import('@noble/curves/ed25519');
+  // Use noble/ed25519 for key generation (explicit .js path for Metro)
+  const { ed25519 } = await import('@noble/curves/ed25519.js');
   
   // Generate random private key (32 bytes)
   const privateKey = randomBytes(32);

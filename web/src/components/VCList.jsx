@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadVCs, removeVC } from "../lib/storage";
 import { t } from "../lib/i18n";
-import QRCode from "qrcode";
+import { qrToDataURL } from "../lib/qr";
 
 function cx(...xs){ return xs.filter(Boolean).join(" "); }
 
@@ -107,7 +107,7 @@ function safeSort(arr){
   async function showQR(vc){
     try{
       const data = JSON.stringify({ type: "vc", jti: vc?.jti, issuer: vc?.issuer });
-      const url = await QRCode.toDataURL(data, { width: 256, errorCorrectionLevel: "M" });
+      const url = await qrToDataURL(data, { width: 256, errorCorrectionLevel: "M" });
       setQrOf({ jti: vc?.jti, issuer: vc?.issuer, dataUrl: url });
     }catch(e){
       setMsg({ type: "err", text: "QR üretilemedi: " + (e?.message || e) });

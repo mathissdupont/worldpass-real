@@ -1,6 +1,6 @@
 // web/src/pages/Present.jsx
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import QRCode from "qrcode";
+import { qrToDataURL } from "../lib/qr";
 import jsQR from "jsqr";
 import { useIdentity } from "../lib/identityContext";
 import { b64u, b64uToBytes } from "../lib/crypto";
@@ -353,7 +353,7 @@ export default function Present() {
       const d = await r.json();
       setPublishedPath(d.path);
       const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
-      setQrImage(await QRCode.toDataURL(full, { width: 256, margin: 1 }));
+      setQrImage(await qrToDataURL(full, { width: 256, margin: 1 }));
       setMsg({ type: "ok", text: t("uploaded_to_server") });
     } catch (e) { setMsg({ type: "err", text: t("upload_error") + e.message }); }
   };

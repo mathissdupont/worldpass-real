@@ -1,7 +1,7 @@
 // components/VisualIDCardVertical.jsx
 import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { getUserProfileData } from "../lib/api";
-import { getSession } from "../lib/auth";
+import { qrToCanvas } from "../lib/qr";
 
 /** QR kanvası (sadece görsel, dışarıya control vermiyoruz) */
 const QRCanvas = forwardRef(function QRCanvas({ value, size = 148 }, canvasRef) {
@@ -14,7 +14,6 @@ const QRCanvas = forwardRef(function QRCanvas({ value, size = 148 }, canvasRef) 
 
     (async () => {
       try {
-        const QRCode = await import("qrcode"); // dinamik import
         if (!mounted) return;
 
         const ctx = target.getContext("2d");
@@ -22,7 +21,7 @@ const QRCanvas = forwardRef(function QRCanvas({ value, size = 148 }, canvasRef) 
           ctx.clearRect(0, 0, target.width, target.height);
         }
 
-        await QRCode.toCanvas(target, String(value || ""), {
+        await qrToCanvas(target, String(value || ""), {
           width: size,
           margin: 0,
           errorCorrectionLevel: "M",

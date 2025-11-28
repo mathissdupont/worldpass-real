@@ -7,6 +7,7 @@ import { getUserProfileData, saveUserProfileData } from "../lib/api";
 import VisualIDCardVertical from "../components/VisualIDCardVertical";
 import { Button, Input, Card, Badge, Toast as UIToast, Spinner } from "../components/ui";
 import { t } from "../lib/i18n";
+import { qrToCanvas } from "../lib/qr";
 
 /* --- MiniQR (dynamic import) --- */
 function MiniQR({ value, size = 112 }) {
@@ -17,15 +18,17 @@ function MiniQR({ value, size = 112 }) {
     let alive = true;
     setLoading(true);
     (async () => {
-      const QR = await import("qrcode");
       if (!alive || !ref.current) return;
-      await QR.toCanvas(ref.current, value || "", {
-        width: size,
-        margin: 1,
-        color: { dark: "#111111", light: "#00000000" },
-        errorCorrectionLevel: "M",
-      });
-      if (alive) setLoading(false);
+      try {
+        await qrToCanvas(ref.current, value || "", {
+          width: size,
+          margin: 1,
+          color: { dark: "#111111", light: "#00000000" },
+          errorCorrectionLevel: "M",
+        });
+      } finally {
+        if (alive) setLoading(false);
+      }
     })();
     return () => {
       alive = false;

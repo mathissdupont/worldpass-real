@@ -1,6 +1,6 @@
 // web/src/components/VerifyVC.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import QRCode from "qrcode";
+import { qrToDataURL } from "../lib/qr";
 import { newChallenge, verifyVC } from "../lib/api";
 import { t } from "../lib/i18n";
 
@@ -257,7 +257,7 @@ export default function VerifyVC() {
       };
       const data = JSON.stringify(reqObj, null, 2);
       setQrJson(data);
-      setRequestQrImage(await QRCode.toDataURL(data, { width: 256, margin: 1 }));
+      setRequestQrImage(await qrToDataURL(data, { width: 256, margin: 1 }));
       setMsg({ type: "ok", text: t("verifier.new_challenge_ready") });
     } catch (e) { setMsg({ type: "err", text: e.message }); } finally { setBusy(false); }
   };

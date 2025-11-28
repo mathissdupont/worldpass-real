@@ -1,5 +1,6 @@
 // components/MiniQR.jsx
 import { useEffect, useRef } from "react";
+import { qrToCanvas } from "../lib/qr";
 
 export default function MiniQR({ value = "", size = 120, className = "" }) {
   const ref = useRef(null);
@@ -7,9 +8,8 @@ export default function MiniQR({ value = "", size = 120, className = "" }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const QR = await import("qrcode");            // dinamik import
       if (!alive || !ref.current) return;
-      await QR.toCanvas(ref.current, value, {
+      await qrToCanvas(ref.current, value, {
         width: size,
         margin: 2,                                  // “quiet zone”
         errorCorrectionLevel: "M",

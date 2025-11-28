@@ -1,6 +1,6 @@
 // src/pages/Verifier.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import QRCode from "qrcode";
+import { qrToCanvas, qrToDataURL } from "../lib/qr";
 import { t } from "../lib/i18n";
 
 /* ---- UI bits (token-friendly) ---- */
@@ -90,7 +90,7 @@ export default function Verifier() {
       errorCorrectionLevel: "M",
       color: { dark: "#111111", light: "#00000000" },
     };
-    await QRCode.toCanvas(canvas, payload, opts);
+    await qrToCanvas(canvas, payload, opts);
   };
 
   const newChallenge = async () => {
@@ -127,7 +127,7 @@ export default function Verifier() {
         qrContainer.classList.add('animate-pulse');
       }
 
-      const dataUrl = await QRCode.toDataURL(payloadStr, {
+      const dataUrl = await qrToDataURL(payloadStr, {
         width: 256,
         errorCorrectionLevel: "M",
         margin: 0,
