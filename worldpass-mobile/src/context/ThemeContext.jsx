@@ -1,58 +1,39 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
+import tokens from '@tokens';
 
 const THEME_KEY = 'worldpass_theme';
 
+const buildTheme = (mode) => {
+  const base = tokens.themes[mode];
+  if (!base) {
+    return tokens.themes.light;
+  }
+
+  const colors = {
+    ...base.colors,
+    cardSecondary: base.colors.cardMuted,
+    cardSurface: base.colors.card,
+    overlay: base.colors.overlay,
+    primarySurface: base.colors.primaryMuted,
+    chip: base.colors.chip,
+  };
+
+  return {
+    name: mode,
+    isDark: Boolean(base.isDark),
+    colors,
+    spacing: tokens.spacing,
+    radii: tokens.radii,
+    typography: tokens.typography,
+    shadows: tokens.nativeShadows[mode] || tokens.nativeShadows.light,
+  };
+};
+
 const themes = {
-  light: {
-    name: 'light',
-    colors: {
-      background: '#f5f5f5',
-      card: '#ffffff',
-      cardSecondary: '#f9fafb',
-      text: '#111827',
-      textSecondary: '#6b7280',
-      textMuted: '#9ca3af',
-      border: '#e5e7eb',
-      borderLight: '#f3f4f6',
-      primary: '#4f46e5',
-      primaryLight: '#eef2ff',
-      success: '#22c55e',
-      successLight: '#dcfce7',
-      warning: '#f59e0b',
-      warningLight: '#fef3c7',
-      danger: '#ef4444',
-      dangerLight: '#fee2e2',
-      info: '#3b82f6',
-      infoLight: '#eff6ff',
-    },
-    isDark: false,
-  },
-  dark: {
-    name: 'dark',
-    colors: {
-      background: '#0f172a',
-      card: '#1e293b',
-      cardSecondary: '#334155',
-      text: '#f1f5f9',
-      textSecondary: '#94a3b8',
-      textMuted: '#64748b',
-      border: '#334155',
-      borderLight: '#475569',
-      primary: '#6366f1',
-      primaryLight: '#312e81',
-      success: '#22c55e',
-      successLight: '#14532d',
-      warning: '#f59e0b',
-      warningLight: '#78350f',
-      danger: '#ef4444',
-      dangerLight: '#7f1d1d',
-      info: '#3b82f6',
-      infoLight: '#1e3a8a',
-    },
-    isDark: true,
-  },
+  light: buildTheme('light'),
+  dark: buildTheme('dark'),
 };
 
 const ThemeContext = createContext({
@@ -60,6 +41,7 @@ const ThemeContext = createContext({
   themeName: 'light',
   setTheme: async () => {},
   toggleTheme: async () => {},
+  loaded: false,
 });
 
 export function ThemeProvider({ children }) {
@@ -74,11 +56,7 @@ export function ThemeProvider({ children }) {
     return themes[themeName] || themes.light;
   }, [themeName, systemColorScheme]);
 
-  useEffect(() => {
-    loadTheme();
-  }, []);
-
-  const loadTheme = async () => {
+  const loadTheme = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(THEME_KEY);
       if (stored && (stored === 'light' || stored === 'dark' || stored === 'system')) {
@@ -89,7 +67,11 @@ export function ThemeProvider({ children }) {
     } finally {
       setLoaded(true);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadTheme();
+  }, [loadTheme]);
 
   const setTheme = useCallback(async (name) => {
     if (name === 'light' || name === 'dark' || name === 'system') {

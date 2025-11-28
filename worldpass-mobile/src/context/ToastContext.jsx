@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,38 +9,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from './ThemeContext';
 
 const ToastContext = createContext({
   showToast: () => {},
   hideToast: () => {},
 });
-
-const TOAST_CONFIGS = {
-  success: {
-    icon: 'checkmark-circle',
-    color: '#22c55e',
-    backgroundColor: '#dcfce7',
-    borderColor: '#bbf7d0',
-  },
-  error: {
-    icon: 'close-circle',
-    color: '#ef4444',
-    backgroundColor: '#fee2e2',
-    borderColor: '#fecaca',
-  },
-  warning: {
-    icon: 'warning',
-    color: '#f59e0b',
-    backgroundColor: '#fef3c7',
-    borderColor: '#fde68a',
-  },
-  info: {
-    icon: 'information-circle',
-    color: '#3b82f6',
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-};
 
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState(null);
@@ -48,6 +22,34 @@ export function ToastProvider({ children }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-100)).current;
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+
+  const toastConfigs = useMemo(() => ({
+    success: {
+      icon: 'checkmark-circle',
+      color: theme.colors.success,
+      backgroundColor: theme.colors.successSurface,
+      borderColor: theme.colors.successBorder,
+    },
+    error: {
+      icon: 'close-circle',
+      color: theme.colors.danger,
+      backgroundColor: theme.colors.dangerSurface,
+      borderColor: theme.colors.dangerBorder,
+    },
+    warning: {
+      icon: 'warning',
+      color: theme.colors.warning,
+      backgroundColor: theme.colors.warningSurface,
+      borderColor: theme.colors.warningBorder,
+    },
+    info: {
+      icon: 'information-circle',
+      color: theme.colors.info,
+      backgroundColor: theme.colors.infoSurface,
+      borderColor: theme.colors.infoBorder,
+    },
+  }), [theme]);
 
   const hideToast = useCallback(() => {
     Animated.parallel([
@@ -92,7 +94,7 @@ export function ToastProvider({ children }) {
     }
   }, [fadeAnim, slideAnim, hideToast]);
 
-  const config = toast ? TOAST_CONFIGS[toast.type] || TOAST_CONFIGS.info : null;
+  const config = toast ? toastConfigs[toast.type] || toastConfigs.info : null;
 
   return (
     <ToastContext.Provider value={{ showToast, hideToast }}>

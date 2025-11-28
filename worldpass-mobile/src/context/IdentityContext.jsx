@@ -4,11 +4,19 @@ import { decryptKeystore } from '../lib/crypto';
 import { getIdentity as loadIdentity, saveIdentity as persistIdentity, clearIdentity as wipeIdentity } from '../lib/storage';
 import { linkDid } from '../lib/api';
 
+const initialTelemetry = {
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  lastErrorMessage: null,
+};
+
 const IdentityContext = createContext({
   identity: null,
   loading: true,
   error: null,
   linking: false,
+  linkTelemetry: initialTelemetry,
   setIdentity: async () => {},
   clearIdentity: async () => {},
   importFromKeystore: async () => {},
@@ -20,6 +28,7 @@ export function IdentityProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [linking, setLinking] = useState(false);
+  const [linkTelemetry, setLinkTelemetry] = useState(() => ({ ...initialTelemetry }));
   const lastLinkedDid = useRef(null);
 
   const bootstrap = useCallback(async () => {
@@ -53,6 +62,7 @@ export function IdentityProvider({ children }) {
       await wipeIdentity();
       setIdentity(null);
       lastLinkedDid.current = null;
+      setLinkTelemetry({ ...initialTelemetry });
     }
   }, []);
 
@@ -75,6 +85,14 @@ export function IdentityProvider({ children }) {
     }
 
     let cancelled = false;
+    const attemptAt = new Date().toISOString();
+    setLinkTelemetry((prev) => ({
+      ...prev,
+      lastSuccessAt: null,
+      lastAttemptAt: attemptAt,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    }));
     setLinking(true);
     setError(null);
 
@@ -83,6 +101,10 @@ export function IdentityProvider({ children }) {
         await linkDid(identity.did);
         if (!cancelled) {
           lastLinkedDid.current = identity.did;
+          setLinkTelemetry((prev) => ({
+            ...prev,
+            lastSuccessAt: new Date().toISOString(),
+          }));
         }
       } catch (err) {
         if (!cancelled) {
@@ -90,8 +112,17 @@ export function IdentityProvider({ children }) {
           if (message === 'did_already_set' || message === 'did_already_linked') {
             lastLinkedDid.current = identity.did;
             setError(null);
+            setLinkTelemetry((prev) => ({
+              ...prev,
+              lastSuccessAt: new Date().toISOString(),
+            }));
           } else {
             setError(message);
+            setLinkTelemetry((prev) => ({
+              ...prev,
+              lastErrorAt: new Date().toISOString(),
+              lastErrorMessage: message,
+            }));
           }
         }
       } finally {
@@ -111,10 +142,11 @@ export function IdentityProvider({ children }) {
     loading,
     error,
     linking,
+    linkTelemetry,
     setIdentity: setIdentityPersistent,
     clearIdentity,
     importFromKeystore,
-  }), [identity, loading, error, linking, setIdentityPersistent, clearIdentity, importFromKeystore]);
+  }), [identity, loading, error, linking, linkTelemetry, setIdentityPersistent, clearIdentity, importFromKeystore]);
 
   return (
     <IdentityContext.Provider value={value}>

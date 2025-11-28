@@ -41,6 +41,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@tokens': path.resolve(__dirname, '../shared/design-tokens.js'),
     },
   },
 
@@ -51,6 +52,9 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': 'http://localhost:8000',
+    },
+    fs: {
+      allow: [path.resolve(__dirname, '..')],
     },
   },
 })

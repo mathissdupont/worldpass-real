@@ -45,8 +45,8 @@ export default function ProfileScreen({ navigation }) {
     try {
       setLoading(true);
       const profile = await getUserProfile();
-      setDisplayName(profile.name || profile.displayName || '');
-      setProfileData(profile.profile_data || {});
+      setDisplayName(profile.displayName || profile.name || '');
+      setProfileData(profile.profile_data || profile.profileData || {});
     } catch (error) {
       console.error('Failed to load profile:', error);
       Alert.alert('Error', 'Failed to load profile data');
@@ -63,7 +63,7 @@ export default function ProfileScreen({ navigation }) {
     
     try {
       setSaving(true);
-      await updateUserProfile({ name: displayName.trim() });
+      await updateUserProfile({ display_name: displayName.trim() });
       await refreshProfile();
       Alert.alert('Success', 'Display name updated');
     } catch (error) {

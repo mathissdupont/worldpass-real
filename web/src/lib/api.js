@@ -76,6 +76,32 @@ export async function verifyVC(vcObj, challenge, presenter_did=null){
   return r.json(); // {valid, reason, issuer, subject, revoked}
 }
 
+export async function verifyPresentation(presentation){
+  const r = await fetch('/api/present/verify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(presentation)
+  });
+  if(!r.ok){
+    const detail = (await r.json().catch(() => ({})))?.detail ?? 'verify_failed';
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
+export async function verifyPresentation(presentation){
+  const r = await fetch('/api/present/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(presentation)
+  });
+  if (!r.ok) {
+    const detail = (await r.json())?.detail ?? 'verify_failed';
+    throw new Error(detail);
+  }
+  return r.json();
+}
+
 // Template management API
 export async function createTemplate(template) {
   const headers = buildUserHeaders({ 'Content-Type': 'application/json' });

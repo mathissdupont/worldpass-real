@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useIdentity } from '../context/IdentityContext';
-import { generateIdentity, encryptKeystore, bytesToBase64Url } from '../lib/crypto';
+import { generateIdentity, encryptKeystore } from '../lib/crypto';
 import { saveIdentity as persistIdentity } from '../lib/storage';
 import { linkDid } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import VisualIDCard from '../components/VisualIDCard';
+import { useTheme } from '../context/ThemeContext';
 
 export default function IdentityCreateScreen({ navigation }) {
-  const { setIdentity, identity } = useIdentity();
+  const { setIdentity, identity, linking, error } = useIdentity();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [step, setStep] = useState(1);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,6 +32,8 @@ export default function IdentityCreateScreen({ navigation }) {
   const [busy, setBusy] = useState(false);
   const [createdDid, setCreatedDid] = useState(null);
   const [status, setStatus] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [copiedDid, setCopiedDid] = useState(false);
 
   const passwordStrength = (() => {
     if (!password) return { score: 0, label: '', color: '#e5e7eb' };
@@ -102,37 +109,78 @@ export default function IdentityCreateScreen({ navigation }) {
       return;
     }
 
+    if (!password) {
+      Alert.alert('Password required', 'Use the password you just created to encrypt the backup.');
+      return;
+    }
+
+    setExporting(true);
     setBusy(true);
     try {
       const keystore = await encryptKeystore(password, identity);
       const keystoreJson = JSON.stringify(keystore, null, 2);
-      
-      // For mobile, we'll show the JSON and let user copy it
-      Alert.alert(
-        'Export Keystore',
-        'Your encrypted keystore has been prepared. You can copy it to a secure location.',
-        [
-          {
-            text: 'Copy to Clipboard',
-            onPress: async () => {
-              await Clipboard.setStringAsync(keystoreJson);
-              Alert.alert('Copied', 'Keystore copied to clipboard');
-            },
-          },
-          { text: 'Done', style: 'cancel' },
-        ]
-      );
+      const filename = `worldpass-keystore-${Date.now()}.wpkeystore`;
+      const fileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, keystoreJson, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'WorldPass Keystore Backup',
+        });
+      } else {
+        await Clipboard.setStringAsync(keystoreJson);
+        Alert.alert('Sharing unavailable', 'Keystore copied to clipboard. Paste it into a secure note.');
+      }
     } catch (err) {
       console.error('Export error:', err);
       Alert.alert('Error', 'Failed to export keystore');
     } finally {
+      setExporting(false);
       setBusy(false);
     }
+  };
+
+  const handleCopyDid = async () => {
+    const activeDid = createdDid || identity?.did;
+    if (!activeDid) return;
+    await Clipboard.setStringAsync(activeDid);
+    setCopiedDid(true);
+    setTimeout(() => setCopiedDid(false), 2000);
   };
 
   const handleFinish = () => {
     navigation.goBack();
   };
+
+  const linkingStatusChip = useMemo(() => {
+    if (!identity?.did) return null;
+    if (linking) {
+      return (
+        <View style={[styles.chip, { backgroundColor: '#eef2ff', borderColor: theme.colors.primary }]}>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={styles.chipText}>Linking…</Text>
+        </View>
+      );
+    }
+    if (error) {
+      return (
+        <View style={[styles.chip, { backgroundColor: '#fee2e2', borderColor: theme.colors.danger }]}>
+          <Ionicons name="alert-circle" size={16} color={theme.colors.danger} />
+          <Text style={[styles.chipText, { color: theme.colors.danger }]}>Link failed</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.chip, { backgroundColor: '#dcfce7', borderColor: theme.colors.success }]}>
+        <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+        <Text style={[styles.chipText, { color: theme.colors.success }]}>Linked</Text>
+      </View>
+    );
+  }, [identity?.did, linking, error, theme.colors]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -284,23 +332,55 @@ export default function IdentityCreateScreen({ navigation }) {
             Your new decentralized identity has been generated and saved securely.
           </Text>
 
+          <View style={styles.identityPreview}>
+            <VisualIDCard did={createdDid} name={user?.name} email={user?.email} />
+          </View>
+
           <View style={styles.didBox}>
-            <Text style={styles.didLabel}>Your DID</Text>
+            <View style={styles.didHeaderRow}>
+              <Text style={styles.didLabel}>Your DID</Text>
+              {linkingStatusChip}
+            </View>
             <Text style={styles.didValue} numberOfLines={3}>
               {createdDid}
             </Text>
+            <TouchableOpacity style={styles.copyRow} onPress={handleCopyDid}>
+              <Ionicons
+                name={copiedDid ? 'checkmark' : 'copy-outline'}
+                size={18}
+                color={copiedDid ? '#16a34a' : '#4f46e5'}
+              />
+              <Text style={[styles.copyText, copiedDid && styles.copyTextSuccess]}>
+                {copiedDid ? 'Copied' : 'Copy DID'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.backupCard}>
+            <View style={styles.backupHeader}>
+              <Ionicons name="shield-checkmark" size={20} color="#4f46e5" />
+              <Text style={styles.backupTitle}>Step 2 — Backup keystore</Text>
+            </View>
+            <Text style={styles.backupText}>
+              Download the encrypted `.wpkeystore` file and store it somewhere offline. You can bring the same identity to another device with this file and your password.
+            </Text>
+            <TouchableOpacity
+              style={[styles.secondaryButton, (exporting || busy) && styles.buttonDisabled]}
+              onPress={handleExport}
+              disabled={exporting || busy}
+            >
+              {exporting ? (
+                <ActivityIndicator color="#4f46e5" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={20} color="#4f46e5" />
+                  <Text style={styles.secondaryButtonText}>Download Encrypted Keystore</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleExport}
-              disabled={busy}
-            >
-              <Ionicons name="download-outline" size={20} color="#4f46e5" />
-              <Text style={styles.secondaryButtonText}>Export Keystore</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleFinish}
@@ -606,6 +686,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#3730a3',
     lineHeight: 18,
+  },
+  identityPreview: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  didHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  copyText: {
+    color: '#4f46e5',
+    fontWeight: '600',
+  },
+  copyTextSuccess: {
+    color: '#16a34a',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4f46e5',
+  },
+  backupCard: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  backupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  backupTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  backupText: {
+    fontSize: 13,
+    color: '#4b5563',
+    marginBottom: 12,
   },
   warningCard: {
     flexDirection: 'row',

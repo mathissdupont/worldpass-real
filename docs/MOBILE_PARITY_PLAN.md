@@ -6,6 +6,24 @@ This document provides a comprehensive cross-reference of web features vs. mobil
 
 ---
 
+## 0. Snapshot (2025-11-28)
+
+| Capability | Web implementation (key files) | Mobile implementation (key files) | Gap / required action |
+| --- | --- | --- | --- |
+| Identity onboarding & DID linkage | `web/src/pages/Account.jsx`, `web/src/pages/Settings.jsx` support DID creation/import, QR preview, keystore download, and automatic account linking. | `worldpass-mobile/src/screens/IdentityCreateScreen.js`, `IdentityImportScreen.js`, `SettingsScreen.js` cover generation/import and linking but only copy keystore JSON; no QR, rotation, or downloadable file. | Add file export/sharing for `.wpkeystore`, DID QR display, and DID rotation guidance to match the web flow. |
+| Wallet & credential management | `web/src/components/VCList.jsx` offers filtering, stats, revoke, QR generation, and JSON download. | `worldpass-mobile/src/screens/WalletScreen.js` + `VCQRScreen.js` show basic list, delete, and QR referencing `jti` but lack filters, stats, revoke, or selective disclosure. | Implement filter/search, issuer facets, inline status checks, revoke flow, and richer QR/export similar to web. |
+| Presentation builder | `web/src/pages/Present.jsx` walks through scanning verifier requests, picking VC fields, signing, generating QR/link/NFC, and publishing to `/api/present/upload`. | Mobile has no presentation builder; `VCQRScreen.js` shares only identifier metadata. | Build a mobile “Present” stack supporting request ingestion (QR/NFC), selective disclosure, Ed25519 signing, and share targets (QR/link/NFC). |
+| Verifier tooling | `web/src/components/VerifyVC.jsx` & `OfflineVerify.jsx` let verifiers mint challenges, scan NFC/QR, upload files, and call `/api/present/verify`. | `worldpass-mobile/src/screens/ScannerScreen.js` only scans ready-made VCs, verifies once, and saves locally. | Add verifier request builder, challenge QR, offline signature check, and presentation validation flows on mobile. |
+| NFC interactions | Present/Verify pages read & write NDEF via `NDEFReader`/`NDEFWriter`. | Mobile project has no NFC package (`expo-nfc`), so all NFC flows are missing. | Reintroduce NFC by wiring `expo-nfc` for request ingestion and presentation sharing; design fallback when hardware unavailable. |
+| Sharing/export | Web can download `.wpvc`, `.wpvp`, keystores, and publish links. | Mobile only copies JSON or triggers `expo-sharing` in a few places; no structured exports or downloads. | Standardize share sheet exports for keystore/VC/presentation plus cached QR images, aligning flows with the browser. |
+| Security & settings | `web/src/pages/Settings.jsx` includes 2FA setup, avatar upload, theme/lang toggles, backup/clear actions. | Mobile has `ProfileScreen.js` and `TwoFactorScreen.js`, but theme/lang, avatar upload, and backup actions are absent or stubbed. | Extend mobile settings to match theme/language/profile completeness, and keep 2FA UX consistent with the browser. |
+| Payments / transactions | `web/src/pages/pay/TransactionsPage.jsx` & `NewPaymentTab.jsx` provide history plus mock payment builder. | `worldpass-mobile/src/screens/TransactionsScreen.js` lists and filters transactions but lacks “New Payment” and plan controls. | Add demo payment flow or clearly state web-only scope; ensure status badges and filters mirror the web semantics. |
+| Admin / issuer tooling | `web/src/pages/admin/Issuers.jsx`, `web/src/pages/issuer/*.jsx`, `web/src/pages/tools/WPTEditorPRO.jsx` enable issuer management. | Mobile has no issuer/admin navigation. | Decide if issuer/admin roles are mobile requirements; if yes, mirror the relevant stacks, otherwise document as web-only. |
+
+Use this snapshot while executing the detailed plan below; keep it updated as features land to maintain a quick-glance dashboard for leadership.
+
+---
+
 ## 1. Feature Cross-Reference: Web vs Mobile
 
 ### 1.1 Identity (DID) Management
@@ -431,7 +449,14 @@ This document provides a comprehensive cross-reference of web features vs. mobil
 
 ---
 
-## 8. Conclusion
+## 8. Execution Sprints
+
+### Sprint 1 – Shared design foundations (2025-11-28)
+- Introduced `shared/design-tokens.js` as the single source of truth for colors, typography, radii, and spacing; web now injects these tokens dynamically via `web/src/lib/theme.js` to eliminate palette drift.
+- Extended the Expo app’s `ThemeContext` to consume the same tokens, refreshed Wallet + Settings screens, aligned toast/navigation colors, and exposed a user-facing light/dark/system picker.
+- Reworked bottom navigation to `Wallet / Present / Verify / Settings` and added a Present landing screen placeholder ahead of the upcoming presentation builder workstream.
+
+## 9. Conclusion
 
 This plan outlines a comprehensive approach to achieving feature parity between the WorldPass web and mobile applications. The prioritized task list ensures critical functionality is implemented first, while maintaining a consistent user experience across platforms.
 

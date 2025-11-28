@@ -1,7 +1,8 @@
 // web/src/components/VerifyVC.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { qrToDataURL } from "../lib/qr";
-import { newChallenge, verifyVC } from "../lib/api";
+import { newChallenge, verifyVC, verifyPresentation } from "../lib/api";
+import jsQR from "jsqr";
 import { t } from "../lib/i18n";
 
 /* ---------------- UI Components ---------------- */
@@ -95,8 +96,9 @@ function SectionCard({ title, children, stepNumber, isActive, isCompleted, onTog
 /* ---------------- VerifyVC Component ---------------- */
 export default function VerifyVC() {
   // -- State --
-  const [vcText, setVcText] = useState("");
-  const [vcObj, setVcObj] = useState(null);
+   const [vcText, setVcText] = useState("");
+   const [vcObj, setVcObj] = useState(null);
+   const [presentationPayload, setPresentationPayload] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const fileRef = useRef(null);
   
@@ -135,7 +137,7 @@ export default function VerifyVC() {
 
   const subjectId = vcObj?.credentialSubject?.id || vcObj?.holder?.did || "";
   const issuer = vcObj?.issuer || vcObj?.vc_ref?.issuer || "";
-  const canVerify = !!vcObj;
+   const canVerify = !!(vcObj || presentationPayload);
 
   // -- Effects --
   useEffect(() => {
@@ -151,9 +153,21 @@ export default function VerifyVC() {
   }, []);
 
   function clearVC() {
-    setVcText(""); setVcObj(null); setResult(null); setMsg(null);
+      setVcText(""); setVcObj(null); setPresentationPayload(null); setResult(null); setMsg(null);
     if (fileRef.current) fileRef.current.value = "";
   }
+
+   function acceptPayload(obj, rawText) {
+      if (!obj) throw new Error(t("invalid_json_file"));
+      const isPresentation = obj?.type === "presentation";
+      if (isPresentation && !obj.vc) throw new Error("Sunum verisinde VC bulunamadı.");
+      setPresentationPayload(isPresentation ? obj : null);
+      const finalVc = isPresentation ? obj.vc : obj;
+      setVcObj(finalVc);
+      setVcText(rawText || JSON.stringify(obj, null, 2));
+      setShowPreview(false);
+      return isPresentation;
+   }
 
   // -- Handlers --
   const handleFile = async (file) => {
@@ -163,10 +177,10 @@ export default function VerifyVC() {
       const txt = await file.text();
       const obj = safeParse(txt);
       if (!obj) throw new Error(t("invalid_json_file"));
-      setVcText(txt); setVcObj(obj); setShowPreview(false);
-      setMsg({ type: "ok", text: t("vc_loaded") });
+         const isPresentation = acceptPayload(obj, txt);
+         setMsg({ type: "ok", text: isPresentation ? "Sunum yüklendi" : t("vc_loaded") });
     } catch (e) {
-      setVcText(""); setVcObj(null);
+         setVcText(""); setVcObj(null); setPresentationPayload(null);
       setMsg({ type: "err", text: e?.message || t("file_read_error") });
     }
   };
@@ -180,10 +194,10 @@ export default function VerifyVC() {
         const r = await fetch(raw);
         const txt = await r.text();
         const obj = safeParse(txt);
-        if (obj) { setVcText(txt); setVcObj(obj); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
+            if (obj) { acceptPayload(obj, txt); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
       }
       const obj = safeParse(raw);
-      if (obj) { setVcText(JSON.stringify(obj, null, 2)); setVcObj(obj); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
+         if (obj) { acceptPayload(obj, JSON.stringify(obj, null, 2)); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
       setMsg({ type: "err", text: t("file_read_error") });
     } catch (e) { setMsg({ type: "err", text: t("file_read_error") }); }
   };
@@ -196,25 +210,48 @@ export default function VerifyVC() {
     } catch {}
     setQrScanning(false);
   };
-  const startQrScan = async () => {
-    setMsg(null);
-    if (!("BarcodeDetector" in window)) return setMsg({ type: "info", text: "Tarayıcı desteklemiyor" });
-    try {
-      detectorRef.current = new BarcodeDetector({ formats: ["qr_code"] });
+   const startQrScan = async () => {
+      setMsg(null);
+      const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+      try {
+         detectorRef.current = hasDetector ? new window.BarcodeDetector({ formats: ["qr_code"] }) : null;
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-      scanIntervalRef.current = setInterval(async () => {
-         try {
-           if (!videoRef.current || videoRef.current.readyState < 2) return;
-           const canvas = canvasRef.current || document.createElement("canvas");
-           canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight;
-           const ctx = canvas.getContext("2d"); ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-           const codes = await detectorRef.current.detect(await createImageBitmap(canvas));
-           if (codes?.length) { handleScanned(codes[0].rawValue); stopQrScan(); }
-         } catch {}
-      }, 500);
+         const decodeFrame = async () => {
+            try {
+               if (!videoRef.current || videoRef.current.readyState < 2) return;
+               const canvas = canvasRef.current || document.createElement("canvas");
+               const ctx = canvas.getContext("2d");
+               if (!ctx) return;
+               canvas.width = videoRef.current.videoWidth;
+               canvas.height = videoRef.current.videoHeight;
+               ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+               let rawValue = null;
+               if (detectorRef.current) {
+                  const detections = await detectorRef.current.detect(canvas);
+                  if (detections?.length) rawValue = detections[0].rawValue;
+               } else {
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const jsqrResult = jsQR(imageData.data, imageData.width, imageData.height, {
+                     inversionAttempts: "attemptBoth",
+                  });
+                  rawValue = jsqrResult?.data || null;
+               }
+
+               if (rawValue) {
+                  handleScanned(rawValue);
+                  stopQrScan();
+               }
+            } catch {
+               /* ignore decode errors */
+            }
+         };
+
+         scanIntervalRef.current = setInterval(decodeFrame, 500);
       setQrScanning(true);
+         setMsg({ type: "ok", text: hasDetector ? t("scanning_qr") : "Kamera açık, karekod aranıyor" });
     } catch (e) { setMsg({ type: "err", text: e.message }); }
   };
   const startNfcScan = async () => { 
@@ -246,12 +283,12 @@ export default function VerifyVC() {
     try {
       setBusy(true); setMsg(null); setQrJson(""); setRequestQrImage(null);
       const host = window.location.hostname || "localhost";
-      const ch = await newChallenge(host, 180);
+         const ch = await newChallenge(host, 180);
       const vcReq = {};
       if (requiredVcType.trim()) vcReq.type = requiredVcType.split(",").map(s => s.trim()).filter(Boolean);
       if (requiredIssuer.trim()) vcReq.issuer = requiredIssuer.trim();
       const reqObj = {
-        type: "present", challenge: ch.nonce, aud: host, exp: Math.floor(new Date(ch.expires_at).getTime()/1000),
+            type: "present", challenge: ch.nonce, aud: host, exp: ch.expires_at,
         fields: requestedFields.length > 0 ? requestedFields : undefined,
         label: requestLabel || undefined, vc: Object.keys(vcReq).length ? vcReq : undefined
       };
@@ -265,11 +302,13 @@ export default function VerifyVC() {
   const onVerify = useCallback(async () => {
     try {
       setBusy(true); setMsg(null);
-      if (!vcObj) throw new Error(t("first_load_or_paste"));
-      const resp = await verifyVC(vcObj);
+         if (!vcObj && !presentationPayload) throw new Error(t("first_load_or_paste"));
+         const resp = presentationPayload
+            ? await verifyPresentation(presentationPayload)
+            : await verifyVC(vcObj);
       setResult(resp);
     } catch (e) { setResult(null); setMsg({ type: "err", text: e.message }); } finally { setBusy(false); }
-  }, [vcObj]);
+   }, [vcObj, presentationPayload]);
 
   return (
     <section className="max-w-3xl mx-auto pb-20">

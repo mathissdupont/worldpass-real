@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,49 @@ import {
 import { Camera, CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { verifyCredential } from '../lib/api';
-import { addCredential } from '../lib/storage';
 import { useNavigation } from '@react-navigation/native';
 import { useIdentity } from '../context/IdentityContext';
+import { useWallet } from '../context/WalletContext';
+import { useTheme } from '../context/ThemeContext';
+import { formatRelativeTime } from '../lib/time';
 
 export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
-  const { identity } = useIdentity();
+  const { identity, linking, error: identityError, linkTelemetry } = useIdentity();
+  const { addCredential: addCredentialToWallet } = useWallet();
   const navigation = useNavigation();
   const walletDid = identity?.did || '';
+  const identityMissing = !walletDid;
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const lastSuccessfulSync = linkTelemetry?.lastSuccessAt
+    ? formatRelativeTime(linkTelemetry.lastSuccessAt)
+    : '';
+
+  const statusBanner = useMemo(() => {
+    if (identityError) {
+      return {
+        text: 'DID hesabına bağlanırken sorun oluştu. Settings > Identity bölümünden yeniden deneyebilirsin.',
+        tone: 'error',
+      };
+    }
+    if (linking) {
+      return {
+        text: 'DID hesaba bağlanıyor…',
+        tone: 'info',
+      };
+    }
+    if (lastSuccessfulSync) {
+      return {
+        text: `DID synced ${lastSuccessfulSync}`,
+        tone: 'success',
+      };
+    }
+    return null;
+  }, [identityError, lastSuccessfulSync, linking]);
 
   useEffect(() => {
     requestCameraPermission();
@@ -42,17 +73,6 @@ export default function ScannerScreen() {
   const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned || scanning) return;
     if (!walletDid) {
-      Alert.alert(
-        'Import identity',
-        'You need to import your wallet identity before adding new credentials.',
-        [
-          {
-            text: 'Go to Identity',
-            onPress: () => navigation.navigate('Settings', { screen: 'IdentityImport' }),
-          },
-          { text: 'Cancel', style: 'cancel', onPress: resetScanner },
-        ],
-      );
       return;
     }
     
@@ -85,7 +105,7 @@ export default function ScannerScreen() {
 
       if (result.valid) {
         // Save credential
-        await addCredential(vcData);
+        await addCredentialToWallet(vcData);
         Alert.alert(
           'Success',
           'Credential verified and saved to your wallet!',
@@ -115,34 +135,41 @@ export default function ScannerScreen() {
 
   if (hasPermission === null) {
     return (
-      <View style={styles.container}>
+      <View style={styles.stateContainer}>
         <Text style={styles.loadingText}>Requesting camera permission...</Text>
       </View>
     );
   }
 
-  if (!walletDid) {
+  if (identityMissing) {
     return (
       <View style={styles.identityContainer}>
-        <Ionicons name="shield-outline" size={72} color="#6366f1" />
-        <Text style={styles.identityTitle}>Import your identity</Text>
+        <Ionicons name="shield-outline" size={72} color={theme.colors.primary} />
+        <Text style={styles.identityTitle}>Kimlik olmadan tarama yapamazsın</Text>
         <Text style={styles.identityText}>
-          Load your .wpkeystore in Settings before scanning credentials.
+          Yeni bir DID oluştur veya var olan `.wpkeystore` dosyanı içe aktar ve ardından QR kodlarını taramaya başla.
         </Text>
-        <TouchableOpacity
-          style={styles.identityButton}
-          onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
-        >
-          <Text style={styles.identityButtonText}>Manage Identity</Text>
-        </TouchableOpacity>
+        <View style={styles.identityActions}>
+          <TouchableOpacity style={styles.identityPrimary} onPress={() => navigation.navigate('IdentityCreate')}>
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text style={styles.identityPrimaryText}>Kimlik Oluştur</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.identitySecondary}
+            onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
+            <Text style={styles.identitySecondaryText}>.wpkeystore İçe Aktar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   if (!hasPermission) {
     return (
-      <View style={styles.container}>
-        <Ionicons name="camera-off" size={64} color="#ef4444" />
+      <View style={styles.stateContainer}>
+        <Ionicons name="camera-off" size={64} color={theme.colors.danger} />
         <Text style={styles.errorTitle}>Camera Access Required</Text>
         <Text style={styles.errorText}>
           WorldPass needs camera access to scan QR codes
@@ -161,17 +188,55 @@ export default function ScannerScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.scannerShell}>
       <CameraView
         style={StyleSheet.absoluteFillObject}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{ barCodeTypes: ['qr'] }}
       >
         <View style={styles.overlay}>
+          {statusBanner && (
+            <View
+              style={[
+                styles.statusBanner,
+                statusBanner.tone === 'error' && styles.statusBannerError,
+                statusBanner.tone === 'info' && styles.statusBannerInfo,
+                statusBanner.tone === 'success' && styles.statusBannerSuccess,
+              ]}
+            >
+              <Ionicons
+                name={statusBanner.tone === 'error' ? 'alert-circle' : statusBanner.tone === 'info' ? 'refresh' : 'shield-checkmark'}
+                size={16}
+                color={
+                  statusBanner.tone === 'error'
+                    ? theme.colors.danger
+                    : statusBanner.tone === 'info'
+                      ? theme.colors.info
+                      : theme.colors.success
+                }
+              />
+              <Text
+                style={[
+                  styles.statusBannerText,
+                  {
+                    color:
+                      statusBanner.tone === 'error'
+                        ? theme.colors.danger
+                        : statusBanner.tone === 'info'
+                          ? theme.colors.info
+                          : theme.colors.success,
+                  },
+                ]}
+              >
+                {statusBanner.text}
+              </Text>
+            </View>
+          )}
           <View style={styles.scanFrame} />
           <Text style={styles.instructions}>
             {scanning ? 'Verifying...' : 'Align QR code within frame'}
           </Text>
+          <Text style={styles.helperText}>Her credential ekledikten sonra keystore yedeğini güncellemeyi unutma.</Text>
         </View>
       </CameraView>
 
@@ -189,112 +254,168 @@ export default function ScannerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (theme) => StyleSheet.create({
+  scannerShell: {
     flex: 1,
     backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  camera: {
-    flex: 1,
-    width: '100%',
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 16,
   },
   scanFrame: {
     width: 250,
     height: 250,
     borderWidth: 3,
-    borderColor: '#6366f1',
-    borderRadius: 12,
+    borderColor: theme.colors.primary,
+    borderRadius: 18,
     backgroundColor: 'transparent',
   },
   instructions: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
     marginTop: 32,
     textAlign: 'center',
   },
+  helperText: {
+    color: '#f3f4f6',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  stateContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    color: theme.colors.text,
+    fontSize: 16,
+  },
   identityContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
     gap: 16,
   },
   identityTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.colors.text,
+    textAlign: 'center',
   },
   identityText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.colors.textMuted,
     textAlign: 'center',
+    lineHeight: 20,
   },
-  identityButton: {
-    backgroundColor: '#4f46e5',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
+  identityActions: {
+    width: '100%',
+    gap: 12,
   },
-  identityButtonText: {
+  identityPrimary: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 14,
+    borderRadius: theme.radii.lg,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  identityPrimaryText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 15,
   },
-  loadingText: {
-    color: 'white',
-    fontSize: 16,
+  identitySecondary: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.lg,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.cardSecondary,
+  },
+  identitySecondaryText: {
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     padding: 20,
   },
   rescanButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.colors.primary,
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
   rescanText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#ef4444',
+    color: theme.colors.danger,
     marginTop: 16,
   },
   errorText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.colors.textMuted,
     marginTop: 8,
     textAlign: 'center',
-    paddingHorizontal: 32,
   },
   button: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 24,
   },
   buttonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  statusBanner: {
+    position: 'absolute',
+    top: 40,
+    left: 24,
+    right: 24,
+    borderRadius: theme.radii.md,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBannerInfo: {
+    backgroundColor: theme.colors.infoSurface,
+  },
+  statusBannerError: {
+    backgroundColor: theme.colors.dangerSurface,
+  },
+  statusBannerSuccess: {
+    backgroundColor: theme.colors.successSurface,
+  },
+  statusBannerText: {
+    flex: 1,
+    fontSize: 13,
   },
 });

@@ -147,13 +147,17 @@ export default function Present() {
     const vcId = currentVC.jti || currentVC.id || null;
     const createdAt = Math.floor(Date.now() / 1000);
     const challenge = request?.challenge || null;
-    const msgObj = { vc_id: vcId, claims: filteredSubject, created_at: createdAt, holder_did: identity.did, challenge, aud: request?.aud, exp: request?.exp };
     return {
-      type: "presentation", created_at: createdAt, challenge, aud: request?.aud, exp: request?.exp,
+      type: "presentation",
+      created_at: createdAt,
+      challenge,
+      aud: request?.aud,
+      exp: request?.exp,
       holder: { did: identity.did, pk_b64u: identity.pk_b64u, alg: "Ed25519" },
-      vc: currentVC, vc_ref: { id: vcId, type: currentVC.type || null, issuer: currentVC.issuer || null },
-      claims: filteredSubject, request: request ? { label: request.label, fields: request.fields, vc: request.vc } : undefined,
-      _sig_msg: msgObj,
+      vc: currentVC,
+      vc_ref: { id: vcId, type: currentVC.type || null, issuer: currentVC.issuer || null },
+      claims: filteredSubject,
+      request: request ? { label: request.label, fields: request.fields, vc: request.vc } : undefined,
     };
   }, [canBuild, currentVC, filteredSubject, identity, request]);
 
@@ -326,12 +330,26 @@ export default function Present() {
   const buildPayload = () => {
     setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
     if (!presentationPayload) return setMsg({ type: "err", text: t("error_missing_data") });
+    if (!request?.challenge) {
+      setMsg({ type: "err", text: "Lütfen önce doğrulama isteğini tara." });
+      return;
+    }
     try {
-      const msgBytes = enc.encode(JSON.stringify(presentationPayload._sig_msg));
+      const parts = [
+        request.challenge,
+        request.aud || "",
+        request.exp ? String(request.exp) : "",
+      ];
+      const msgBytes = enc.encode(parts.join("|"));
       const sk = b64uToBytes(identity.sk_b64u);
       const sig = nacl.sign.detached(msgBytes, sk);
-      const payloadToSend = { ...presentationPayload, holder: { ...presentationPayload.holder, sig_b64u: b64u(sig) } };
-      delete payloadToSend._sig_msg;
+      const payloadToSend = {
+        ...presentationPayload,
+        holder: {
+          ...presentationPayload.holder,
+          sig_b64u: b64u(sig),
+        },
+      };
       setOut(JSON.stringify(payloadToSend, null, 2));
       setMsg({ type: "ok", text: t("presentation_signed_created") });
     } catch (e) { setMsg({ type: "err", text: t("signature_error") + e.message }); }

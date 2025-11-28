@@ -62,19 +62,34 @@ export async function getCredentials() {
   return data ? JSON.parse(data) : [];
 }
 
+function upsertCredential(list, credential) {
+  const key = credential?.jti || credential?.id;
+  if (!key) {
+    return [credential, ...list];
+  }
+  const filtered = list.filter(c => (c?.jti || c?.id) !== key);
+  return [credential, ...filtered];
+}
+
 export async function addCredential(credential) {
   const credentials = await getCredentials();
-  credentials.push(credential);
-  await saveCredentials(credentials);
+  const updated = upsertCredential(credentials, credential);
+  await saveCredentials(updated);
+  return updated;
 }
 
 export async function deleteCredential(credentialId) {
   const credentials = await getCredentials();
-  const filtered = credentials.filter(c => c.jti !== credentialId);
+  const filtered = credentials.filter(c => (c?.jti || c?.id) !== credentialId);
   await saveCredentials(filtered);
+  return filtered;
+}
+
+export async function clearCredentials() {
+  await AsyncStorage.removeItem(CREDENTIALS_KEY);
 }
 
 export async function clearAllData() {
-  await AsyncStorage.removeItem(CREDENTIALS_KEY);
+  await clearCredentials();
   await clearIdentity();
 }

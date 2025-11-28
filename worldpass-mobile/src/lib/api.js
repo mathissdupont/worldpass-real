@@ -12,6 +12,9 @@ const LOCAL_API_BASE = Platform.select({
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
   || (__DEV__ ? LOCAL_API_BASE : 'https://worldpass.tech');
 
+const ACCOUNT_PROFILE_ENDPOINT = '/api/user/profile';
+const PROFILE_DATA_ENDPOINT = '/api/user/profile-data';
+
 export async function getToken() {
   return await AsyncStorage.getItem('user_token');
 }
@@ -57,6 +60,23 @@ export async function apiRequest(endpoint, options = {}) {
   return response.json();
 }
 
+function normalizeUserPayload(rawUser = {}) {
+  const displayName = (rawUser.display_name || rawUser.displayName || '').trim();
+  const fullName = [rawUser.first_name, rawUser.last_name]
+    .filter(Boolean)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(' ');
+  const fallbackFromEmail = rawUser.email ? rawUser.email.split('@')[0] : '';
+  const derivedName = displayName || fullName || fallbackFromEmail;
+
+  return {
+    ...rawUser,
+    displayName,
+    name: derivedName,
+  };
+}
+
 // User APIs
 export async function login(email, password) {
   const data = await apiRequest('/api/user/login', {
@@ -81,14 +101,66 @@ export async function register(email, password, name) {
 }
 
 export async function getUserProfile() {
-  return apiRequest('/api/user/profile');
+  const account = await apiRequest(ACCOUNT_PROFILE_ENDPOINT);
+  let profileData = {};
+
+  try {
+    const profileResp = await apiRequest(PROFILE_DATA_ENDPOINT);
+    profileData = profileResp?.profile_data || {};
+  } catch (err) {
+    console.warn('Failed to fetch extended profile data', err?.message || err);
+  }
+
+  return {
+    ...normalizeUserPayload(account?.user || account || {}),
+    profile_data: profileData,
+  };
 }
 
-export async function updateUserProfile(updates) {
-  return apiRequest('/api/user/profile', {
-    method: 'POST',
-    body: JSON.stringify(updates),
+export async function updateUserProfile(updates = {}) {
+  const accountPayload = {};
+  const profileDataIncluded = Object.prototype.hasOwnProperty.call(updates, 'profile_data');
+
+  if (
+    Object.prototype.hasOwnProperty.call(updates, 'display_name') ||
+    Object.prototype.hasOwnProperty.call(updates, 'displayName') ||
+    Object.prototype.hasOwnProperty.call(updates, 'name')
+  ) {
+    const desiredName =
+      updates.display_name ?? updates.displayName ?? updates.name;
+    if (typeof desiredName === 'string') {
+      accountPayload.display_name = desiredName.trim();
+    }
+  }
+
+  ['email', 'theme', 'avatar', 'phone', 'lang', 'otp_enabled'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+      accountPayload[key] = updates[key];
+    }
   });
+
+  let latestAccount;
+  if (Object.keys(accountPayload).length > 0) {
+    const accountResp = await apiRequest(ACCOUNT_PROFILE_ENDPOINT, {
+      method: 'POST',
+      body: JSON.stringify(accountPayload),
+    });
+    latestAccount = normalizeUserPayload(accountResp?.user || accountResp || {});
+  }
+
+  let latestProfileData;
+  if (profileDataIncluded) {
+    const profileResp = await apiRequest(PROFILE_DATA_ENDPOINT, {
+      method: 'POST',
+      body: JSON.stringify({ profile_data: updates.profile_data || {} }),
+    });
+    latestProfileData = profileResp?.profile_data || updates.profile_data || {};
+  }
+
+  return {
+    ...(latestAccount || {}),
+    ...(profileDataIncluded ? { profile_data: latestProfileData } : {}),
+  };
 }
 
 export async function linkDid(did) {
