@@ -587,7 +587,7 @@ export default function IssuerConsole() {
       </div>
     </div>
   );
-}
+//
 
 
 function Input({ id, name, type="text", value, onChange, placeholder, error, autoComplete }) {
@@ -658,117 +658,7 @@ function Field({ f, value, onChange, error }) {
   );
 }
 
-/* ---------- Main ---------- */
-export default function IssuerConsole(){
-  const navigate = useNavigate();
-  const { identity } = useIdentity();
-  
-  // Auth & Profile
-  const [issuer, setIssuer] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [apiKey, setApiKey] = useState("");
-
-  useEffect(() => {
-    const token = localStorage.getItem("issuer_token");
-    if (!token) {
-      navigate("/issuer/login");
-      return;
-    }
-    
-    getIssuerProfile()
-      .then(resp => {
-        setIssuer(resp.issuer);
-        setLoadingProfile(false);
-        
-        // Load templates
-        setLoadingTemplates(true);
-        return listIssuerTemplates();
-      })
-      .then(resp => {
-        setAvailableTemplates(resp.templates || []);
-        setLoadingTemplates(false);
-      })
-      .catch(err => {
-        console.error(err);
-        if (err.message.includes('authenticated')) {
-          localStorage.removeItem("issuer_token");
-          navigate("/issuer/login");
-        } else {
-          setLoadingTemplates(false);
-        }
-      });
-  }, [navigate]);
-
-  const handleRotateKey = async () => {
-    if (!confirm("API anahtarını değiştirmek istediğinize emin misiniz? Eski anahtar geçersiz olacak.")) return;
-    try {
-      const resp = await rotateIssuerApiKey();
-      setApiKey(resp.api_key);
-      alert("Yeni API Anahtarı oluşturuldu. Lütfen güvenli bir yere kaydedin, tekrar gösterilmeyecek.");
-    } catch (err) {
-      alert("Hata: " + err.message);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("issuer_token");
-    localStorage.removeItem("issuer_info");
-    navigate("/issuer/login");
-  };
-
-  // org (Legacy local storage support - might need to migrate to backend)
-  // For now, we use the fetched issuer as the "org"
-  const org = useMemo(() => issuer ? {
-    id: issuer.id,
-    name: issuer.name,
-    did: issuer.did,
-    domain: issuer.domain,
-    templates: {} // TODO: Fetch templates from backend
-  } : null, [issuer]);
-
-  // modlar
-  const [mode, setMode] = useState("wpml"); // "wpml" | "wpt" | "manual"
-  const [wptParsed, setWptParsed] = useState(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
-  
-  // template selection (issuer_templates integration)
-  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
-  const [availableTemplates, setAvailableTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
-
-  // template meta
-  const [tplKey,setTplKey] = useState("studentCard");
-  const [tplName,setTplName] = useState("StudentCard");
-
-  // sadece advanced’te
-  const [tplBody,setTplBody] = useState(JSON.stringify({
-    "@context":["https://www.w3.org/2018/credentials/v1"],
-    "type":["VerifiableCredential","StudentCard"],
-    "issuer":"{{org.did}}",
-    "credentialSubject": { "id":"{{subjectDid}}","name":"{{name}}" }
-  },null,2));
-  const [tplErr,setTplErr] = useState("");
-
-  // presetler
-  const PRESETS = useMemo(()=>listPresetTexts() || [],[]);
-  const [selectedPresetIdx, setSelectedPresetIdx] = useState(-1);
-  const [presetFields, setPresetFields] = useState([]); // [{id,type,label,required,values?}]
-  const [fieldValues, setFieldValues] = useState({});   // id->value
-
-  // preview & output
-  const [preview,setPreview] = useState("");
-  const [out,setOut] = useState("");
-  const [flash, setFlash] = useState(null); // {tone,text}
-  const [recipientId, setRecipientId] = useState(null);
-
-  const templateInputIds = useMemo(() => ({
-    tplKey: "issuer-template-key",
-    tplName: "issuer-template-name",
-    templateSelector: "issuer-template-selector",
-    tplBody: "issuer-template-body",
-    presetSelector: "issuer-preset-selector"
-  }), []);
+// ... ikinci IssuerConsole fonksiyonu ve içeriği kaldırıldı ...
 
   // helpers
   const copyToClipboard = (txt) => navigator.clipboard.writeText(txt).catch(()=>{});
