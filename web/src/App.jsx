@@ -228,7 +228,7 @@ export default function App() {
           />
           <Route
             path="/share-info"
-            element={<Navigate to="/verify" replace />}
+            element={<Navigate to="/present" replace />}
           />
           <Route
             path="/receive-info"

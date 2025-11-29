@@ -88,7 +88,6 @@ export default function NavBar({ health, user, features }) {
     { to: "/credentials",   label: "Kimlik Bilgilerim",      icon: "list" },
     { to: "/verify",        label: "Doğrula",                icon: "verify" },
     { to: "/present",       label: "Göster",                 icon: "present" },
-    { to: "/share-info",    label: "Bilgi Paylaş",           icon: "present" },
     { to: "/receive-info",  label: "Bilgi Al",               icon: "list" },
     { to: "/settings",      label: "Ayarlar",                icon: "settings" },
     { to: "/admin/issuers", label: "Yönetici",               icon: "admin",   roles: ["admin"] },
