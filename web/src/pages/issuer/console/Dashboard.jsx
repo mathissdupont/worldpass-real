@@ -131,86 +131,86 @@ export default function IssuerDashboard() {
         <p className="text-[color:var(--muted)] mt-1">Overview of your issuer activity</p>
       </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            title="Total Issued"
-            value={stats?.total_issued || 0}
-            subtitle="All time"
-            icon={<FiFileText className="h-6 w-6 text-gray-600" />}
-            loading={!stats}
-          />
-          <StatCard
-            title="Active"
-            value={stats?.active_count || 0}
-            subtitle="Currently valid"
-            icon={<FiCheckCircle className="h-6 w-6 text-emerald-600" />}
-            loading={!stats}
-          />
-          <StatCard
-            title="Revoked"
-            value={stats?.revoked_count || 0}
-            subtitle="Invalidated"
-            icon={<FiXCircle className="h-6 w-6 text-rose-600" />}
-            loading={!stats}
-          />
-          <StatCard
-            title="Expired"
-            value={stats?.expired_count || 0}
-            subtitle="Past expiration"
-            icon={<FiClock className="h-6 w-6 text-amber-600" />}
-            loading={!stats}
-          />
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Issued"
+          value={stats?.total_issued || 0}
+          subtitle="All time"
+          icon={<FiFileText className="h-6 w-6 text-gray-600" />}
+          loading={!stats}
+        />
+        <StatCard
+          title="Active"
+          value={stats?.active_count || 0}
+          subtitle="Currently valid"
+          icon={<FiCheckCircle className="h-6 w-6 text-emerald-600" />}
+          loading={!stats}
+        />
+        <StatCard
+          title="Revoked"
+          value={stats?.revoked_count || 0}
+          subtitle="Invalidated"
+          icon={<FiXCircle className="h-6 w-6 text-rose-600" />}
+          loading={!stats}
+        />
+        <StatCard
+          title="Expired"
+          value={stats?.expired_count || 0}
+          subtitle="Past expiration"
+          icon={<FiClock className="h-6 w-6 text-amber-600" />}
+          loading={!stats}
+        />
+      </div>
 
-        {/* Recent Activity */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Credentials</h2>
-            <button
-              onClick={() => navigate("/issuer/console/credentials")}
-              className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              View All →
-            </button>
-          </div>
-          <DataTable
-            columns={columns}
-            data={recentCredentials}
-            loading={loading}
-            emptyMessage="No credentials issued yet"
-            onRowClick={(row) => navigate(`/issuer/console/credentials/${row.vc_id}`)}
-          />
+      {/* Recent Activity */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Recent Credentials</h2>
+          <button
+            onClick={() => navigate("/issuer/console/credentials")}
+            className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            View All →
+          </button>
         </div>
+        <DataTable
+          columns={columns}
+          data={recentCredentials}
+          loading={loading}
+          emptyMessage="No credentials issued yet"
+          onRowClick={(row) => navigate(`/issuer/console/credentials/${row.vc_id}`)}
+        />
+      </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button
-              onClick={() => navigate("/issue")}
-              className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-left transition-colors"
-            >
-              <h4 className="font-medium text-blue-900">Issue Credential</h4>
-              <p className="text-sm text-blue-700 mt-1">Create and issue a new credential</p>
-            </button>
-            <button
-              onClick={() => navigate("/issuer/console/templates")}
-              className="p-4 rounded-lg border-2 border-gray-200 hover:bg-gray-50 text-left transition-colors"
-            >
-              <h4 className="font-medium text-gray-900">Manage Templates</h4>
-              <p className="text-sm text-gray-600 mt-1">Create and edit credential templates</p>
-            </button>
-            <button
-              onClick={() => navigate("/issuer/console/api")}
-              className="p-4 rounded-lg border-2 border-gray-200 hover:bg-gray-50 text-left transition-colors"
-            >
-              <h4 className="font-medium text-gray-900">API Keys</h4>
-              <p className="text-sm text-gray-600 mt-1">Manage API keys and webhooks</p>
-            </button>
-          </div>
+      {/* Quick Actions */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => navigate("/issue")}
+            className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-left transition-colors"
+          >
+            <h4 className="font-medium text-blue-900">Issue Credential</h4>
+            <p className="text-sm text-blue-700 mt-1">Create and issue a new credential</p>
+          </button>
+          <button
+            onClick={() => navigate("/issuer/console/templates")}
+            className="p-4 rounded-lg border-2 border-gray-200 hover:bg-gray-50 text-left transition-colors"
+          >
+            <h4 className="font-medium text-gray-900">Manage Templates</h4>
+            <p className="text-sm text-gray-600 mt-1">Create and edit credential templates</p>
+          </button>
+          <button
+            onClick={() => navigate("/issuer/console/api")}
+            className="p-4 rounded-lg border-2 border-gray-200 hover:bg-gray-50 text-left transition-colors"
+          >
+            <h4 className="font-medium text-gray-900">API Keys</h4>
+            <p className="text-sm text-gray-600 mt-1">Manage API keys and webhooks</p>
+          </button>
         </div>
       </div>
     </div>
   );
 }
+

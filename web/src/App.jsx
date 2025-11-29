@@ -15,8 +15,8 @@ import Settings from "./pages/Settings";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
-import IssuerConsole from "./pages/issuer/ConsoleNew";
-import IssuerDashboard from "./pages/issuer/Dashboard";
+import IssuerConsole from "./pages/issuer/Console";
+
 import IssuerCredentials from "./pages/issuer/Credentials";
 import IssuerTemplates from "./pages/issuer/console/Templates";
 import IssuerSettings from "./pages/issuer/Settings";
@@ -87,14 +87,7 @@ export default function App() {
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <Routes>
         {/* Issuer Routes - Full page layout with their own navigation */}
-        <Route
-          path="/issuer/dashboard"
-          element={
-            <IssuerLayout>
-              <IssuerDashboard />
-            </IssuerLayout>
-          }
-        />
+        {/* Dashboard kaldırıldı, tüm işlevler Console.jsx'te */}
         <Route
           path="/issuer/credentials"
           element={
