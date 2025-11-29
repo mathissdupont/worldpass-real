@@ -138,7 +138,7 @@ export default function NavBar({ health, user, features }) {
           aria-label="WorldPass Home"
         >
           <img src="/worldpass_logo.svg" alt="WorldPass Logo" className="h-8 w-8 object-contain dark:invert" />
-          <span className="tracking-tight inline">WorldPass</span>
+          <span className="tracking-tight inline"></span>
         </Link>
 
         {/* Desktop Navigation */}

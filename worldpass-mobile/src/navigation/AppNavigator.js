@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, View } from 'react-native';
 
 import WalletScreen from '../screens/WalletScreen';
+import ShareInfoScreen from '../screens/ShareInfoScreen';
+import ReceiveInfoScreen from '../screens/ReceiveInfoScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import IdentityImportScreen from '../screens/IdentityImportScreen';
@@ -45,6 +47,16 @@ function WalletStackScreen() {
         name="WalletHome"
         component={WalletScreen}
         options={{ headerShown: false }}
+      />
+      <WalletStack.Screen
+        name="ShareInfo"
+        component={ShareInfoScreen}
+        options={{ title: 'VC Paylaş (QR/NFC)' }}
+      />
+      <WalletStack.Screen
+        name="ReceiveInfo"
+        component={ReceiveInfoScreen}
+        options={{ title: 'VC Al (QR/NFC)' }}
       />
       <WalletStack.Screen
         name="VCQR"

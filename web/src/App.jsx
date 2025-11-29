@@ -13,6 +13,8 @@ import CredentialIssuerForm from "./components/CredentialIssuerForm";
 import Verify from "./pages/Verify";
 import Credentials from "./pages/Credentials";
 import Settings from "./pages/Settings";
+import ShareInfo from "./pages/ShareInfo";
+import ReceiveInfo from "./pages/ReceiveInfo";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
@@ -221,6 +223,18 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Present />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/share-info"
+            element={<Navigate to="/verify" replace />}
+          />
+          <Route
+            path="/receive-info"
+            element={
+              <ProtectedRoute>
+                <ReceiveInfo />
               </ProtectedRoute>
             }
           />

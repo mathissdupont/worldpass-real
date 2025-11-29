@@ -1,4 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Platform, ToastAndroid } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+// NFC paylaşım simülasyonu (gerçek NFC için native modül gerekir)
+const sendNfc = async (payload, onResult) => {
+  if (Platform.OS === 'android') {
+    setTimeout(() => onResult && onResult(true), 1200);
+    ToastAndroid.show('NFC ile paylaşım simüle edildi', ToastAndroid.SHORT);
+  } else {
+    alert('NFC paylaşımı sadece Android cihazlarda desteklenir.');
+    onResult && onResult(false);
+  }
+};
 import {
   View,
   Text,
@@ -14,6 +26,26 @@ import { useWallet } from '../context/WalletContext';
 import { useIdentity } from '../context/IdentityContext';
 
 export default function PresentScreen({ navigation }) {
+  const [selectedVC, setSelectedVC] = useState(null);
+  const [selectedFields, setSelectedFields] = useState([]);
+  const [nfcStatus, setNfcStatus] = useState('');
+    // Alan seçimi için mevcut alanları çıkar
+    const getFields = (vc) => {
+      if (!vc) return [];
+      const subject = vc.credentialSubject || {};
+      return Object.keys(subject);
+    };
+
+    // Seçili alanlardan yeni bir VC objesi oluştur
+    const getPartialVC = () => {
+      if (!selectedVC || selectedFields.length === 0) return null;
+      const partial = { ...selectedVC };
+      partial.credentialSubject = {};
+      selectedFields.forEach(f => {
+        partial.credentialSubject[f] = selectedVC.credentialSubject[f];
+      });
+      return partial;
+    };
   const { theme } = useTheme();
   const { credentials, loading } = useWallet();
   const { identity, linking } = useIdentity();
@@ -222,9 +254,12 @@ export default function PresentScreen({ navigation }) {
                   </View>
                   <Text style={styles.issuerLabel}>{issuerLabel}</Text>
                   <View style={styles.credentialActions}>
-                    <TouchableOpacity style={styles.shareButton} onPress={() => handleShare(vc)}>
+                    <TouchableOpacity style={styles.shareButton} onPress={() => {
+                      setSelectedVC(vc);
+                      setSelectedFields(getFields(vc));
+                    }}>
                       <Ionicons name="qr-code" size={16} color={theme.colors.primary} />
-                      <Text style={styles.shareButtonText}>QR üret</Text>
+                      <Text style={styles.shareButtonText}>Alan Seç & Paylaş</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.outlineButtonCompact}
@@ -236,6 +271,45 @@ export default function PresentScreen({ navigation }) {
                 </View>
               );
             })}
+          </View>
+        )}
+
+        {/* Alan seçimi ve paylaşım kutusu */}
+        {selectedVC && (
+          <View style={{ marginTop: 24, padding: 16, backgroundColor: theme.colors.cardSecondary, borderRadius: 12 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Paylaşılacak Alanları Seç</Text>
+            {getFields(selectedVC).map(field => (
+              <TouchableOpacity
+                key={field}
+                style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}
+                onPress={() => setSelectedFields(f => f.includes(field) ? f.filter(x => x !== field) : [...f, field])}
+              >
+                <Ionicons name={selectedFields.includes(field) ? 'checkbox' : 'square-outline'} size={20} color={theme.colors.primary} />
+                <Text style={{ marginLeft: 8 }}>{field}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ alignItems: 'center', marginVertical: 12 }}>
+              {selectedFields.length > 0 && (
+                <QRCode value={JSON.stringify(getPartialVC())} size={180} />
+              )}
+            </View>
+            <TouchableOpacity
+              style={{ backgroundColor: theme.colors.primary, padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 8 }}
+              onPress={() => {
+                setNfcStatus('NFC ile aktarılıyor...');
+                sendNfc(getPartialVC(), ok => setNfcStatus(ok ? 'NFC ile gönderildi (simülasyon)' : 'NFC ile gönderilemedi.'));
+              }}
+              disabled={selectedFields.length === 0}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>NFC ile Paylaş</Text>
+            </TouchableOpacity>
+            {nfcStatus ? <Text style={{ color: theme.colors.primary, marginTop: 4 }}>{nfcStatus}</Text> : null}
+            <TouchableOpacity
+              style={{ marginTop: 8, alignItems: 'center' }}
+              onPress={() => { setSelectedVC(null); setSelectedFields([]); setNfcStatus(''); }}
+            >
+              <Text style={{ color: theme.colors.danger }}>Kapat</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>

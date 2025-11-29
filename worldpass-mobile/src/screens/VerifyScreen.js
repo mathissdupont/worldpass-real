@@ -1,11 +1,44 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
+import QRCodeScanner from 'react-native-qrcode-scanner';
+import { ToastAndroid } from 'react-native';
+// NFC alma simülasyonu (gerçek NFC için native modül gerekir)
+const receiveNfc = async (onResult) => {
+  if (Platform.OS === 'android') {
+    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
+    ToastAndroid.show('NFC ile alma simüle edildi', ToastAndroid.SHORT);
+  } else {
+    alert('NFC alma sadece Android cihazlarda desteklenir.');
+    onResult && onResult(null);
+  }
+};
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 
 export default function VerifyScreen({ navigation }) {
+  const [vcText, setVcText] = useState('');
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [loadingVerify, setLoadingVerify] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+    // Backend doğrulama fonksiyonu
+    const handleVerify = async () => {
+      setLoadingVerify(true);
+      setVerifyResult(null);
+      try {
+        const resp = await fetch('https://worldpass-beta.heptapusgroup.com/api/vc/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: vcText,
+        });
+        const data = await resp.json();
+        setVerifyResult(data);
+      } catch (e) {
+        setVerifyResult({ valid: false, error: 'Doğrulama hatası: ' + e.message });
+      }
+      setLoadingVerify(false);
+    };
   const { theme } = useTheme();
   const { identity, linking } = useIdentity();
   const { credentials } = useWallet();
@@ -90,48 +123,69 @@ export default function VerifyScreen({ navigation }) {
 
       <View style={[styles.sectionCard, theme.shadows.card]}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
-          <Text style={styles.sectionSubtitle}>Verify akışının kısa yolu</Text>
+          <Text style={styles.sectionTitle}>Doğrulama</Text>
+          <Text style={styles.sectionSubtitle}>QR, NFC veya manuel JSON ile VC doğrula</Text>
         </View>
-        {[
-          {
-            icon: 'scan-outline',
-            title: 'Canlı QR taraması',
-            text: 'Cihaz kamerası ile doğrulayıcı isteğini okur ve Scanner ekranını açar.',
-            action: openScanner,
-          },
-          {
-            icon: 'document-attach-outline',
-            title: '.wpvp yükle',
-            text: 'Dosya yöneticisinden gelen sunum talebini seçerek doğrulama yap.',
-            action: () => {},
-            disabled: true,
-            helper: 'Dosya seçme desteği yakında',
-          },
-          {
-            icon: 'shield-half-outline',
-            title: 'Politikaları incele',
-            text: 'Her talep için alan eşleşmelerini ve imza gerekliliklerini kontrol et.',
-            action: () => openIdentity('SettingsHome'),
-          },
-        ].map((item) => (
-          <TouchableOpacity
-            key={item.title}
-            style={[styles.actionRow, item.disabled && styles.actionRowDisabled]}
-            onPress={item.action}
-            disabled={item.disabled}
-          >
-            <View style={styles.actionIcon}>
-              <Ionicons name={item.icon} size={18} color={theme.colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>{item.title}</Text>
-              <Text style={styles.actionText}>{item.text}</Text>
-              {item.helper && <Text style={styles.helperText}>{item.helper}</Text>}
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+          <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => setShowScanner(true)}>
+            <Ionicons name="qr-code" size={18} color="#fff" />
+            <Text style={styles.primaryButtonText}>QR Tara</Text>
           </TouchableOpacity>
-        ))}
+          <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={() => {
+            setVerifyResult(null);
+            setVcText('');
+            receiveNfc(data => {
+              if (data) {
+                setVcText(data);
+                setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
+              } else {
+                setVerifyResult({ error: 'NFC ile veri alınamadı.' });
+              }
+            });
+          }}>
+            <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary} />
+            <Text style={styles.secondaryButtonText}>NFC ile Al</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.metaLabel}>VC JSON</Text>
+        <TextInput
+          style={{ backgroundColor: '#f9f9f9', borderRadius: 8, padding: 10, minHeight: 80, textAlignVertical: 'top', marginBottom: 8 }}
+          value={vcText}
+          onChangeText={setVcText}
+          placeholder="VC JSON'u buraya yapıştır veya tara/NFC ile al"
+          multiline
+          numberOfLines={6}
+        />
+        <TouchableOpacity style={[styles.primaryButton, { marginBottom: 8 }]} onPress={handleVerify} disabled={loadingVerify || !vcText}>
+          <Text style={styles.primaryButtonText}>{loadingVerify ? 'Doğrulanıyor...' : 'Doğrula'}</Text>
+        </TouchableOpacity>
+        {showScanner && (
+          <QRCodeScanner
+            onRead={e => {
+              setVcText(e.data);
+              setShowScanner(false);
+              setVerifyResult({ info: 'QR ile veri alındı. JSON kutusuna yapıştırıldı.' });
+            }}
+            topContent={<Text>QR kodu tara</Text>}
+            bottomContent={
+              <TouchableOpacity onPress={() => setShowScanner(false)}>
+                <Text style={{ color: '#007aff', marginTop: 16 }}>Kapat</Text>
+              </TouchableOpacity>
+            }
+          />
+        )}
+        {verifyResult && (
+          <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: verifyResult.valid ? '#e0ffe0' : '#ffe0e0' }}>
+            {verifyResult.info && <Text style={{ color: '#007aff' }}>{verifyResult.info}</Text>}
+            {verifyResult.valid !== undefined && (
+              <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red' }}>
+                {verifyResult.valid ? 'Geçerli Credential ✅' : 'Geçersiz Credential ❌'}
+              </Text>
+            )}
+            {verifyResult.error && <Text style={{ color: 'red' }}>{verifyResult.error}</Text>}
+            {verifyResult.details && <Text style={{ color: '#333', marginTop: 4 }}>{JSON.stringify(verifyResult.details, null, 2)}</Text>}
+          </View>
+        )}
       </View>
 
       <View style={[styles.sectionCard, theme.shadows.card]}>

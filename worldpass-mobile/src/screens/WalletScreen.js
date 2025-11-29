@@ -1,5 +1,68 @@
 import React, { useState, useMemo } from 'react';
-import { Share, Clipboard, ToastAndroid, Platform } from 'react-native';
+import { Share, Clipboard, ToastAndroid, Platform, View as RNView } from 'react-native';
+// NFC paylaşım fonksiyonu (Android için simülasyon)
+const sendNfc = async (payload, onResult) => {
+  if (Platform.OS === 'android') {
+    setTimeout(() => onResult && onResult(true), 1200);
+    ToastAndroid.show('NFC ile paylaşım simüle edildi', ToastAndroid.SHORT);
+  } else {
+    alert('NFC paylaşımı sadece Android cihazlarda desteklenir.');
+    onResult && onResult(false);
+  }
+};
+  // VC önemli alanlarını daha okunabilir göster
+  const renderCredentialDetails = (cred) => {
+    if (!cred) return null;
+    const { proof, status, '@context': context, type, issuer, issuanceDate, expirationDate, credentialSubject } = cred;
+    return (
+      <RNView style={{ marginBottom: 16 }}>
+        <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>Temel Bilgiler</Text>
+        <Text>Tip: {Array.isArray(type) ? type.join(', ') : type}</Text>
+        <Text>Issuer: {issuer}</Text>
+        <Text>Issued: {issuanceDate ? new Date(issuanceDate).toLocaleString() : '-'}</Text>
+        {expirationDate && <Text>Expires: {new Date(expirationDate).toLocaleString()}</Text>}
+        <Text style={{ fontWeight: 'bold', marginTop: 8 }}>Holder:</Text>
+        <Text>{credentialSubject?.id || '-'}</Text>
+        {status && (
+          <>
+            <Text style={{ fontWeight: 'bold', marginTop: 8 }}>Status:</Text>
+            <Text>{typeof status === 'object' ? JSON.stringify(status, null, 2) : String(status)}</Text>
+          </>
+        )}
+        {context && (
+          <>
+            <Text style={{ fontWeight: 'bold', marginTop: 8 }}>@context:</Text>
+            <Text numberOfLines={2} ellipsizeMode="tail">{Array.isArray(context) ? context.join(', ') : String(context)}</Text>
+          </>
+        )}
+        {proof && (
+          <>
+            <Text style={{ fontWeight: 'bold', marginTop: 8 }}>Proof:</Text>
+            <Text numberOfLines={2} ellipsizeMode="tail">{typeof proof === 'object' ? JSON.stringify(proof, null, 2) : String(proof)}</Text>
+          </>
+        )}
+      </RNView>
+    );
+  };
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+  // Dosya olarak dışa aktar (paylaş veya kaydet)
+  const handleExport = async () => {
+    if (!selectedCredential) return;
+    try {
+      const json = JSON.stringify(selectedCredential, null, 2);
+      const fileName = `credential-${selectedCredential.jti || selectedCredential.id || Date.now()}.json`;
+      const fileUri = FileSystem.cacheDirectory + fileName;
+      await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'VC Dışa Aktar' });
+      } else {
+        alert('Paylaşım desteklenmiyor, dosya kaydedildi: ' + fileUri);
+      }
+    } catch (e) {
+      alert('Dışa aktarma hatası: ' + e.message);
+    }
+  };
 import {
   View,
   Text,
@@ -336,14 +399,14 @@ export default function WalletScreen() {
       {loading ? (
         <>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.emptyText}>Loading credentials...</Text>
+          <Text style={styles.emptyText}>Kimlikler yükleniyor...</Text>
         </>
       ) : (
         <>
           <Ionicons name="wallet-outline" size={64} color={theme.colors.tabInactive} />
-          <Text style={styles.emptyText}>No credentials yet</Text>
+          <Text style={styles.emptyText}>Henüz hiç credential yok</Text>
           <Text style={styles.emptySubtext}>
-            Scan QR codes to add verifiable credentials
+            Cüzdanına ilk verifiable credential’ı eklemek için QR kod tara veya bir dosya/uygulamadan paylaşım al. NFC ile paylaşım için Android cihazlarda VC detayında “NFC ile Paylaş” butonunu kullanabilirsin.
           </Text>
         </>
       )}
@@ -385,7 +448,7 @@ export default function WalletScreen() {
       {error && (
         <View style={styles.errorBanner}>
           <Ionicons name="alert-circle" size={18} color={theme.colors.danger} />
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{typeof error === 'string' ? error : 'Bir hata oluştu, lütfen tekrar deneyin.'}</Text>
         </View>
       )}
       <FlatList
@@ -415,16 +478,31 @@ export default function WalletScreen() {
           <View style={[styles.modalContent, theme.shadows.card]}>
             <Text style={styles.modalTitle}>Credential Details</Text>
             <ScrollView style={styles.modalBody}>
+              {renderCredentialDetails(selectedCredential)}
               <Text style={styles.jsonText}>
                 {selectedCredential ? JSON.stringify(selectedCredential, null, 2) : ''}
               </Text>
             </ScrollView>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
               <TouchableOpacity style={[styles.modalButton, { flex: 1 }]} onPress={handleCopy}>
                 <Text style={styles.modalButtonText}>Kopyala</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, { flex: 1, backgroundColor: '#4f8cff' }]} onPress={handleShare}>
                 <Text style={styles.modalButtonText}>Paylaş</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, { flex: 1, backgroundColor: '#2ecc40' }]} onPress={handleExport}>
+                <Text style={styles.modalButtonText}>Dışa Aktar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, { flex: 1, backgroundColor: '#ffb300' }]} onPress={() => {
+                sendNfc(selectedCredential, (ok) => {
+                  if (ok) {
+                    if (Platform.OS === 'android') ToastAndroid.show('NFC ile gönderildi (simülasyon)', ToastAndroid.SHORT);
+                  } else {
+                    alert('NFC ile gönderilemedi.');
+                  }
+                });
+              }}>
+                <Text style={styles.modalButtonText}>NFC ile Paylaş</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity

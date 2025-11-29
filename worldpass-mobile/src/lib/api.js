@@ -4,9 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDID } from './storage';
 
 const LOCAL_API_BASE = Platform.select({
-  ios: 'http://localhost:8000',
+  ios: 'https://worldpass-beta.heptapusgroup.com',
   android: 'http://10.0.2.2:8000',
-  default: 'http://localhost:8000',
+  default: 'https://worldpass-beta.heptapusgroup.com',
 });
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
