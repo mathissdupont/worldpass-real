@@ -140,25 +140,27 @@ export default function Present() {
   }, [currentVC, selectedFields]);
 
   const hasId = !!identity?.sk_b64u && !!identity?.did;
+  // QR/istek olmadan da sunum oluşturulabilsin
   const canBuild = !!(hasId && currentVC && filteredSubject);
 
   const presentationPayload = useMemo(() => {
     if (!canBuild) return null;
     const vcId = currentVC.jti || currentVC.id || null;
     const createdAt = Math.floor(Date.now() / 1000);
-    const challenge = request?.challenge || null;
-    return {
+    // challenge, aud, exp sadece request varsa eklenir
+    const payload = {
       type: "presentation",
       created_at: createdAt,
-      challenge,
-      aud: request?.aud,
-      exp: request?.exp,
       holder: { did: identity.did, pk_b64u: identity.pk_b64u, alg: "Ed25519" },
       vc: currentVC,
       vc_ref: { id: vcId, type: currentVC.type || null, issuer: currentVC.issuer || null },
       claims: filteredSubject,
-      request: request ? { label: request.label, fields: request.fields, vc: request.vc } : undefined,
     };
+    if (request?.challenge) payload.challenge = request.challenge;
+    if (request?.aud) payload.aud = request.aud;
+    if (request?.exp) payload.exp = request.exp;
+    if (request) payload.request = { label: request.label, fields: request.fields, vc: request.vc };
+    return payload;
   }, [canBuild, currentVC, filteredSubject, identity, request]);
 
   const handleRequestObject = (obj) => {
@@ -522,7 +524,7 @@ export default function Present() {
                  <div className="p-6 space-y-6">
                     <div className="grid sm:grid-cols-2 gap-4">
                        <Button onClick={download} variant="secondary" className="h-auto py-4 flex-col gap-2"><span>{t("download_file")}</span></Button>
-                       <Button onClick={publishToServer} disabled={!!qrImage} variant="primary" className="h-auto py-4 flex-col gap-2"><span>{t("generate_qr")}</span></Button>
+                       <Button onClick={publishToServer} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>{t("generate_qr")}</span></Button>
                     </div>
                     {qrImage && (
                        <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">
