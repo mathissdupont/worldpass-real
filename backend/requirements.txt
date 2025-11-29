@@ -15,4 +15,5 @@ pytest
 pytest-asyncio
 dnspython
 pyotp
-jsqr 
+jsqrcode==1.0.9
+Pillow==10.4.0  
