@@ -1,5 +1,5 @@
 // Modern Issuer Console - Clean & Responsive
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getIssuerProfile,
@@ -17,7 +17,25 @@ export default function IssuerConsole() {
   // Issue form
   const [recipientDID, setRecipientDID] = useState('');
   const [credentialType, setCredentialType] = useState('');
+  // Dinamik credential fields
+  const [credentialFields, setCredentialFields] = useState([
+    { key: '', value: '', type: 'text', required: false },
+  ]);
+  // JSON string for backend
   const [credentialData, setCredentialData] = useState('{}');
+  // Autocomplete için field isimleri
+  const [fieldSuggestions, setFieldSuggestions] = useState([]);
+  // Credential type dropdown için örnekler
+  const credentialTypeOptions = [
+    'UniversityDegree',
+    'DriversLicense',
+    'EmployeeID',
+    'MembershipCard',
+    'StudentCard',
+    'CustomType',
+  ];
+  // JSON kopyalama için ref
+  const jsonPreviewRef = useRef(null);
   const [issuing, setIssuing] = useState(false);
   const [issueError, setIssueError] = useState('');
   const [issueSuccess, setIssueSuccess] = useState('');
@@ -96,12 +114,19 @@ export default function IssuerConsole() {
       return;
     }
 
-    let parsedData;
-    try {
-      parsedData = JSON.parse(credentialData);
-    } catch (err) {
-      setIssueError('Invalid JSON in credential data');
-      return;
+    // credentialFields'i objeye çevir
+    const parsedData = {};
+    for (const field of credentialFields) {
+      if (field.key) {
+        // Tipine göre dönüştür
+        let val = field.value;
+        if (field.type === 'number') {
+          val = val === '' ? '' : Number(val);
+        } else if (field.type === 'date') {
+          val = val;
+        }
+        parsedData[field.key] = val;
+      }
     }
 
     // issuer DID'i profilden çek
@@ -134,6 +159,7 @@ export default function IssuerConsole() {
       setIssueSuccess('Credential issued successfully!');
       setRecipientDID('');
       setCredentialType('');
+      setCredentialFields([{ key: '', value: '', type: 'text', required: false }]);
       setCredentialData('{}');
       setSelectedTemplate(null);
 
@@ -260,22 +286,24 @@ export default function IssuerConsole() {
                       value={selectedTemplate?.id || ''}
                       onChange={(e) => {
                         const id = e.target.value;
-                        const template = templates.find(
-                          (t) => String(t.id) === id,
-                        );
+                        const template = templates.find((t) => String(t.id) === id);
                         setSelectedTemplate(template || null);
                         if (template) {
                           setCredentialType(template.vc_type);
-                          const schema =
-                            template.schema_json || template.schema_data;
+                          // Alanları template'e göre doldur
+                          const schema = template.schema_json || template.schema_data;
                           if (schema && schema.properties) {
-                            const example = {};
-                            Object.keys(schema.properties).forEach((key) => {
-                              example[key] = '';
+                            const newFields = Object.keys(schema.properties).map((key) => {
+                              const prop = schema.properties[key];
+                              return {
+                                key,
+                                value: prop.example || '',
+                                type: prop.type === 'number' ? 'number' : prop.format === 'date' ? 'date' : 'text',
+                                required: schema.required?.includes(key) || false,
+                              };
                             });
-                            setCredentialData(
-                              JSON.stringify(example, null, 2),
-                            );
+                            setCredentialFields(newFields.length ? newFields : [{ key: '', value: '', type: 'text', required: false }]);
+                            setFieldSuggestions(Object.keys(schema.properties));
                           }
                         }
                       }}
@@ -315,45 +343,143 @@ export default function IssuerConsole() {
                     value={recipientDID}
                     onChange={(e) => setRecipientDID(e.target.value)}
                     placeholder="did:key:z6Mk..."
-                    className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all"
+                    className={`w-full px-4 py-3 bg-[color:var(--panel-2)] border rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all ${!recipientDID ? 'border-rose-500' : 'border-[color:var(--border)]'}`}
                   />
+                  {!recipientDID && <p className="text-xs text-rose-500 mt-1">Recipient DID is required</p>}
                   <p className="text-xs text-[color:var(--muted)] mt-1">
                     The DID of the credential recipient
                   </p>
                 </div>
 
-                {/* Credential Type */}
+                {/* Credential Type Dropdown */}
                 <div>
                   <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
                     Credential Type <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={credentialType}
-                    onChange={(e) => setCredentialType(e.target.value)}
-                    placeholder="UniversityDegree"
-                    className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all"
-                  />
+                    onChange={e => setCredentialType(e.target.value)}
+                    className={`w-full px-4 py-3 bg-[color:var(--panel-2)] border rounded-lg text-[color:var(--text)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all ${!credentialType ? 'border-rose-500' : 'border-[color:var(--border)]'}`}
+                  >
+                    <option value="">Select type...</option>
+                    {credentialTypeOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {!credentialType && <p className="text-xs text-rose-500 mt-1">Credential type is required</p>}
                   <p className="text-xs text-[color:var(--muted)] mt-1">
                     Examples: UniversityDegree, DriversLicense, EmployeeID
                   </p>
                 </div>
 
-                {/* Credential Data */}
+                {/* Dinamik Credential Fields - tip, autocomplete, required, validasyon */}
                 <div>
                   <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
-                    Credential Data (JSON)
+                    Credential Fields
                   </label>
-                  <textarea
-                    value={credentialData}
-                    onChange={(e) => setCredentialData(e.target.value)}
-                    rows={8}
-                    className="w-full px-4 py-3 bg-[color:var(--panel-2)] border border-[color:var(--border)] rounded-lg text-[color:var(--text)] placeholder-[color:var(--muted)] focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent outline-none transition-all font-mono text-sm"
-                    placeholder={`{\n  "name": "John Doe",\n  "degree": "Bachelor of Science",\n  "graduationDate": "2024-05-15"\n}`}
-                  />
+                  {credentialFields.map((field, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2 items-center">
+                      <input
+                        type="text"
+                        placeholder="Field Name"
+                        value={field.key}
+                        list="field-suggestions"
+                        onChange={e => {
+                          const newFields = [...credentialFields];
+                          newFields[idx].key = e.target.value;
+                          setCredentialFields(newFields);
+                        }}
+                        className={`flex-1 px-3 py-2 border rounded-lg bg-[color:var(--panel-2)] text-[color:var(--text)] ${field.required && !field.value ? 'border-rose-500' : 'border-[color:var(--border)]'}`}
+                        autoComplete="off"
+                      />
+                      <datalist id="field-suggestions">
+                        {fieldSuggestions.map(s => <option key={s} value={s} />)}
+                      </datalist>
+                      <input
+                        type={field.type || 'text'}
+                        placeholder="Field Value"
+                        value={field.value}
+                        onChange={e => {
+                          const newFields = [...credentialFields];
+                          newFields[idx].value = e.target.value;
+                          setCredentialFields(newFields);
+                        }}
+                        className={`flex-1 px-3 py-2 border rounded-lg bg-[color:var(--panel-2)] text-[color:var(--text)] ${field.required && !field.value ? 'border-rose-500' : 'border-[color:var(--border)]'}`}
+                        autoComplete="off"
+                      />
+                      <select
+                        value={field.type}
+                        onChange={e => {
+                          const newFields = [...credentialFields];
+                          newFields[idx].type = e.target.value;
+                          setCredentialFields(newFields);
+                        }}
+                        className="px-2 py-2 border rounded-lg bg-[color:var(--panel-2)] text-[color:var(--text)] border-[color:var(--border)] text-xs"
+                      >
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                      </select>
+                      <label className="flex items-center gap-1 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={field.required}
+                          onChange={e => {
+                            const newFields = [...credentialFields];
+                            newFields[idx].required = e.target.checked;
+                            setCredentialFields(newFields);
+                          }}
+                        />
+                        Required
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFields = credentialFields.filter((_, i) => i !== idx);
+                          setCredentialFields(newFields.length ? newFields : [{ key: '', value: '', type: 'text', required: false }]);
+                        }}
+                        className="px-2 py-1 text-xs bg-rose-500 text-white rounded-lg"
+                        title="Remove field"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setCredentialFields([...credentialFields, { key: '', value: '', type: 'text', required: false }])}
+                    className="mt-2 px-3 py-2 bg-[color:var(--brand)] text-white rounded-lg text-sm"
+                  >
+                    + Add Field
+                  </button>
                   <p className="text-xs text-[color:var(--muted)] mt-1">
-                    Additional data to include in credentialSubject
+                    Her alan credentialSubject'a otomatik eklenir. Alan tipi ve zorunluluğu seçebilirsin.
                   </p>
+                  {/* JSON preview + kopyala butonu */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <pre ref={jsonPreviewRef} className="bg-[color:var(--panel-2)] p-2 rounded text-xs font-mono border border-[color:var(--border)] overflow-x-auto flex-1">
+                      {JSON.stringify(
+                        credentialFields.reduce((acc, cur) => {
+                          if (cur.key) acc[cur.key] = cur.value;
+                          return acc;
+                        }, {}),
+                        null,
+                        2
+                      )}
+                    </pre>
+                    <button
+                      type="button"
+                      className="px-2 py-1 bg-blue-500 text-white rounded text-xs"
+                      onClick={() => {
+                        if (jsonPreviewRef.current) {
+                          const text = jsonPreviewRef.current.textContent;
+                          navigator.clipboard.writeText(text);
+                        }
+                      }}
+                    >
+                      JSON Kopyala
+                    </button>
+                  </div>
                 </div>
 
                 {/* Error/Success Messages */}
