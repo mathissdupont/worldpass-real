@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import Account from "./pages/Account";
 import Profile from "./pages/Profile";
 import Issue from "./pages/Issue";
+import CredentialIssuerForm from "./components/CredentialIssuerForm";
 import Verify from "./pages/Verify";
 import Credentials from "./pages/Credentials";
 import Settings from "./pages/Settings";
@@ -194,13 +195,14 @@ export default function App() {
             }
           />
 
+
           {/* Sertifika verme: sadece issuer rolüne açık */}
           <Route
             path="/issue"
             element={
               <RoleRoute user={user} roles="issuer">
                 <ProtectedRoute>
-                  <Issue />
+                  <CredentialIssuerForm />
                 </ProtectedRoute>
               </RoleRoute>
             }
