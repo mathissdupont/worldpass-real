@@ -14,6 +14,4 @@ httpx
 pytest
 pytest-asyncio
 dnspython
-pyotp
-jsqrcode==1.0.9
-Pillow==10.4.0  
+pyotp 
