@@ -88,6 +88,8 @@ export default function NavBar({ health, user, features }) {
     { to: "/credentials",   label: "Kimlik Bilgilerim",      icon: "list" },
     { to: "/verify",        label: "Doğrula",                icon: "verify" },
     { to: "/present",       label: "Göster",                 icon: "present" },
+    { to: "/share-info",    label: "Bilgi Paylaş",           icon: "present" },
+    { to: "/receive-info",  label: "Bilgi Al",               icon: "list" },
     { to: "/settings",      label: "Ayarlar",                icon: "settings" },
     { to: "/admin/issuers", label: "Yönetici",               icon: "admin",   roles: ["admin"] },
   ];
@@ -136,7 +138,7 @@ export default function NavBar({ health, user, features }) {
           aria-label="WorldPass Home"
         >
           <img src="/worldpass_logo.svg" alt="WorldPass Logo" className="h-8 w-8 object-contain dark:invert" />
-          <span className="tracking-tight hidden sm:inline">WorldPass</span>
+          <span className="tracking-tight inline">WorldPass</span>
         </Link>
 
         {/* Desktop Navigation */}

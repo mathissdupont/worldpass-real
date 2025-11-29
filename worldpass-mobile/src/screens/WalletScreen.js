@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Share, Clipboard, ToastAndroid, Platform } from 'react-native';
 import {
   View,
   Text,
@@ -349,6 +350,36 @@ export default function WalletScreen() {
     </View>
   );
 
+  // Kopyala fonksiyonu
+  const handleCopy = async () => {
+    if (!selectedCredential) return;
+    const text = JSON.stringify(selectedCredential, null, 2);
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('Kopyalandı!');
+      } catch {
+        alert('Kopyalanamadı.');
+      }
+    } else {
+      Clipboard.setString(text);
+      if (Platform.OS === 'android') ToastAndroid.show('Kopyalandı!', ToastAndroid.SHORT);
+    }
+  };
+
+  // Paylaş fonksiyonu
+  const handleShare = async () => {
+    if (!selectedCredential) return;
+    try {
+      await Share.share({
+        message: JSON.stringify(selectedCredential, null, 2),
+        title: 'Verifiable Credential',
+      });
+    } catch (e) {
+      // kullanıcı iptal ederse sessiz geç
+    }
+  };
+
   return (
     <View style={styles.container}>
       {error && (
@@ -388,11 +419,19 @@ export default function WalletScreen() {
                 {selectedCredential ? JSON.stringify(selectedCredential, null, 2) : ''}
               </Text>
             </ScrollView>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+              <TouchableOpacity style={[styles.modalButton, { flex: 1 }]} onPress={handleCopy}>
+                <Text style={styles.modalButtonText}>Kopyala</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, { flex: 1, backgroundColor: '#4f8cff' }]} onPress={handleShare}>
+                <Text style={styles.modalButtonText}>Paylaş</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={styles.modalButton}
+              style={[styles.modalButton, { marginTop: 10 }]}
               onPress={() => setSelectedCredential(null)}
             >
-              <Text style={styles.modalButtonText}>Close</Text>
+              <Text style={styles.modalButtonText}>Kapat</Text>
             </TouchableOpacity>
           </View>
         </View>

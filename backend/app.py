@@ -1206,6 +1206,19 @@ async def issuer_issue(
     if vc.get("issuer") != (issuer["did"] or ""):
         raise HTTPException(status_code=400, detail="issuer_did_mismatch")
 
+    # --- VC'yi imzala (proof ekle) ---
+    # issuer'ın private key'i ve public key'i alınır
+    issuer_sk_b64u = issuer.get("sk_b64u")
+    issuer_pk_b64u = issuer.get("pk_b64u")
+    verification_method = f"{issuer['did']}#key-1"
+    if not issuer_sk_b64u or not issuer_pk_b64u:
+        raise HTTPException(status_code=500, detail="issuer_keys_missing")
+    from backend.core.vc import sign_vc
+    from backend.core.crypto_ed25519 import b64u_d
+    sk_bytes = b64u_d(issuer_sk_b64u)
+    signed_vc = sign_vc(vc, signer, sk_bytes, issuer_pk_b64u, verification_method)
+    vc = signed_vc
+
     # Optional template validation
     template_id = body.template_id
     if template_id:
@@ -1307,7 +1320,6 @@ async def issuer_issue(
                 print(f"Failed to auto-add VC to user wallet: {e}")
 
     await db.commit()
-    
     # Dispatch webhook event (async, non-blocking)
     try:
         await _dispatch_webhooks(db, issuer["id"], "credential.issued", {
@@ -1320,8 +1332,8 @@ async def issuer_issue(
         })
     except Exception as e:
         print(f"Webhook dispatch failed: {e}")
-    
-    return IssuerIssueResp(ok=True, vc_id=jti, recipient_id=recipient_id)
+    # İmzalı VC'yi daima döndür
+    return {"ok": True, "vc_id": jti, "recipient_id": recipient_id, "vc": vc}
 
 
 
