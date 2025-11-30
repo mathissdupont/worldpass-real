@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('open-worldpass').addEventListener('click', () => {
     chrome.tabs.create({ url: 'https://worldpass-beta.heptapusgroup.com/account' });
   });
+
+    // NEW: Connect button
+  const connectBtn = document.getElementById('connect-worldpass');
+  if (connectBtn) {
+    connectBtn.addEventListener('click', connectWorldPass);
+  }
+
 });
 
 async function updateStatus() {
@@ -119,4 +126,57 @@ function showSuccess() {
     syncBtn.textContent = originalText;
     syncBtn.style.background = '';
   }, 2000);
+}
+
+
+async function connectWorldPass() {
+  hideError();
+
+  const statusBadge = document.getElementById('status-badge');
+  statusBadge.textContent = 'Connecting...';
+  statusBadge.className = 'badge badge-warning';
+
+  // Aktif sekmeyi bul
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+
+    if (!tab || !tab.url || !tab.url.includes('worldpass-beta.heptapusgroup.com')) {
+      showError('Önce WorldPass sekmesine geç, sonra tekrar Connect’e bas.');
+      updateStatus();
+      return;
+    }
+
+    // Content script’e token isteği gönder
+    chrome.tabs.sendMessage(
+      tab.id,
+      { action: 'getWorldpassToken' },
+      async (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('[WorldPass] sendMessage error:', chrome.runtime.lastError);
+          showError('WorldPass sayfasına erişilemedi. Sayfayı yenileyip tekrar dene.');
+          await updateStatus();
+          return;
+        }
+
+        if (!response || !response.token) {
+          console.warn('[WorldPass] No token in response:', response);
+          showError('Token bulunamadı. WorldPass’te giriş yaptığından emin ol.');
+          await updateStatus();
+          return;
+        }
+
+        try {
+          await chrome.storage.local.set({ worldpass_token: response.token });
+          console.log('[WorldPass] Token saved to chrome.storage.local');
+
+          await updateStatus();
+          showSuccess();
+        } catch (e) {
+          console.error('[WorldPass] Error saving token:', e);
+          showError('Token kaydedilemedi.');
+          await updateStatus();
+        }
+      }
+    );
+  });
 }

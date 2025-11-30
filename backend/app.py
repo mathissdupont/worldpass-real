@@ -73,6 +73,7 @@ ALLOWED_ISSUER_STATUSES = ("approved", "verified")
 WALLET_OPTIONAL_ENDPOINTS = {
     ("POST", f"{API}/user/did-link"),
     ("GET", f"{API}/user/profile"),
+    ("GET", f"{API}/user/profile-data"),
 }
 signer = Ed25519Signer()
 
@@ -500,11 +501,13 @@ async def _get_current_user(
         route_key = (request.method.upper(), current_path)
 
         if wallet_did:
-            if not x_wallet_did:
-                raise HTTPException(status_code=400, detail="wallet_did_required")
-            normalized_wallet = x_wallet_did.strip()
-            if normalized_wallet != wallet_did:
-                raise HTTPException(status_code=403, detail="wallet_did_mismatch")
+            # Bu endpoint için wallet zorunlu olmasın (extension kullanıyor)
+            if route_key not in WALLET_OPTIONAL_ENDPOINTS:
+                if not x_wallet_did:
+                    raise HTTPException(status_code=400, detail="wallet_did_required")
+                normalized_wallet = x_wallet_did.strip()
+                if normalized_wallet != wallet_did:
+                    raise HTTPException(status_code=403, detail="wallet_did_mismatch")
         else:
             if route_key not in WALLET_OPTIONAL_ENDPOINTS:
                 raise HTTPException(status_code=403, detail="user_did_not_linked")
