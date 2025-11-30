@@ -10,7 +10,7 @@ const LOCAL_API_BASE = Platform.select({
 });
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
-  || (__DEV__ ? LOCAL_API_BASE : 'https://worldpass.tech');
+  || (__DEV__ ? LOCAL_API_BASE : 'https://worldpass-beta.heptapusgroup.com');
 
 const ACCOUNT_PROFILE_ENDPOINT = '/api/user/profile';
 const PROFILE_DATA_ENDPOINT = '/api/user/profile-data';

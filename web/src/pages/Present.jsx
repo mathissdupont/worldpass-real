@@ -332,26 +332,26 @@ export default function Present() {
   const buildPayload = () => {
     setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
     if (!presentationPayload) return setMsg({ type: "err", text: t("error_missing_data") });
-    if (!request?.challenge) {
-      setMsg({ type: "err", text: "Lütfen önce doğrulama isteğini tara." });
-      return;
-    }
     try {
-      const parts = [
-        request.challenge,
-        request.aud || "",
-        request.exp ? String(request.exp) : "",
-      ];
-      const msgBytes = enc.encode(parts.join("|"));
-      const sk = b64uToBytes(identity.sk_b64u);
-      const sig = nacl.sign.detached(msgBytes, sk);
-      const payloadToSend = {
-        ...presentationPayload,
-        holder: {
-          ...presentationPayload.holder,
-          sig_b64u: b64u(sig),
-        },
-      };
+      let payloadToSend = { ...presentationPayload };
+      // Eğer request ve challenge varsa challenge imzası ekle
+      if (request?.challenge) {
+        const parts = [
+          request.challenge,
+          request.aud || "",
+          request.exp ? String(request.exp) : "",
+        ];
+        const msgBytes = enc.encode(parts.join("|"));
+        const sk = b64uToBytes(identity.sk_b64u);
+        const sig = nacl.sign.detached(msgBytes, sk);
+        payloadToSend = {
+          ...presentationPayload,
+          holder: {
+            ...presentationPayload.holder,
+            sig_b64u: b64u(sig),
+          },
+        };
+      }
       setOut(JSON.stringify(payloadToSend, null, 2));
       setMsg({ type: "ok", text: t("presentation_signed_created") });
     } catch (e) { setMsg({ type: "err", text: t("signature_error") + e.message }); }
