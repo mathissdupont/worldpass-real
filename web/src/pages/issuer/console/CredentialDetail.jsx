@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import IssuerLayout from "@/components/issuer/IssuerLayout";
-import { getIssuerProfile, getIssuerCredentialDetail, revokeCredential } from "@/lib/api";
-import { FiCheckCircle, FiXCircle, FiArrowLeft, FiCopy, FiAlertCircle } from "react-icons/fi";
+import { getIssuerProfile, getIssuerCredentialDetail, revokeCredential, downloadIssuerCredential } from "@/lib/api";
+import { FiCheckCircle, FiXCircle, FiArrowLeft, FiCopy, FiAlertCircle, FiDownload } from "react-icons/fi";
 
 export default function IssuerCredentialDetail() {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ export default function IssuerCredentialDetail() {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
 
   useEffect(() => {
@@ -54,6 +55,26 @@ export default function IssuerCredentialDetail() {
     navigator.clipboard.writeText(vcId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const blob = await downloadIssuerCredential(vcId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${vcId}.wpvc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setError("Download failed: " + err.message);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleRevoke = async () => {
@@ -161,7 +182,7 @@ export default function IssuerCredentialDetail() {
 
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900">Credential Details</h1>
             <div className="flex items-center gap-3 mt-2">
               <span className="font-mono text-sm text-gray-600">{vcId}</span>
@@ -175,7 +196,17 @@ export default function IssuerCredentialDetail() {
               {copied && <span className="text-xs text-green-600">Copied!</span>}
             </div>
           </div>
-          <StatusBadge status={credential.status} />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              <FiDownload className="h-4 w-4" />
+              {downloading ? 'Downloading...' : 'Download'}
+            </button>
+            <StatusBadge status={credential.status} />
+          </div>
         </div>
 
         {/* Main Info Card */}

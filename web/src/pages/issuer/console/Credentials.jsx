@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import IssuerLayout from "@/components/issuer/IssuerLayout";
 import DataTable from "@/components/issuer/DataTable";
-import { getIssuerProfile, listIssuerCredentials } from "@/lib/api";
-import { FiCheckCircle, FiXCircle, FiSearch, FiFilter } from "react-icons/fi";
+import { getIssuerProfile, listIssuerCredentials, exportIssuerCredentials } from "@/lib/api";
+import { FiCheckCircle, FiXCircle, FiSearch, FiFilter, FiDownload } from "react-icons/fi";
 
 export default function IssuerCredentials() {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export default function IssuerCredentials() {
   const [pagination, setPagination] = useState({ page: 1, per_page: 20, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -106,6 +107,26 @@ export default function IssuerCredentials() {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
+  const handleExportAll = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportIssuerCredentials();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `issuer-credentials-${issuer.id}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setError("Export failed: " + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (!issuer) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -180,12 +201,22 @@ export default function IssuerCredentials() {
             <h1 className="text-3xl font-bold text-gray-900">Credentials</h1>
             <p className="text-gray-600 mt-1">Manage all issued credentials</p>
           </div>
-          <button
-            onClick={() => navigate("/issue")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-          >
-            Issue New Credential
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportAll}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium disabled:opacity-50"
+            >
+              <FiDownload className="h-4 w-4" />
+              {exporting ? 'Exporting...' : 'Export All'}
+            </button>
+            <button
+              onClick={() => navigate("/issue")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            >
+              Issue New Credential
+            </button>
+          </div>
         </div>
 
         {/* Filters */}

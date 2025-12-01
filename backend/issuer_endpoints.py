@@ -253,6 +253,62 @@ async def list_issuer_credentials(
     )
 
 
+@router.get("/credentials/export/all")
+async def export_all_credentials(
+    issuer=Depends(_get_current_issuer_from_dep),
+    db=Depends(get_db)
+):
+    """Export all credentials issued by this issuer as JSON"""
+    from fastapi.responses import Response
+    import time
+    
+    # Fetch all credentials for this issuer
+    rows = await db.execute_fetchall(
+        """
+        SELECT iv.payload, iv.vc_id, iv.created_at, COALESCE(vs.status, 'unknown') as status
+        FROM issued_vcs iv
+        LEFT JOIN vc_status vs ON iv.vc_id = vs.vc_id
+        WHERE iv.issuer_id=?
+        ORDER BY iv.created_at DESC
+        """,
+        (issuer["id"],)
+    )
+    
+    credentials = []
+    for row in rows:
+        try:
+            credential = json.loads(row["payload"])
+            credentials.append({
+                "credential": credential,
+                "status": row["status"],
+                "issued_at": row["created_at"]
+            })
+        except:
+            continue
+    
+    # Create export bundle
+    export_data = {
+        "version": "1.0",
+        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "issuer_did": issuer.get("did", ""),
+        "issuer_name": issuer.get("name", ""),
+        "total_credentials": len(credentials),
+        "credentials": credentials
+    }
+    
+    json_str = json.dumps(export_data, indent=2)
+    timestamp = int(time.time())
+    filename = f"issuer-credentials-{issuer['id']}-{timestamp}.json"
+    
+    return Response(
+        content=json_str,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
 @router.get("/credentials/{vc_id}", response_model=IssuerCredentialDetailResp)
 async def get_credential_detail(
     vc_id: str,
@@ -305,6 +361,48 @@ async def get_credential_detail(
         credential=credential,
         status=row["status"],
         audit_log=audit_log
+    )
+
+
+@router.get("/credentials/{vc_id}/download")
+async def download_credential(
+    vc_id: str,
+    issuer=Depends(_get_current_issuer_from_dep),
+    db=Depends(get_db)
+):
+    """Download a specific credential as JSON file"""
+    from fastapi.responses import Response
+    
+    # Fetch credential
+    row = await db.execute_fetchone(
+        """
+        SELECT iv.*, COALESCE(vs.status, 'unknown') as status
+        FROM issued_vcs iv
+        LEFT JOIN vc_status vs ON iv.vc_id = vs.vc_id
+        WHERE iv.vc_id=? AND iv.issuer_id=?
+        """,
+        (vc_id, issuer["id"])
+    )
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="credential_not_found")
+    
+    # Parse credential payload
+    try:
+        credential = json.loads(row["payload"])
+    except:
+        raise HTTPException(status_code=500, detail="invalid_credential_payload")
+    
+    # Return as downloadable JSON file
+    json_str = json.dumps(credential, indent=2)
+    filename = f"{vc_id}.wpvc"
+    
+    return Response(
+        content=json_str,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
     )
 
 
