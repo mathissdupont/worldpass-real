@@ -8,6 +8,7 @@ import bcrypt
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
+import logging
 
 # Tamamı paket içi relative olsun:
 from backend.settings import settings
@@ -59,6 +60,9 @@ from typing import Optional
 import dns.resolver
 import httpx
 import pyotp
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -1187,6 +1191,57 @@ async def _get_approved_issuer_by_key(db, api_key: str):
     return row
 
 
+async def _ensure_issuer_keys(issuer: dict, db) -> dict:
+    """
+    Ensure that the issuer has signing keys (sk_b64u, pk_b64u).
+    If keys are missing, generate them automatically and update the database.
+    
+    Args:
+        issuer: Issuer row from database (aiosqlite.Row or dict)
+        db: Database connection
+        
+    Returns:
+        Updated issuer dict with keys
+    """
+    from backend.core.crypto_ed25519 import b64u
+    
+    # Convert Row to dict if needed, then check for keys
+    issuer_dict = dict(issuer)
+    
+    # Check if keys already exist (explicit None checks to handle empty strings)
+    if (issuer_dict.get("sk_b64u") is not None and 
+        issuer_dict.get("pk_b64u") is not None and 
+        issuer_dict.get("sk_b64u") and 
+        issuer_dict.get("pk_b64u")):
+        return issuer_dict
+    
+    # Generate new keypair
+    sk_bytes, pk_bytes = signer.generate_keypair()
+    sk_b64u = b64u(sk_bytes)
+    pk_b64u = b64u(pk_bytes)
+    
+    # Generate or update DID if needed (use helper function for consistency)
+    issuer_did = issuer_dict.get("did") or f"did:key:z{pk_b64u}"
+    
+    # Update database
+    now = int(time.time())
+    await db.execute(
+        "UPDATE issuers SET sk_b64u=?, pk_b64u=?, did=?, updated_at=? WHERE id=?",
+        (sk_b64u, pk_b64u, issuer_did, now, issuer_dict["id"]),
+    )
+    await db.commit()
+    
+    # Update the dict with new values
+    issuer_dict["sk_b64u"] = sk_b64u
+    issuer_dict["pk_b64u"] = pk_b64u
+    issuer_dict["did"] = issuer_did
+    issuer_dict["updated_at"] = now
+    
+    logger.info(f"Auto-generated signing keys for issuer ID={issuer_dict['id']}, DID={issuer_did}")
+    
+    return issuer_dict
+
+
 # ---------- issuer /issue & /revoke ----------
 @app.post(f"{API}/issuer/issue", response_model=IssuerIssueResp)
 async def issuer_issue(
@@ -1214,22 +1269,19 @@ async def issuer_issue(
     if issuer["status"] not in ALLOWED_ISSUER_STATUSES:
         raise HTTPException(status_code=403, detail="issuer_not_authorized")
 
+    # Ensure issuer has signing keys (auto-generate if missing)
+    issuer = await _ensure_issuer_keys(issuer, db)
+
     vc = body.vc
     if vc.get("issuer") != (issuer["did"] or ""):
         raise HTTPException(status_code=400, detail="issuer_did_mismatch")
 
     # --- VC'yi imzala (proof ekle) ---
     # issuer'ın private key'i ve public key'i alınır
-    try:
-        issuer_sk_b64u = issuer["sk_b64u"]
-        issuer_pk_b64u = issuer["pk_b64u"]
-    except (KeyError, TypeError):
-        issuer_sk_b64u = None
-        issuer_pk_b64u = None
+    issuer_sk_b64u = issuer["sk_b64u"]
+    issuer_pk_b64u = issuer["pk_b64u"]
     
     verification_method = f"{issuer['did']}#key-1"
-    if not issuer_sk_b64u or not issuer_pk_b64u:
-        raise HTTPException(status_code=500, detail="issuer_keys_missing")
     from backend.core.vc import sign_vc
     from backend.core.crypto_ed25519 import b64u_d
     sk_bytes = b64u_d(issuer_sk_b64u)
