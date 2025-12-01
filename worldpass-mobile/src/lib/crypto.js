@@ -245,3 +245,134 @@ export async function generateIdentity() {
     pk_b64u: bytesToBase64Url(publicKey),
   };
 }
+
+/**
+ * Sign a message with Ed25519
+ * @param {Uint8Array|string} skBytes - Private key (32 bytes) in Uint8Array or base64url string
+ * @param {Uint8Array|string} message - Message to sign
+ * @returns {Promise<Uint8Array>} Signature (64 bytes)
+ */
+export async function ed25519Sign(skBytes, message) {
+  const { ed25519 } = await import('@noble/curves/ed25519.js');
+  const sk = typeof skBytes === 'string' ? base64UrlToBytes(skBytes) : toUint8(skBytes);
+  const msg = typeof message === 'string' ? enc.encode(message) : toUint8(message);
+  return ed25519.sign(msg, sk);
+}
+
+/**
+ * Verify an Ed25519 signature
+ * @param {Uint8Array|string} pkBytes - Public key (32 bytes)
+ * @param {Uint8Array|string} message - Original message
+ * @param {Uint8Array|string} signature - Signature (64 bytes)
+ * @returns {Promise<boolean>}
+ */
+export async function ed25519Verify(pkBytes, message, signature) {
+  const { ed25519 } = await import('@noble/curves/ed25519.js');
+  try {
+    const pk = typeof pkBytes === 'string' ? base64UrlToBytes(pkBytes) : toUint8(pkBytes);
+    const msg = typeof message === 'string' ? enc.encode(message) : toUint8(message);
+    const sig = typeof signature === 'string' ? base64UrlToBytes(signature) : toUint8(signature);
+    return ed25519.verify(sig, msg, pk);
+  } catch (err) {
+    console.warn('Signature verification failed:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * Create JWS message for VC signing (matches backend format)
+ * @param {object} header - JWT header
+ * @param {object} payload - VC body
+ * @returns {string} base64url(header).base64url(payload)
+ */
+function jwsMessage(header, payload) {
+  const headerB64 = bytesToBase64Url(enc.encode(JSON.stringify(header)));
+  const payloadB64 = bytesToBase64Url(enc.encode(JSON.stringify(payload)));
+  return `${headerB64}.${payloadB64}`;
+}
+
+/**
+ * Sign a Verifiable Credential (matches backend core/vc.py format)
+ * @param {object} vcBody - VC without proof
+ * @param {string} sk_b64u - Issuer's private key (base64url)
+ * @param {string} pk_b64u - Issuer's public key (base64url)
+ * @param {string} verificationMethod - Verification method (e.g., "did:key:z...#key-1")
+ * @returns {Promise<object>} VC with proof section
+ */
+export async function signVC(vcBody, sk_b64u, pk_b64u, verificationMethod) {
+  const header = { alg: 'EdDSA', typ: 'JWT' };
+  const payload = { ...vcBody };
+  
+  // Create JWS message to sign
+  const message = jwsMessage(header, payload);
+  
+  // Sign the message
+  const signature = await ed25519Sign(sk_b64u, message);
+  
+  // Build proof object (matches backend format)
+  const proof = {
+    type: 'Ed25519Signature2020',
+    created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    proofPurpose: 'assertionMethod',
+    verificationMethod,
+    jws: bytesToBase64Url(signature),
+    issuer_pk_b64u: pk_b64u,
+  };
+  
+  // Return VC with proof
+  return {
+    ...payload,
+    proof,
+  };
+}
+
+/**
+ * Verify a Verifiable Credential signature
+ * @param {object} vcSigned - VC with proof section
+ * @returns {Promise<{valid: boolean, reason: string, issuer?: string, subject?: string}>}
+ */
+export async function verifyVC(vcSigned) {
+  try {
+    const proof = vcSigned?.proof;
+    if (!proof) {
+      return { valid: false, reason: 'missing_proof' };
+    }
+    
+    const { jws, issuer_pk_b64u } = proof;
+    if (!jws || !issuer_pk_b64u) {
+      return { valid: false, reason: 'incomplete_proof' };
+    }
+    
+    // Reconstruct the message that was signed
+    const header = { alg: 'EdDSA', typ: 'JWT' };
+    const payload = { ...vcSigned };
+    delete payload.proof;
+    
+    const message = jwsMessage(header, payload);
+    
+    // Verify the signature
+    const isValid = await ed25519Verify(issuer_pk_b64u, message, jws);
+    
+    if (!isValid) {
+      return { valid: false, reason: 'invalid_signature' };
+    }
+    
+    // Extract issuer and subject
+    const issuer = vcSigned.issuer;
+    const subject = vcSigned.credentialSubject?.id;
+    
+    return {
+      valid: true,
+      reason: 'ok',
+      issuer,
+      subject,
+    };
+  } catch (err) {
+    console.warn('VC verification error:', err?.message || err);
+    return {
+      valid: false,
+      reason: 'verification_error',
+      error: err?.message,
+    };
+  }
+}

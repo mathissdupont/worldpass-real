@@ -14,6 +14,8 @@ import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatRelativeTime } from '../lib/time';
+import { parseQRData } from '../lib/qr';
+import { verifyVC } from '../lib/crypto';
 
 export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -80,24 +82,66 @@ export default function ScannerScreen() {
     setScanning(true);
 
     try {
-      // Parse QR data
-      let vcData;
-      try {
-        vcData = JSON.parse(data);
-      } catch (e) {
-        Alert.alert('Invalid QR Code', 'This is not a valid credential QR code');
-        resetScanner();
-        return;
-      }
+      // Parse QR data to determine type
+      const parsed = parseQRData(data);
+      
+      if (parsed.type === 'credential') {
+        const vcData = parsed.data;
+        
+        // Verify the credential locally
+        const verifyResult = await verifyVC(vcData);
 
-      // Verify the credential
-      const result = await verifyCredential(vcData);
+        if (!verifyResult.valid) {
+          Alert.alert(
+            'Invalid Credential',
+            `Verification failed: ${verifyResult.reason}`,
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
 
-      const subjectDid = vcData?.credentialSubject?.id;
-      if (subjectDid && subjectDid !== walletDid) {
+        const subjectDid = vcData?.credentialSubject?.id;
+        if (subjectDid && subjectDid !== walletDid) {
+          Alert.alert(
+            'Wrong identity',
+            'This credential is not issued to your DID.',
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
+
+        // Add to wallet
+        await addCredentialToWallet(vcData);
+        
         Alert.alert(
-          'Wrong identity',
-          'This credential is not issued to your DID.',
+          'Credential Added',
+          'The credential has been verified and added to your wallet.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else if (parsed.type === 'did') {
+        Alert.alert(
+          'DID Scanned',
+          `DID: ${parsed.data.did}`,
+          [{ text: 'OK', onPress: resetScanner }]
+        );
+      } else {
+        Alert.alert(
+          'QR Code Scanned',
+          `Type: ${parsed.type}\nData: ${JSON.stringify(parsed.data).substring(0, 100)}`,
+          [{ text: 'OK', onPress: resetScanner }]
+        );
+      }
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to process QR code',
+        [{ text: 'OK', onPress: resetScanner }]
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
           [{ text: 'OK', onPress: resetScanner }],
         );
         return;
