@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator } from 'react-native';
 import QRCodeScanner from 'react-native-qrcode-scanner';
 import { ToastAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +21,17 @@ const receiveNfc = async (onResult) => {
 
 export default function VerifyScreen() {
   const { theme } = useTheme();
+  const { identity } = useIdentity();
+  const { credentials } = useWallet();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [vcText, setVcText] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+
+  const did = identity?.did;
+  const identityReady = Boolean(did);
   
   // Verification function
   const handleVerify = async () => {
@@ -66,69 +71,18 @@ export default function VerifyScreen() {
     }
     setLoadingVerify(false);
   };
-  const { theme } = useTheme();
-  const { identity, linking } = useIdentity();
-  const { credentials } = useWallet();
-  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const did = identity?.did;
-  const identityReady = Boolean(did);
-
-  const openScanner = () => {
-    navigation.navigate('VerifyScanner');
-  };
-
-  const openIdentity = (screen) => {
-    const parent = navigation.getParent?.();
-    if (screen) {
-      parent?.navigate('Settings', { screen });
-    } else {
-      parent?.navigate('Settings');
-    }
-  };
-
-  const handleNfcSimulate = () => {
-    receiveNfc((ok) => {
-      if (ok) {
-        setResult({
-          type: 'info',
-          message:
-            'NFC alma simüle edildi. Gerçek NFC entegrasyonu native modülle eklenecek.',
-        });
+  const handleNfcReceive = () => {
+    setVerifyResult(null);
+    setVcText('');
+    receiveNfc(data => {
+      if (data) {
+        setVcText(data);
+        setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
+      } else {
+        setVerifyResult({ error: 'NFC ile veri alınamadı.' });
       }
     });
-  };
-
-  const renderResultBanner = () => {
-    if (!result) return null;
-
-    let containerStyle = styles.bannerInfo;
-    let icon = 'information-circle';
-
-    if (result.type === 'success') {
-      containerStyle = styles.bannerSuccess;
-      icon = 'checkmark-circle';
-    } else if (result.type === 'error') {
-      containerStyle = styles.bannerError;
-      icon = 'alert-circle';
-    }
-
-    return (
-      <View style={[styles.resultBanner, containerStyle]}>
-        <Ionicons
-          name={icon}
-          size={18}
-          color={
-            result.type === 'success'
-              ? theme.colors.success
-              : result.type === 'error'
-              ? theme.colors.danger
-              : theme.colors.info || theme.colors.primary
-          }
-        />
-        <Text style={styles.resultBannerText}>{result.message}</Text>
-      </View>
-    );
   };
 
   return (
@@ -146,12 +100,26 @@ export default function VerifyScreen() {
           />
           <Text style={styles.title}>Credential Doğrulama</Text>
           <Text style={styles.subtitle}>
-            Holder’dan aldığın verifiable credential JSON’unu aşağıya yapıştır.
-            Backend üzerinden kriptografik olarak doğrulayalım.
+            QR, NFC veya manuel JSON ile VC doğrula
           </Text>
         </View>
 
-        {renderResultBanner()}
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          <TouchableOpacity 
+            style={[styles.primaryButton, { flex: 1 }]} 
+            onPress={() => setShowScanner(true)}
+          >
+            <Ionicons name="qr-code" size={18} color="#fff" />
+            <Text style={styles.primaryButtonText}>QR Tara</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.secondaryButton, { flex: 1 }]} 
+            onPress={handleNfcReceive}
+          >
+            <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary} />
+            <Text style={styles.secondaryButtonText}>NFC ile Al</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>VC JSON</Text>
@@ -160,108 +128,36 @@ export default function VerifyScreen() {
             value={vcText}
             onChangeText={setVcText}
             multiline
-            placeholder='{"@context": [...], "type": ["VerifiableCredential", ...], ...}'
+            numberOfLines={6}
+            placeholder="VC JSON'u buraya yapıştır veya tara/NFC ile al"
             placeholderTextColor={theme.colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
           />
           <Text style={styles.sectionHint}>
-            Tam VC gövdesini (örneğin QR’dan veya başka bir uygulamadan aldığın veriyi)
-            buraya yapıştırmalısın.
+            Tam VC gövdesini buraya yapıştırmalısın.
           </Text>
         </View>
 
-        <View style={styles.buttonsRow}>
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              loading && styles.buttonDisabled,
-            ]}
-            onPress={handleVerify}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={18}
-                  color="#fff"
-                />
-                <Text style={styles.primaryButtonText}>
-                  Credential’ı Doğrula
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleNfcSimulate}
-          >
-            <Ionicons
-              name="wifi-outline"
-              size={18}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.secondaryButtonText}>
-              NFC’den Al (Sim)
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Creds</Text>
-            <Text style={styles.metaValue}>{credentials.length}</Text>
-          </View>
-          <View style={styles.metaDivider} />
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Kimlik</Text>
-            <Text style={styles.metaValue}>{identityReady ? 'Bağlı' : 'Eksik'}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={[styles.sectionCard, theme.shadows.card]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Doğrulama</Text>
-          <Text style={styles.sectionSubtitle}>QR, NFC veya manuel JSON ile VC doğrula</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-          <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => setShowScanner(true)}>
-            <Ionicons name="qr-code" size={18} color="#fff" />
-            <Text style={styles.primaryButtonText}>QR Tara</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={() => {
-            setVerifyResult(null);
-            setVcText('');
-            receiveNfc(data => {
-              if (data) {
-                setVcText(data);
-                setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
-              } else {
-                setVerifyResult({ error: 'NFC ile veri alınamadı.' });
-              }
-            });
-          }}>
-            <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary} />
-            <Text style={styles.secondaryButtonText}>NFC ile Al</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.metaLabel}>VC JSON</Text>
-        <TextInput
-          style={{ backgroundColor: '#f9f9f9', borderRadius: 8, padding: 10, minHeight: 80, textAlignVertical: 'top', marginBottom: 8 }}
-          value={vcText}
-          onChangeText={setVcText}
-          placeholder="VC JSON'u buraya yapıştır veya tara/NFC ile al"
-          multiline
-          numberOfLines={6}
-        />
-        <TouchableOpacity style={[styles.primaryButton, { marginBottom: 8 }]} onPress={handleVerify} disabled={loadingVerify || !vcText}>
-          <Text style={styles.primaryButtonText}>{loadingVerify ? 'Doğrulanıyor...' : 'Doğrula'}</Text>
+        <TouchableOpacity 
+          style={[
+            styles.primaryButton, 
+            { marginBottom: 16 },
+            (loadingVerify || !vcText) && styles.buttonDisabled
+          ]} 
+          onPress={handleVerify} 
+          disabled={loadingVerify || !vcText}
+        >
+          {loadingVerify ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              <Text style={styles.primaryButtonText}>Doğrula</Text>
+            </>
+          )}
         </TouchableOpacity>
+
         {showScanner && (
           <QRCodeScanner
             onRead={e => {
@@ -277,25 +173,57 @@ export default function VerifyScreen() {
             }
           />
         )}
+
         {verifyResult && (
-          <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: verifyResult.valid ? '#e0ffe0' : '#ffe0e0' }}>
+          <View style={{ 
+            marginTop: 12, 
+            padding: 12, 
+            borderRadius: 8, 
+            backgroundColor: verifyResult.valid ? '#e0ffe0' : verifyResult.info ? '#e0f0ff' : '#ffe0e0' 
+          }}>
             {verifyResult.info && <Text style={{ color: '#007aff' }}>{verifyResult.info}</Text>}
             {verifyResult.valid !== undefined && (
               <>
-                <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red', fontSize: 16, marginBottom: 8 }}>
+                <Text style={{ 
+                  fontWeight: 'bold', 
+                  color: verifyResult.valid ? 'green' : 'red', 
+                  fontSize: 16, 
+                  marginBottom: 8 
+                }}>
                   {verifyResult.valid ? '✅ Valid Credential' : '❌ Invalid Credential'}
                 </Text>
                 
                 {verifyResult.valid && verifyResult.proof && (
-                  <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>Signature & Proof:</Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Type: {verifyResult.proof.type}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Created: {verifyResult.proof.created}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Verification Method: {verifyResult.proof.verificationMethod}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                  <View style={{ 
+                    marginTop: 8, 
+                    padding: 8, 
+                    backgroundColor: 'rgba(0,0,0,0.05)', 
+                    borderRadius: 6 
+                  }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>
+                      Signature & Proof:
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      Type: {verifyResult.proof.type}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      Created: {verifyResult.proof.created}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      Verification Method: {verifyResult.proof.verificationMethod}
+                    </Text>
+                    <Text 
+                      style={{ fontSize: 10, fontFamily: 'monospace' }} 
+                      numberOfLines={1} 
+                      ellipsizeMode="middle"
+                    >
                       JWS: {verifyResult.proof.jws}
                     </Text>
-                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                    <Text 
+                      style={{ fontSize: 10, fontFamily: 'monospace' }} 
+                      numberOfLines={1} 
+                      ellipsizeMode="middle"
+                    >
                       Issuer PK: {verifyResult.proof.issuer_pk_b64u}
                     </Text>
                   </View>
@@ -322,9 +250,23 @@ export default function VerifyScreen() {
                 )}
               </>
             )}
-            {verifyResult.error && <Text style={{ color: 'red', marginTop: 4 }}>{verifyResult.error}</Text>}
+            {verifyResult.error && (
+              <Text style={{ color: 'red', marginTop: 4 }}>{verifyResult.error}</Text>
+            )}
           </View>
         )}
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Creds</Text>
+            <Text style={styles.metaValue}>{credentials.length}</Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Kimlik</Text>
+            <Text style={styles.metaValue}>{identityReady ? 'Bağlı' : 'Eksik'}</Text>
+          </View>
+        </View>
 
         <View style={styles.footerInfo}>
           <Ionicons
@@ -438,69 +380,34 @@ const createStyles = (theme) =>
     buttonDisabled: {
       opacity: 0.6,
     },
-    resultBanner: {
+    metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      padding: theme.spacing.sm,
-      borderRadius: theme.radii.md,
-      marginBottom: theme.spacing.sm,
-    },
-    resultBannerText: {
-      flex: 1,
-      fontSize: theme.typography.sizes.xs,
-    },
-    bannerSuccess: {
-      backgroundColor: theme.colors.successSurface || '#f0fdf4',
-      borderWidth: 1,
-      borderColor: theme.colors.successBorder || '#bbf7d0',
-    },
-    bannerError: {
-      backgroundColor: theme.colors.dangerSurface || '#fef2f2',
-      borderWidth: 1,
-      borderColor: theme.colors.dangerBorder || '#fecaca',
-    },
-    bannerInfo: {
-      backgroundColor: theme.colors.infoSurface || theme.colors.cardMuted,
-      borderWidth: 1,
-      borderColor: theme.colors.infoBorder || theme.colors.border,
-    },
-    summaryCard: {
+      justifyContent: 'space-around',
+      marginTop: theme.spacing.lg,
+      padding: theme.spacing.md,
+      backgroundColor: theme.colors.card,
       borderRadius: theme.radii.md,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing.md,
-      marginBottom: theme.spacing.md,
     },
-    summaryTitle: {
-      fontSize: theme.typography.sizes.md,
-      fontWeight: '700',
-      color: theme.colors.text,
-      marginBottom: theme.spacing.sm,
+    metaItem: {
+      alignItems: 'center',
     },
-    summaryLabel: {
+    metaDivider: {
+      width: 1,
+      height: 32,
+      backgroundColor: theme.colors.border,
+    },
+    metaLabel: {
       fontSize: theme.typography.sizes.xs,
       color: theme.colors.textMuted,
-      marginTop: theme.spacing.xs,
+      marginBottom: 4,
     },
-    summaryValue: {
-      fontSize: theme.typography.sizes.sm,
+    metaValue: {
+      fontSize: theme.typography.sizes.md,
+      fontWeight: '600',
       color: theme.colors.text,
-    },
-    jsonContainer: {
-      marginTop: theme.spacing.sm,
-      maxHeight: 200,
-      borderRadius: theme.radii.md,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
-      padding: theme.spacing.md,
-    },
-    jsonText: {
-      fontSize: theme.typography.sizes.xs,
-      color: theme.colors.text,
-      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     footerInfo: {
       flexDirection: 'row',
