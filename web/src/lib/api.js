@@ -403,11 +403,19 @@ export async function issueCredential(orgId, payload, token, templateId) {
   }
 
   if (!res.ok) {
+    // Handle FastAPI validation errors (422)
+    if (res.status === 422 && data?.detail && Array.isArray(data.detail)) {
+      const errors = data.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join(', ');
+      console.error('Validation error details:', data.detail);
+      throw new Error(`Validation error: ${errors}`);
+    }
+    
     const message =
       (data && (data.detail || data.error || data.message)) ||
       rawText ||                           // "Internal Server Error" vs.
       `HTTP ${res.status}`;
 
+    console.error('Issue credential error:', { status: res.status, message, data });
     throw new Error(message);
   }
 
