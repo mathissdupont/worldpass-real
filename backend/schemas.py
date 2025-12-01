@@ -105,6 +105,7 @@ class IssuerIssueResp(BaseModel):
     ok: bool
     vc_id: Optional[str] = None
     recipient_id: Optional[str] = None
+    vc: Optional[Dict[str, Any]] = None  # The signed VC
 
 class IssuerRevokeReq(BaseModel):
     api_key: Optional[str] = None

@@ -333,6 +333,8 @@ async def _run_migrations(conn: aiosqlite.Connection):
         ("support_link", "ALTER TABLE issuers ADD COLUMN support_link TEXT"),
         ("timezone", "ALTER TABLE issuers ADD COLUMN timezone TEXT DEFAULT 'UTC'"),
         ("locale", "ALTER TABLE issuers ADD COLUMN locale TEXT DEFAULT 'en'"),
+        ("sk_b64u", "ALTER TABLE issuers ADD COLUMN sk_b64u TEXT"),
+        ("pk_b64u", "ALTER TABLE issuers ADD COLUMN pk_b64u TEXT"),
     ]
     
     for column_name, alter_sql in issuer_migrations:
