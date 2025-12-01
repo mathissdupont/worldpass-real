@@ -129,7 +129,14 @@ export default function IssuerConsole() {
       };
 
       const token = localStorage.getItem('issuer_token');
-      await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      const response = await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      
+      // ✅ IMPORTANT: Use the signed VC from the backend response
+      const signedVC = response.vc;
+      
+      if (!signedVC || !signedVC.proof) {
+        throw new Error('Backend did not return a signed VC');
+      }
 
       setIssueSuccess('Credential issued successfully!');
       setRecipientDID('');

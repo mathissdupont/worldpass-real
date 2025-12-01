@@ -154,7 +154,14 @@ export default function IssuerConsole() {
       };
 
       const token = localStorage.getItem('issuer_token');
-      await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      const response = await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      
+      // ✅ IMPORTANT: Use the signed VC from the backend response
+      const signedVC = response.vc;
+      
+      if (!signedVC || !signedVC.proof) {
+        throw new Error('Backend did not return a signed VC');
+      }
 
       setIssueSuccess('Credential issued successfully!');
       setRecipientDID('');
@@ -810,7 +817,13 @@ function Field({ f, value, onChange, error }) {
 
       const response = await issueCredential(null, signed, token, selectedTemplateId);
 
-      const pretty = JSON.stringify(signed,null,2);
+      // ✅ IMPORTANT: Use the signed VC from the backend response
+      const backendSignedVC = response?.vc;
+      if (!backendSignedVC || !backendSignedVC.proof) {
+        throw new Error("Backend did not return a signed VC");
+      }
+
+      const pretty = JSON.stringify(backendSignedVC, null, 2);
       setOut(pretty);
       const newRecipientId = response?.recipient_id || null;
       setRecipientId(newRecipientId);
