@@ -382,11 +382,10 @@ export async function issueCredential(orgId, payload, token, templateId) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { 'X-Token': token } : {}),
     },
     body: JSON.stringify({
-      org_id: orgId,
-      payload,
+      vc: payload,
       template_id: templateId,
     }),
   });
