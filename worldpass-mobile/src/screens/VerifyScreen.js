@@ -25,18 +25,14 @@ export default function VerifyScreen({ navigation }) {
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   
-  // Backend verification function
+  // Verification function
   const handleVerify = async () => {
     setLoadingVerify(true);
     setVerifyResult(null);
+    
     try {
-      // Parse the VC
-      let vcObj;
-      try {
-        vcObj = JSON.parse(vcText);
-      } catch (e) {
-        throw new Error('Invalid JSON format');
-      }
+      // Parse the VC JSON
+      const vcObj = JSON.parse(vcText);
 
       // Use local crypto verification
       const localResult = await verifyVC(vcObj);

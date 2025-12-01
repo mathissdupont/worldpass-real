@@ -142,36 +142,6 @@ export default function ScannerScreen() {
       setScanning(false);
     }
   };
-          [{ text: 'OK', onPress: resetScanner }],
-        );
-        return;
-      }
-
-      if (result.valid) {
-        // Save credential
-        await addCredentialToWallet(vcData);
-        Alert.alert(
-          'Success',
-          'Credential verified and saved to your wallet!',
-          [{ text: 'OK', onPress: resetScanner }]
-        );
-      } else {
-        Alert.alert(
-          'Verification Failed',
-          result.reason || 'The credential could not be verified',
-          [{ text: 'OK', onPress: resetScanner }]
-        );
-      }
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to process credential',
-        [{ text: 'OK', onPress: resetScanner }]
-      );
-    } finally {
-      setScanning(false);
-    }
-  };
 
   const resetScanner = () => {
     setScanned(false);
@@ -189,21 +159,21 @@ export default function ScannerScreen() {
     return (
       <View style={styles.identityContainer}>
         <Ionicons name="shield-outline" size={72} color={theme.colors.primary} />
-        <Text style={styles.identityTitle}>Kimlik olmadan tarama yapamazsın</Text>
+        <Text style={styles.identityTitle}>Identity Required</Text>
         <Text style={styles.identityText}>
-          Yeni bir DID oluştur veya var olan `.wpkeystore` dosyanı içe aktar ve ardından QR kodlarını taramaya başla.
+          Create a new DID or import an existing `.wpkeystore` file to start scanning QR codes.
         </Text>
         <View style={styles.identityActions}>
           <TouchableOpacity style={styles.identityPrimary} onPress={() => navigation.navigate('IdentityCreate')}>
             <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.identityPrimaryText}>Kimlik Oluştur</Text>
+            <Text style={styles.identityPrimaryText}>Create Identity</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.identitySecondary}
             onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
           >
             <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.identitySecondaryText}>.wpkeystore İçe Aktar</Text>
+            <Text style={styles.identitySecondaryText}>Import .wpkeystore</Text>
           </TouchableOpacity>
         </View>
       </View>

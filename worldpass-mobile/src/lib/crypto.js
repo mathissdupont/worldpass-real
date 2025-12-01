@@ -15,6 +15,15 @@ const PBKDF2_ROUNDS = 300000;
 const SUPPORTED_KDFS = ['argon2id', 'pbkdf2-sha256'];
 
 let wasmBinaryPromise = null;
+let ed25519Promise = null;
+
+// Cache ed25519 import for performance
+async function getEd25519() {
+  if (!ed25519Promise) {
+    ed25519Promise = import('@noble/curves/ed25519.js').then(m => m.ed25519);
+  }
+  return ed25519Promise;
+}
 
 function toUint8(value) {
   if (!value) return new Uint8Array();
@@ -221,8 +230,8 @@ export function didFromPublicKey(pkBytes) {
  * @returns {Promise<{did: string, sk_b64u: string, pk_b64u: string}>}
  */
 export async function generateIdentity() {
-  // Use noble/ed25519 for key generation (explicit .js path for Metro)
-  const { ed25519 } = await import('@noble/curves/ed25519.js');
+  // Use cached ed25519 import
+  const ed25519 = await getEd25519();
   
   // Generate random private key (32 bytes)
   const privateKey = randomBytes(32);
@@ -253,7 +262,7 @@ export async function generateIdentity() {
  * @returns {Promise<Uint8Array>} Signature (64 bytes)
  */
 export async function ed25519Sign(skBytes, message) {
-  const { ed25519 } = await import('@noble/curves/ed25519.js');
+  const ed25519 = await getEd25519();
   const sk = typeof skBytes === 'string' ? base64UrlToBytes(skBytes) : toUint8(skBytes);
   const msg = typeof message === 'string' ? enc.encode(message) : toUint8(message);
   return ed25519.sign(msg, sk);
@@ -267,7 +276,7 @@ export async function ed25519Sign(skBytes, message) {
  * @returns {Promise<boolean>}
  */
 export async function ed25519Verify(pkBytes, message, signature) {
-  const { ed25519 } = await import('@noble/curves/ed25519.js');
+  const ed25519 = await getEd25519();
   try {
     const pk = typeof pkBytes === 'string' ? base64UrlToBytes(pkBytes) : toUint8(pkBytes);
     const msg = typeof message === 'string' ? enc.encode(message) : toUint8(message);
