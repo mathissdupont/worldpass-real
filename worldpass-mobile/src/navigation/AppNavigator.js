@@ -20,6 +20,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import PresentScreen from '../screens/PresentLandingScreen';
 import VerifyScreen from '../screens/VerifyScreen';
+import IssuerScreen from '../screens/IssuerScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -29,6 +30,7 @@ const SettingsStack = createNativeStackNavigator();
 const WalletStack = createNativeStackNavigator();
 const PresentStack = createNativeStackNavigator();
 const VerifyStack = createNativeStackNavigator();
+const IssuerStack = createNativeStackNavigator();
 
 function useStackScreenOptions(theme) {
   return {
@@ -103,6 +105,19 @@ function VerifyStackScreen() {
   );
 }
 
+function IssuerStackScreen() {
+  const { theme } = useTheme();
+  return (
+    <IssuerStack.Navigator screenOptions={useStackScreenOptions(theme)}>
+      <IssuerStack.Screen
+        name="IssuerHome"
+        component={IssuerScreen}
+        options={{ headerShown: false }}
+      />
+    </IssuerStack.Navigator>
+  );
+}
+
 function SettingsStackScreen() {
   const { theme } = useTheme();
   return (
@@ -156,6 +171,9 @@ function AppTabs() {
             case 'Present':
               iconName = focused ? 'color-wand' : 'color-wand-outline';
               break;
+            case 'Issuer':
+              iconName = focused ? 'shield' : 'shield-outline';
+              break;
             case 'Verify':
               iconName = focused ? 'shield-checkmark' : 'shield-checkmark-outline';
               break;
@@ -187,6 +205,11 @@ function AppTabs() {
         name="Present" 
         component={PresentStackScreen}
         options={{ title: 'Present' }}
+      />
+      <Tab.Screen 
+        name="Issuer" 
+        component={IssuerStackScreen}
+        options={{ title: 'Issuer' }}
       />
       <Tab.Screen 
         name="Verify" 

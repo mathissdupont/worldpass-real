@@ -14,6 +14,8 @@ import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatRelativeTime } from '../lib/time';
+import { parseQRData } from '../lib/qr';
+import { verifyVC } from '../lib/crypto';
 
 export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -80,48 +82,60 @@ export default function ScannerScreen() {
     setScanning(true);
 
     try {
-      // Parse QR data
-      let vcData;
-      try {
-        vcData = JSON.parse(data);
-      } catch (e) {
-        Alert.alert('Invalid QR Code', 'This is not a valid credential QR code');
-        resetScanner();
-        return;
-      }
+      // Parse QR data to determine type
+      const parsed = parseQRData(data);
+      
+      if (parsed.type === 'credential') {
+        const vcData = parsed.data;
+        
+        // Verify the credential locally
+        const verifyResult = await verifyVC(vcData);
 
-      // Verify the credential
-      const result = await verifyCredential(vcData);
+        if (!verifyResult.valid) {
+          Alert.alert(
+            'Invalid Credential',
+            `Verification failed: ${verifyResult.reason}`,
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
 
-      const subjectDid = vcData?.credentialSubject?.id;
-      if (subjectDid && subjectDid !== walletDid) {
-        Alert.alert(
-          'Wrong identity',
-          'This credential is not issued to your DID.',
-          [{ text: 'OK', onPress: resetScanner }],
-        );
-        return;
-      }
+        const subjectDid = vcData?.credentialSubject?.id;
+        if (subjectDid && subjectDid !== walletDid) {
+          Alert.alert(
+            'Wrong identity',
+            'This credential is not issued to your DID.',
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
 
-      if (result.valid) {
-        // Save credential
+        // Add to wallet
         await addCredentialToWallet(vcData);
+        
         Alert.alert(
-          'Success',
-          'Credential verified and saved to your wallet!',
+          'Credential Added',
+          'The credential has been verified and added to your wallet.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else if (parsed.type === 'did') {
+        Alert.alert(
+          'DID Scanned',
+          `DID: ${parsed.data.did}`,
           [{ text: 'OK', onPress: resetScanner }]
         );
       } else {
         Alert.alert(
-          'Verification Failed',
-          result.reason || 'The credential could not be verified',
+          'QR Code Scanned',
+          `Type: ${parsed.type}\nData: ${JSON.stringify(parsed.data).substring(0, 100)}`,
           [{ text: 'OK', onPress: resetScanner }]
         );
       }
     } catch (error) {
+      console.error('Error processing QR code:', error);
       Alert.alert(
         'Error',
-        error.message || 'Failed to process credential',
+        error.message || 'Failed to process QR code',
         [{ text: 'OK', onPress: resetScanner }]
       );
     } finally {
@@ -145,21 +159,21 @@ export default function ScannerScreen() {
     return (
       <View style={styles.identityContainer}>
         <Ionicons name="shield-outline" size={72} color={theme.colors.primary} />
-        <Text style={styles.identityTitle}>Kimlik olmadan tarama yapamazsın</Text>
+        <Text style={styles.identityTitle}>Identity Required</Text>
         <Text style={styles.identityText}>
-          Yeni bir DID oluştur veya var olan `.wpkeystore` dosyanı içe aktar ve ardından QR kodlarını taramaya başla.
+          Create a new DID or import an existing `.wpkeystore` file to start scanning QR codes.
         </Text>
         <View style={styles.identityActions}>
           <TouchableOpacity style={styles.identityPrimary} onPress={() => navigation.navigate('IdentityCreate')}>
             <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.identityPrimaryText}>Kimlik Oluştur</Text>
+            <Text style={styles.identityPrimaryText}>Create Identity</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.identitySecondary}
             onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
           >
             <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.identitySecondaryText}>.wpkeystore İçe Aktar</Text>
+            <Text style={styles.identitySecondaryText}>Import .wpkeystore</Text>
           </TouchableOpacity>
         </View>
       </View>

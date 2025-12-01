@@ -2,43 +2,67 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
 import QRCodeScanner from 'react-native-qrcode-scanner';
 import { ToastAndroid } from 'react-native';
-// NFC alma simülasyonu (gerçek NFC için native modül gerekir)
-const receiveNfc = async (onResult) => {
-  if (Platform.OS === 'android') {
-    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
-    ToastAndroid.show('NFC ile alma simüle edildi', ToastAndroid.SHORT);
-  } else {
-    alert('NFC alma sadece Android cihazlarda desteklenir.');
-    onResult && onResult(null);
-  }
-};
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
+import { verifyVC } from '../lib/crypto';
+
+// NFC simulation (real NFC requires native module)
+const receiveNfc = async (onResult) => {
+  if (Platform.OS === 'android') {
+    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
+    ToastAndroid.show('NFC receiving simulated', ToastAndroid.SHORT);
+  } else {
+    alert('NFC receiving is only supported on Android devices.');
+    onResult && onResult(null);
+  }
+};
 
 export default function VerifyScreen({ navigation }) {
   const [vcText, setVcText] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-    // Backend doğrulama fonksiyonu
-    const handleVerify = async () => {
-      setLoadingVerify(true);
-      setVerifyResult(null);
-      try {
-        const resp = await fetch('https://worldpass-beta.heptapusgroup.com/api/vc/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: vcText,
+  
+  // Verification function
+  const handleVerify = async () => {
+    setLoadingVerify(true);
+    setVerifyResult(null);
+    
+    try {
+      // Parse the VC JSON
+      const vcObj = JSON.parse(vcText);
+
+      // Use local crypto verification
+      const localResult = await verifyVC(vcObj);
+
+      if (localResult.valid) {
+        setVerifyResult({
+          valid: true,
+          issuer: localResult.issuer,
+          subject: localResult.subject,
+          reason: localResult.reason,
+          proof: vcObj.proof,
+          issuanceDate: vcObj.issuanceDate,
+          expirationDate: vcObj.expirationDate,
+          type: vcObj.type,
         });
-        const data = await resp.json();
-        setVerifyResult(data);
-      } catch (e) {
-        setVerifyResult({ valid: false, error: 'Doğrulama hatası: ' + e.message });
+      } else {
+        setVerifyResult({
+          valid: false,
+          reason: localResult.reason,
+          error: `Verification failed: ${localResult.reason}`,
+        });
       }
-      setLoadingVerify(false);
-    };
+    } catch (e) {
+      setVerifyResult({ 
+        valid: false, 
+        error: 'Verification error: ' + e.message 
+      });
+    }
+    setLoadingVerify(false);
+  };
   const { theme } = useTheme();
   const { identity, linking } = useIdentity();
   const { credentials } = useWallet();
@@ -178,12 +202,48 @@ export default function VerifyScreen({ navigation }) {
           <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: verifyResult.valid ? '#e0ffe0' : '#ffe0e0' }}>
             {verifyResult.info && <Text style={{ color: '#007aff' }}>{verifyResult.info}</Text>}
             {verifyResult.valid !== undefined && (
-              <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red' }}>
-                {verifyResult.valid ? 'Geçerli Credential ✅' : 'Geçersiz Credential ❌'}
-              </Text>
+              <>
+                <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red', fontSize: 16, marginBottom: 8 }}>
+                  {verifyResult.valid ? '✅ Valid Credential' : '❌ Invalid Credential'}
+                </Text>
+                
+                {verifyResult.valid && verifyResult.proof && (
+                  <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>Signature & Proof:</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Type: {verifyResult.proof.type}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Created: {verifyResult.proof.created}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Verification Method: {verifyResult.proof.verificationMethod}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                      JWS: {verifyResult.proof.jws}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                      Issuer PK: {verifyResult.proof.issuer_pk_b64u}
+                    </Text>
+                  </View>
+                )}
+                
+                {verifyResult.valid && (
+                  <View style={{ marginTop: 8 }}>
+                    {verifyResult.issuer && (
+                      <Text style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                        Issuer: {verifyResult.issuer}
+                      </Text>
+                    )}
+                    {verifyResult.subject && (
+                      <Text style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                        Subject: {verifyResult.subject}
+                      </Text>
+                    )}
+                    {verifyResult.issuanceDate && (
+                      <Text style={{ fontSize: 11 }}>
+                        Issued: {new Date(verifyResult.issuanceDate).toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </>
             )}
-            {verifyResult.error && <Text style={{ color: 'red' }}>{verifyResult.error}</Text>}
-            {verifyResult.details && <Text style={{ color: '#333', marginTop: 4 }}>{JSON.stringify(verifyResult.details, null, 2)}</Text>}
+            {verifyResult.error && <Text style={{ color: 'red', marginTop: 4 }}>{verifyResult.error}</Text>}
           </View>
         )}
       </View>
