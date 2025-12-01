@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator } from 'react-native';
-import QRCodeScanner from 'react-native-qrcode-scanner';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator, Modal } from 'react-native';
+import { CameraView, Camera } from 'expo-camera';
 import { ToastAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
@@ -29,9 +29,29 @@ export default function VerifyScreen() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanned, setScanned] = useState(false);
 
   const did = identity?.did;
   const identityReady = Boolean(did);
+  
+  // Request camera permission when scanner is opened
+  useEffect(() => {
+    if (showScanner) {
+      (async () => {
+        const { status } = await Camera.requestCameraPermissionsAsync();
+        setHasPermission(status === 'granted');
+      })();
+    }
+  }, [showScanner]);
+
+  const handleBarCodeScanned = ({ data }) => {
+    setScanned(true);
+    setVcText(data);
+    setShowScanner(false);
+    setVerifyResult({ info: 'QR ile veri alındı. JSON kutusuna yapıştırıldı.' });
+    setScanned(false);
+  };
   
   // Verification function
   const handleVerify = async () => {
@@ -158,21 +178,105 @@ export default function VerifyScreen() {
           )}
         </TouchableOpacity>
 
-        {showScanner && (
-          <QRCodeScanner
-            onRead={e => {
-              setVcText(e.data);
-              setShowScanner(false);
-              setVerifyResult({ info: 'QR ile veri alındı. JSON kutusuna yapıştırıldı.' });
-            }}
-            topContent={<Text>QR kodu tara</Text>}
-            bottomContent={
-              <TouchableOpacity onPress={() => setShowScanner(false)}>
-                <Text style={{ color: '#007aff', marginTop: 16 }}>Kapat</Text>
-              </TouchableOpacity>
-            }
-          />
-        )}
+        <Modal
+          visible={showScanner}
+          animationType="slide"
+          onRequestClose={() => setShowScanner(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            {hasPermission === null ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#fff' }}>Kamera izni isteniyor...</Text>
+              </View>
+            ) : hasPermission === false ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                <Ionicons name="camera-off" size={64} color="#999" />
+                <Text style={{ color: '#fff', marginTop: 16, textAlign: 'center' }}>
+                  Kamera izni gerekli
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    marginTop: 20,
+                    backgroundColor: theme.colors.primary,
+                    paddingHorizontal: 24,
+                    paddingVertical: 12,
+                    borderRadius: 8,
+                  }}
+                  onPress={async () => {
+                    const { status } = await Camera.requestCameraPermissionsAsync();
+                    setHasPermission(status === 'granted');
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>İzin Ver</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ marginTop: 12 }}
+                  onPress={() => setShowScanner(false)}
+                >
+                  <Text style={{ color: '#007aff' }}>İptal</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <CameraView
+                  style={StyleSheet.absoluteFillObject}
+                  onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                  barcodeScannerSettings={{ barCodeTypes: ['qr'] }}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.4)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 250,
+                      height: 250,
+                      borderWidth: 3,
+                      borderColor: theme.colors.primary,
+                      borderRadius: 16,
+                      backgroundColor: 'transparent',
+                    }}
+                  />
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 16,
+                      fontWeight: '600',
+                      marginTop: 24,
+                      textAlign: 'center',
+                    }}
+                  >
+                    QR kodu çerçeveye hizala
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={{
+                    position: 'absolute',
+                    top: 50,
+                    right: 20,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: 12,
+                    borderRadius: 20,
+                  }}
+                  onPress={() => {
+                    setShowScanner(false);
+                    setScanned(false);
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </Modal>
 
         {verifyResult && (
           <View style={{ 
