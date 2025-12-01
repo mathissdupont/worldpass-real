@@ -1129,9 +1129,18 @@ async def admin_approve_issuer(body: ApproveIssuerReq, db=Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="issuer_not_found")
 
+    # Generate signing keys for the issuer if not already present
+    from backend.core.crypto_ed25519 import b64u
+    sk_bytes, pk_bytes = signer.generate_keypair()
+    sk_b64u = b64u(sk_bytes)
+    pk_b64u = b64u(pk_bytes)
+    
+    # Generate or update DID if needed
+    issuer_did = row["did"] if row["did"] else f"did:key:z{pk_b64u}"
+
     await db.execute(
-        "UPDATE issuers SET status='approved', api_key_hash=?, updated_at=? WHERE id=?",
-        (_sha256(api_key), now, body.issuer_id),
+        "UPDATE issuers SET status='approved', api_key_hash=?, sk_b64u=?, pk_b64u=?, did=?, updated_at=? WHERE id=?",
+        (_sha256(api_key), sk_b64u, pk_b64u, issuer_did, now, body.issuer_id),
     )
     await db.commit()
     return ApproveIssuerResp(api_key=api_key)
@@ -1211,8 +1220,8 @@ async def issuer_issue(
 
     # --- VC'yi imzala (proof ekle) ---
     # issuer'ın private key'i ve public key'i alınır
-    issuer_sk_b64u = issuer.get("sk_b64u")
-    issuer_pk_b64u = issuer.get("pk_b64u")
+    issuer_sk_b64u = issuer["sk_b64u"] if "sk_b64u" in issuer.keys() else None
+    issuer_pk_b64u = issuer["pk_b64u"] if "pk_b64u" in issuer.keys() else None
     verification_method = f"{issuer['did']}#key-1"
     if not issuer_sk_b64u or not issuer_pk_b64u:
         raise HTTPException(status_code=500, detail="issuer_keys_missing")
