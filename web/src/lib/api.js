@@ -377,7 +377,7 @@ export async function rotateIssuerApiKey() {
   return r.json();
 }
 
-export async function issueCredential(orgId, payload, token, templateId) {
+export async function issueCredential(payload, token, templateId) {
   const res = await fetch('/api/issuer/issue', {
     method: 'POST',
     headers: {
@@ -390,7 +390,7 @@ export async function issueCredential(orgId, payload, token, templateId) {
     }),
   });
 
-  // Her zaman önce text oku
+  // Always read text first
   const rawText = await res.text();
   let data = null;
 
@@ -398,7 +398,7 @@ export async function issueCredential(orgId, payload, token, templateId) {
     try {
       data = JSON.parse(rawText);
     } catch {
-      // JSON değilse data null kalsın
+      // If not JSON, keep data as null
     }
   }
 
@@ -419,7 +419,7 @@ export async function issueCredential(orgId, payload, token, templateId) {
     throw new Error(message);
   }
 
-  // Başarılıysa JSON döndüyse onu, yoksa boş obje dön
+  // If successful and JSON returned, use it, otherwise return empty object
   return data ?? {};
 }
 
