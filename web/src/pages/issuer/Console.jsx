@@ -154,7 +154,7 @@ export default function IssuerConsole() {
       };
 
       const token = localStorage.getItem('issuer_token');
-      const response = await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      const response = await issueCredential(vc, token, selectedTemplate?.id || null);
       
       // ✅ IMPORTANT: Use the signed VC from the backend response
       const signedVC = response.vc;
@@ -817,7 +817,7 @@ function Field({ f, value, onChange, error }) {
       const token = localStorage.getItem("issuer_token");
       if (!token) throw new Error("Issuer token bulunamadı. Tekrar giriş yap.");
 
-      const response = await issueCredential(null, signed, token, selectedTemplateId);
+      const response = await issueCredential(signed, token, selectedTemplateId);
 
       // ✅ IMPORTANT: Use the signed VC from the backend response
       const backendSignedVC = response?.vc;
