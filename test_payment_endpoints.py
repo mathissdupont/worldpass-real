@@ -12,7 +12,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://worldpass-beta.heptapusgroup.com"
 
 def test_health():
     """Test API health"""
@@ -25,13 +25,13 @@ def test_payment_endpoints():
     """Test payment endpoints (requires auth)"""
     print("\n⚠️  Payment endpoints require authentication")
     print("To test payment flow:")
-    print("1. Register/login at: http://localhost:5173/login")
-    print("2. Navigate to: http://localhost:5173/pay/demo")
+    print("1. Register/login at: http://worldpass-beta.heptapusgroup.com/login")
+    print("2. Navigate to: http://worldpass-beta.heptapusgroup.com/pay/demo")
     print("3. Enter amount: 10.00")
     print("4. Click 'Proceed to Payment'")
     print("5. Click 'Pay Now' on checkout page")
     print("6. Verify success on result page")
-    print("7. Check transactions at: http://localhost:5173/account/payments")
+    print("7. Check transactions at: http://worldpass-beta.heptapusgroup.com/account/payments")
 
 def test_checkout_page():
     """Test mock provider checkout page (no auth required)"""
@@ -42,7 +42,7 @@ def test_checkout_page():
             "tx_id": 1,
             "amount": 1000,
             "currency": "USD",
-            "return_url": "http://localhost:5173/pay/return"
+            "return_url": "http://worldpass-beta.heptapusgroup.com/pay/return"
         }
     )
     if response.status_code == 200 and "Mock Payment Provider" in response.text:
@@ -73,7 +73,7 @@ def main():
     print("=" * 60)
     print("\n📝 Next steps:")
     print("1. Start frontend: cd web && npm run dev")
-    print("2. Open browser: http://localhost:5173")
+    print("2. Open browser: http://worldpass-beta.heptapusgroup.com")
     print("3. Follow the payment flow instructions above")
     print()
 

@@ -389,7 +389,7 @@ async def handle_stripe_webhook(
 
 ```env
 # Payment Provider
-PAYMENT_PROVIDER_BASE_URL=http://localhost:8000/mock-provider
+PAYMENT_PROVIDER_BASE_URL=http://worldpass-beta.heptapusgroup.com/mock-provider
 PAYMENT_WEBHOOK_SECRET=mock_webhook_secret_change_in_production
 
 # For production PSP (e.g., Stripe)
@@ -404,7 +404,7 @@ class Settings(BaseSettings):
     # ... existing settings ...
     
     # Payment
-    PAYMENT_PROVIDER_BASE_URL: str = "http://localhost:8000/mock-provider"
+    PAYMENT_PROVIDER_BASE_URL: str = "http://worldpass-beta.heptapusgroup.com/mock-provider"
     PAYMENT_WEBHOOK_SECRET: str = "mock_webhook_secret_change_in_production"
 ```
 
