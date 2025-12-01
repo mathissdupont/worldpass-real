@@ -1,450 +1,491 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
-import QRCodeScanner from 'react-native-qrcode-scanner';
-import { ToastAndroid } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Platform,
+  ActivityIndicator,
+  Alert,
+  ToastAndroid,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { useTheme } from '../context/ThemeContext';
+import { verifyCredential } from '../lib/api';
+
 // NFC alma simülasyonu (gerçek NFC için native modül gerekir)
 const receiveNfc = async (onResult) => {
   if (Platform.OS === 'android') {
-    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
-    ToastAndroid.show('NFC ile alma simüle edildi', ToastAndroid.SHORT);
+    setTimeout(() => {
+      if (onResult) onResult(true);
+    }, 800);
+    ToastAndroid.show('NFC alma simüle edildi', ToastAndroid.SHORT);
   } else {
-    alert('NFC alma sadece Android cihazlarda desteklenir.');
-    onResult && onResult(null);
+    Alert.alert(
+      'NFC',
+      'NFC alma şu an sadece Android cihazlarda simüle ediliyor.',
+    );
+    if (onResult) onResult(false);
   }
 };
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext';
-import { useIdentity } from '../context/IdentityContext';
-import { useWallet } from '../context/WalletContext';
 
-export default function VerifyScreen({ navigation }) {
-  const [vcText, setVcText] = useState('');
-  const [verifyResult, setVerifyResult] = useState(null);
-  const [loadingVerify, setLoadingVerify] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-    // Backend doğrulama fonksiyonu
-    const handleVerify = async () => {
-      setLoadingVerify(true);
-      setVerifyResult(null);
-      try {
-        const resp = await fetch('https://worldpass-beta.heptapusgroup.com/api/vc/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: vcText,
-        });
-        const data = await resp.json();
-        setVerifyResult(data);
-      } catch (e) {
-        setVerifyResult({ valid: false, error: 'Doğrulama hatası: ' + e.message });
-      }
-      setLoadingVerify(false);
-    };
+// VC özetini gösteren yardımcı render
+const renderCredentialSummary = (cred, styles) => {
+  if (!cred) return null;
+
+  const {
+    type,
+    issuer,
+    issuanceDate,
+    expirationDate,
+    credentialSubject,
+    status,
+  } = cred;
+
+  const typeLabel = Array.isArray(type)
+    ? type[type.length - 1]
+    : type || 'VerifiableCredential';
+
+  return (
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryTitle}>{typeLabel}</Text>
+
+      <Text style={styles.summaryLabel}>Issuer</Text>
+      <Text style={styles.summaryValue}>{issuer || '-'}</Text>
+
+      <Text style={styles.summaryLabel}>Holder</Text>
+      <Text style={styles.summaryValue}>
+        {credentialSubject?.id || credentialSubject?.subjectId || '-'}
+      </Text>
+
+      <Text style={styles.summaryLabel}>Issued</Text>
+      <Text style={styles.summaryValue}>
+        {issuanceDate
+          ? new Date(issuanceDate).toLocaleString()
+          : '-'}
+      </Text>
+
+      {expirationDate && (
+        <>
+          <Text style={styles.summaryLabel}>Expires</Text>
+          <Text style={styles.summaryValue}>
+            {new Date(expirationDate).toLocaleString()}
+          </Text>
+        </>
+      )}
+
+      {status && (
+        <>
+          <Text style={styles.summaryLabel}>Status</Text>
+          <Text
+            style={styles.summaryValue}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {typeof status === 'object'
+              ? JSON.stringify(status)
+              : String(status)}
+          </Text>
+        </>
+      )}
+    </View>
+  );
+};
+
+export default function VerifyScreen() {
   const { theme } = useTheme();
-  const { identity, linking } = useIdentity();
-  const { credentials } = useWallet();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const did = identity?.did;
-  const identityReady = Boolean(did);
+  const [vcText, setVcText] = useState('');
+  const [parsedVC, setParsedVC] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null); // { type: 'success'|'error'|'info', message: string }
 
-  const openScanner = () => {
-    navigation.navigate('VerifyScanner');
-  };
+  const handleVerify = async () => {
+    if (!vcText.trim()) {
+      setResult({
+        type: 'error',
+        message: 'Önce JSON verisini yapıştırmalısın.',
+      });
+      return;
+    }
 
-  const openIdentity = (screen) => {
-    const parent = navigation.getParent?.();
-    if (screen) {
-      parent?.navigate('Settings', { screen });
-    } else {
-      parent?.navigate('Settings');
+    let vc;
+    try {
+      vc = JSON.parse(vcText);
+    } catch (e) {
+      setResult({
+        type: 'error',
+        message: 'Geçersiz JSON. Lütfen tam VC JSON’unu yapıştır.',
+      });
+      setParsedVC(null);
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const resp = await verifyCredential(vc);
+      // Backend ScannerScreen’de resp.valid bekleniyordu
+      if (resp.valid) {
+        setResult({
+          type: 'success',
+          message: 'Credential geçerli olarak doğrulandı.',
+        });
+        setParsedVC(vc);
+      } else {
+        setResult({
+          type: 'error',
+          message:
+            resp.reason ||
+            'Credential doğrulanamadı veya geçersiz.',
+        });
+        setParsedVC(vc);
+      }
+    } catch (err) {
+      setResult({
+        type: 'error',
+        message:
+          err?.message ||
+          'Doğrulama isteği sırasında bir hata oluştu.',
+      });
+      setParsedVC(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const statusPill = () => {
-    if (linking) {
-      return (
-        <View style={[styles.statusPill, styles.statusInfo]}>
-          <Ionicons name="refresh" size={14} color={theme.colors.primary} />
-          <Text style={styles.statusText}>Bağlantı kuruluyor…</Text>
-        </View>
-      );
+  const handleNfcSimulate = () => {
+    receiveNfc((ok) => {
+      if (ok) {
+        setResult({
+          type: 'info',
+          message:
+            'NFC alma simüle edildi. Gerçek NFC entegrasyonu native modülle eklenecek.',
+        });
+      }
+    });
+  };
+
+  const renderResultBanner = () => {
+    if (!result) return null;
+
+    let containerStyle = styles.bannerInfo;
+    let icon = 'information-circle';
+
+    if (result.type === 'success') {
+      containerStyle = styles.bannerSuccess;
+      icon = 'checkmark-circle';
+    } else if (result.type === 'error') {
+      containerStyle = styles.bannerError;
+      icon = 'alert-circle';
     }
-    if (identityReady) {
-      return (
-        <View style={[styles.statusPill, styles.statusSuccess]}>
-          <Ionicons name="shield-checkmark" size={14} color="#10b981" />
-          <Text style={styles.statusText}>DID hazır</Text>
-        </View>
-      );
-    }
+
     return (
-      <View style={[styles.statusPill, styles.statusWarning]}>
-        <Ionicons name="alert-circle" size={14} color="#f97316" />
-        <Text style={styles.statusText}>Kimlik yok</Text>
+      <View style={[styles.resultBanner, containerStyle]}>
+        <Ionicons
+          name={icon}
+          size={18}
+          color={
+            result.type === 'success'
+              ? theme.colors.success
+              : result.type === 'error'
+              ? theme.colors.danger
+              : theme.colors.info || theme.colors.primary
+          }
+        />
+        <Text style={styles.resultBannerText}>{result.message}</Text>
       </View>
     );
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={[styles.heroCard, theme.shadows.card]}>
-        {statusPill()}
-        <Text style={styles.title}>Verify merkezi</Text>
-        <Text style={styles.subtitle}>
-          Credential doğrulamayı QR, bağlantı veya NFC isteği üzerinden tamamla. Zararlı istekleri anında reddet.
-        </Text>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={32}
+            color={theme.colors.primary}
+          />
+          <Text style={styles.title}>Credential Doğrulama</Text>
+          <Text style={styles.subtitle}>
+            Holder’dan aldığın verifiable credential JSON’unu aşağıya yapıştır.
+            Backend üzerinden kriptografik olarak doğrulayalım.
+          </Text>
+        </View>
 
-        <View style={styles.heroActions}>
-          <TouchableOpacity style={styles.primaryButton} onPress={openScanner}>
-            <Ionicons name="qr-code" size={18} color="#fff" />
-            <Text style={styles.primaryButtonText}>QR Tara</Text>
+        {renderResultBanner()}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>VC JSON</Text>
+          <TextInput
+            style={styles.textArea}
+            value={vcText}
+            onChangeText={setVcText}
+            multiline
+            placeholder='{"@context": [...], "type": ["VerifiableCredential", ...], ...}'
+            placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.sectionHint}>
+            Tam VC gövdesini (örneğin QR’dan veya başka bir uygulamadan aldığın veriyi)
+            buraya yapıştırmalısın.
+          </Text>
+        </View>
+
+        <View style={styles.buttonsRow}>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              loading && styles.buttonDisabled,
+            ]}
+            onPress={handleVerify}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.primaryButtonText}>
+                  Credential’ı Doğrula
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => openIdentity('IdentityImport')}
+            onPress={handleNfcSimulate}
           >
-            <Ionicons name="shield" size={18} color={theme.colors.primary} />
-            <Text style={styles.secondaryButtonText}>Kimlik yönet</Text>
+            <Ionicons
+              name="wifi-outline"
+              size={18}
+              color={theme.colors.primary}
+            />
+            <Text style={styles.secondaryButtonText}>
+              NFC’den Al (Sim)
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Creds</Text>
-            <Text style={styles.metaValue}>{credentials.length}</Text>
-          </View>
-          <View style={styles.metaDivider} />
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Kimlik</Text>
-            <Text style={styles.metaValue}>{identityReady ? 'Bağlı' : 'Eksik'}</Text>
-          </View>
-        </View>
-      </View>
+        {parsedVC && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Özet</Text>
+            {renderCredentialSummary(parsedVC, styles)}
 
-      <View style={[styles.sectionCard, theme.shadows.card]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Doğrulama</Text>
-          <Text style={styles.sectionSubtitle}>QR, NFC veya manuel JSON ile VC doğrula</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-          <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => setShowScanner(true)}>
-            <Ionicons name="qr-code" size={18} color="#fff" />
-            <Text style={styles.primaryButtonText}>QR Tara</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={() => {
-            setVerifyResult(null);
-            setVcText('');
-            receiveNfc(data => {
-              if (data) {
-                setVcText(data);
-                setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
-              } else {
-                setVerifyResult({ error: 'NFC ile veri alınamadı.' });
-              }
-            });
-          }}>
-            <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary} />
-            <Text style={styles.secondaryButtonText}>NFC ile Al</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.metaLabel}>VC JSON</Text>
-        <TextInput
-          style={{ backgroundColor: '#f9f9f9', borderRadius: 8, padding: 10, minHeight: 80, textAlignVertical: 'top', marginBottom: 8 }}
-          value={vcText}
-          onChangeText={setVcText}
-          placeholder="VC JSON'u buraya yapıştır veya tara/NFC ile al"
-          multiline
-          numberOfLines={6}
-        />
-        <TouchableOpacity style={[styles.primaryButton, { marginBottom: 8 }]} onPress={handleVerify} disabled={loadingVerify || !vcText}>
-          <Text style={styles.primaryButtonText}>{loadingVerify ? 'Doğrulanıyor...' : 'Doğrula'}</Text>
-        </TouchableOpacity>
-        {showScanner && (
-          <QRCodeScanner
-            onRead={e => {
-              setVcText(e.data);
-              setShowScanner(false);
-              setVerifyResult({ info: 'QR ile veri alındı. JSON kutusuna yapıştırıldı.' });
-            }}
-            topContent={<Text>QR kodu tara</Text>}
-            bottomContent={
-              <TouchableOpacity onPress={() => setShowScanner(false)}>
-                <Text style={{ color: '#007aff', marginTop: 16 }}>Kapat</Text>
-              </TouchableOpacity>
-            }
-          />
-        )}
-        {verifyResult && (
-          <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: verifyResult.valid ? '#e0ffe0' : '#ffe0e0' }}>
-            {verifyResult.info && <Text style={{ color: '#007aff' }}>{verifyResult.info}</Text>}
-            {verifyResult.valid !== undefined && (
-              <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red' }}>
-                {verifyResult.valid ? 'Geçerli Credential ✅' : 'Geçersiz Credential ❌'}
+            <Text style={styles.sectionLabel}>Ham JSON</Text>
+            <ScrollView
+              style={styles.jsonContainer}
+              horizontal={true}
+            >
+              <Text style={styles.jsonText}>
+                {JSON.stringify(parsedVC, null, 2)}
               </Text>
-            )}
-            {verifyResult.error && <Text style={{ color: 'red' }}>{verifyResult.error}</Text>}
-            {verifyResult.details && <Text style={{ color: '#333', marginTop: 4 }}>{JSON.stringify(verifyResult.details, null, 2)}</Text>}
+            </ScrollView>
           </View>
         )}
-      </View>
 
-      <View style={[styles.sectionCard, theme.shadows.card]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Güvenlik kontrol listesi</Text>
-          <Text style={styles.sectionSubtitle}>Tarama öncesi hatırlatma</Text>
+        <View style={styles.footerInfo}>
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            color={theme.colors.textMuted}
+          />
+          <Text style={styles.footerText}>
+            QR ile credential tarayıp cüzdana eklemek için Wallet sekmesindeki
+            Scanner ekranını kullanabilirsin. Bu ekran, özellikle manuel JSON
+            doğrulama ve ileride NFC senaryoları için tasarlandı.
+          </Text>
         </View>
-        {[
-          {
-            icon: 'lock-closed-outline',
-            text: 'Talep sahibinin DID veya host adresini doğrula.',
-          },
-          {
-            icon: 'finger-print-outline',
-            text: 'İmzalamadan önce istenen alanların gerekli olup olmadığını kontrol et.',
-          },
-          {
-            icon: 'cloud-download-outline',
-            text: 'Yeni credential aldıysan Wallet > Backup ile keystore yedeğini güncelle.',
-          },
-        ].map((item) => (
-          <View key={item.text} style={styles.checkRow}>
-            <View style={styles.checkIcon}>
-              <Ionicons name={item.icon} size={16} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.checkText}>{item.text}</Text>
-          </View>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.scannerBanner} onPress={openScanner}>
-        <View style={styles.bannerIcon}>
-          <Ionicons name="scan" size={20} color={theme.colors.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.bannerTitle}>Scanner&apos;a geç</Text>
-          <Text style={styles.bannerText}>Canlı kamera ile QR kodları anında doğrula.</Text>
-        </View>
-        <Ionicons name="arrow-forward" size={18} color={theme.colors.primary} />
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl * 2,
-  },
-  heroCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radii.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
-  },
-  title: {
-    fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
-  },
-  subtitle: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textMuted,
-    lineHeight: 20,
-  },
-  heroActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  primaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radii.lg,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: theme.typography.weights.semibold,
-  },
-  secondaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.cardSecondary,
-  },
-  secondaryButtonText: {
-    color: theme.colors.primary,
-    fontWeight: theme.typography.weights.medium,
-  },
-  statusPill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  statusSuccess: {
-    backgroundColor: 'rgba(16,185,129,0.12)',
-  },
-  statusWarning: {
-    backgroundColor: 'rgba(249,115,22,0.15)',
-  },
-  statusInfo: {
-    backgroundColor: theme.colors.infoSurface,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.lg,
-    padding: theme.spacing.sm,
-  },
-  metaItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metaLabel: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  metaValue: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
-  },
-  metaDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: theme.colors.border,
-  },
-  sectionCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
-  },
-  sectionHeader: {
-    gap: 4,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.sizes.md,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
-  },
-  sectionSubtitle: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.textMuted,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.lg,
-    padding: theme.spacing.md,
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.cardSecondary,
-  },
-  actionRowDisabled: {
-    opacity: 0.5,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.card,
-  },
-  actionTitle: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
-  },
-  actionText: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.textMuted,
-  },
-  helperText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: theme.colors.muted,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    alignItems: 'center',
-  },
-  checkIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radii.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkText: {
-    flex: 1,
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text,
-  },
-  scannerBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: theme.radii.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primarySurface,
-    gap: theme.spacing.md,
-  },
-  bannerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.card,
-  },
-  bannerTitle: {
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: theme.typography.weights.semibold,
-    color: theme.colors.text,
-  },
-  bannerText: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.textMuted,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scroll: {
+      flex: 1,
+    },
+    content: {
+      padding: theme.spacing.lg,
+      paddingBottom: theme.spacing.xl,
+    },
+    header: {
+      alignItems: 'flex-start',
+      gap: theme.spacing.sm,
+      marginBottom: theme.spacing.lg,
+    },
+    title: {
+      fontSize: theme.typography.sizes.lg,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    subtitle: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textMuted,
+      lineHeight: 20,
+    },
+    section: {
+      marginTop: theme.spacing.md,
+      marginBottom: theme.spacing.md,
+    },
+    sectionLabel: {
+      fontSize: theme.typography.sizes.sm,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs,
+    },
+    sectionHint: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textMuted,
+      marginTop: theme.spacing.xs,
+    },
+    textArea: {
+      minHeight: 140,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.md,
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.card,
+      textAlignVertical: 'top',
+    },
+    buttonsRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.sm,
+      marginTop: theme.spacing.sm,
+      marginBottom: theme.spacing.md,
+    },
+    primaryButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm + 4,
+      borderRadius: theme.radii.lg,
+    },
+    primaryButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: theme.typography.sizes.sm,
+    },
+    secondaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderRadius: theme.radii.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
+      paddingVertical: theme.spacing.sm + 4,
+      paddingHorizontal: theme.spacing.sm,
+      backgroundColor: theme.colors.card,
+    },
+    secondaryButtonText: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+      fontSize: theme.typography.sizes.xs,
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    resultBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: theme.spacing.sm,
+      borderRadius: theme.radii.md,
+      marginBottom: theme.spacing.sm,
+    },
+    resultBannerText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.xs,
+    },
+    bannerSuccess: {
+      backgroundColor: theme.colors.successSurface || '#f0fdf4',
+      borderWidth: 1,
+      borderColor: theme.colors.successBorder || '#bbf7d0',
+    },
+    bannerError: {
+      backgroundColor: theme.colors.dangerSurface || '#fef2f2',
+      borderWidth: 1,
+      borderColor: theme.colors.dangerBorder || '#fecaca',
+    },
+    bannerInfo: {
+      backgroundColor: theme.colors.infoSurface || theme.colors.cardMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.infoBorder || theme.colors.border,
+    },
+    summaryCard: {
+      borderRadius: theme.radii.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing.md,
+      marginBottom: theme.spacing.md,
+    },
+    summaryTitle: {
+      fontSize: theme.typography.sizes.md,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm,
+    },
+    summaryLabel: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textMuted,
+      marginTop: theme.spacing.xs,
+    },
+    summaryValue: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.text,
+    },
+    jsonContainer: {
+      marginTop: theme.spacing.sm,
+      maxHeight: 200,
+      borderRadius: theme.radii.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing.md,
+    },
+    jsonText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text,
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    footerInfo: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+      marginTop: theme.spacing.md,
+    },
+    footerText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.textMuted,
+      lineHeight: 18,
+    },
+  });

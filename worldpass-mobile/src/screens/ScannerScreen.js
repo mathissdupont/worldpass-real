@@ -6,10 +6,11 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { Camera, CameraView } from 'expo-camera';
+import { CameraView, Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { verifyCredential } from '../lib/api';
 import { useNavigation } from '@react-navigation/native';
+
+import { verifyCredential } from '../lib/api';
 import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { useTheme } from '../context/ThemeContext';
@@ -20,13 +21,16 @@ export default function ScannerScreen() {
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
+
   const { identity, linking, error: identityError, linkTelemetry } = useIdentity();
   const { addCredential: addCredentialToWallet } = useWallet();
   const navigation = useNavigation();
   const walletDid = identity?.did || '';
   const identityMissing = !walletDid;
+
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
   const lastSuccessfulSync = linkTelemetry?.lastSuccessAt
     ? formatRelativeTime(linkTelemetry.lastSuccessAt)
     : '';
@@ -70,67 +74,119 @@ export default function ScannerScreen() {
     }
   };
 
-  const handleBarCodeScanned = async ({ type, data }) => {
-    if (scanned || scanning) return;
-    if (!walletDid) {
-      return;
+  const resetScanner = () => {
+    setScanned(false);
+  };
+
+  const extractVcFromPayload = (raw) => {
+    // QR payload’ını olabildiğince esnek yorumla
+    let parsed = raw;
+
+    if (typeof raw === 'string') {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        // string ama JSON değil -> desteklemiyoruz (URL vs.)
+        return null;
+      }
     }
-    
+
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    // { vc: {...} } diye geldiyse
+    if (parsed.vc && typeof parsed.vc === 'object') {
+      return parsed.vc;
+    }
+
+    // { credential: {...} } diye geldiyse
+    if (parsed.credential && typeof parsed.credential === 'object') {
+      return parsed.credential;
+    }
+
+    // Doğrudan VC objesi gibi görünüyorsa
+    if (
+      parsed['@context'] &&
+      parsed.type &&
+      parsed.issuer &&
+      parsed.credentialSubject
+    ) {
+      return parsed;
+    }
+
+    return null;
+  };
+
+  const handleBarCodeScanned = async ({ data }) => {
+    if (scanned || scanning) return;
+    if (!walletDid) return;
+
     setScanned(true);
     setScanning(true);
 
     try {
-      // Parse QR data
-      let vcData;
-      try {
-        vcData = JSON.parse(data);
-      } catch (e) {
-        Alert.alert('Invalid QR Code', 'This is not a valid credential QR code');
-        resetScanner();
-        return;
-      }
+      console.log('QR raw data (first 200 chars):', String(data).slice(0, 200));
 
-      // Verify the credential
-      const result = await verifyCredential(vcData);
+      const vcData = extractVcFromPayload(data);
 
-      const subjectDid = vcData?.credentialSubject?.id;
-      if (subjectDid && subjectDid !== walletDid) {
+      if (!vcData) {
         Alert.alert(
-          'Wrong identity',
-          'This credential is not issued to your DID.',
+          'Geçersiz QR',
+          'Bu QR, WorldPass tarafından beklenen credential formatında değil.',
           [{ text: 'OK', onPress: resetScanner }],
         );
         return;
       }
 
+      const subjectDid = vcData?.credentialSubject?.id;
+      if (subjectDid && subjectDid !== walletDid) {
+        Alert.alert(
+          'Yanlış kimlik',
+          'Bu credential senin DID’ine issued edilmemiş.',
+          [{ text: 'OK', onPress: resetScanner }],
+        );
+        return;
+      }
+
+      // Backend doğrulama
+      let result;
+      try {
+        result = await verifyCredential(vcData);
+      } catch (err) {
+        console.log('verifyCredential error:', err?.message);
+        const msg =
+          err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')
+            ? 'Sunucu bu credential’ı bulamadı veya bu QR eski bir format kullanıyor.'
+            : err?.message || 'Doğrulama isteği başarısız oldu.';
+        Alert.alert('Verification Error', msg, [
+          { text: 'OK', onPress: resetScanner },
+        ]);
+        return;
+      }
+
       if (result.valid) {
-        // Save credential
         await addCredentialToWallet(vcData);
         Alert.alert(
-          'Success',
-          'Credential verified and saved to your wallet!',
-          [{ text: 'OK', onPress: resetScanner }]
+          'Başarılı',
+          'Credential doğrulandı ve cüzdana kaydedildi!',
+          [{ text: 'OK', onPress: resetScanner }],
         );
       } else {
         Alert.alert(
           'Verification Failed',
-          result.reason || 'The credential could not be verified',
-          [{ text: 'OK', onPress: resetScanner }]
+          result.reason || 'Credential doğrulanamadı.',
+          [{ text: 'OK', onPress: resetScanner }],
         );
       }
     } catch (error) {
+      console.error('Scanner error:', error);
       Alert.alert(
         'Error',
-        error.message || 'Failed to process credential',
-        [{ text: 'OK', onPress: resetScanner }]
+        error.message || 'Credential işlenemedi.',
+        [{ text: 'OK', onPress: resetScanner }],
       );
     } finally {
       setScanning(false);
     }
-  };
-
-  const resetScanner = () => {
-    setScanned(false);
   };
 
   if (hasPermission === null) {
@@ -150,16 +206,27 @@ export default function ScannerScreen() {
           Yeni bir DID oluştur veya var olan `.wpkeystore` dosyanı içe aktar ve ardından QR kodlarını taramaya başla.
         </Text>
         <View style={styles.identityActions}>
-          <TouchableOpacity style={styles.identityPrimary} onPress={() => navigation.navigate('IdentityCreate')}>
+          <TouchableOpacity
+            style={styles.identityPrimary}
+            onPress={() => navigation.navigate('IdentityCreate')}
+          >
             <Ionicons name="add" size={18} color="#fff" />
             <Text style={styles.identityPrimaryText}>Kimlik Oluştur</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.identitySecondary}
-            onPress={() => navigation.navigate('Settings', { screen: 'IdentityImport' })}
+            onPress={() =>
+              navigation.navigate('Settings', { screen: 'IdentityImport' })
+            }
           >
-            <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
-            <Text style={styles.identitySecondaryText}>.wpkeystore İçe Aktar</Text>
+            <Ionicons
+              name="cloud-upload-outline"
+              size={18}
+              color={theme.colors.primary}
+            />
+            <Text style={styles.identitySecondaryText}>
+              .wpkeystore İçe Aktar
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -172,7 +239,7 @@ export default function ScannerScreen() {
         <Ionicons name="camera-off" size={64} color={theme.colors.danger} />
         <Text style={styles.errorTitle}>Camera Access Required</Text>
         <Text style={styles.errorText}>
-          WorldPass needs camera access to scan QR codes
+          WorldPass, QR kodlarını taramak için kamera erişimine ihtiyaç duyar.
         </Text>
         <TouchableOpacity
           style={styles.button}
@@ -189,63 +256,72 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.scannerShell}>
+      {/* Kamera **tek başına**, children YOK */}
       <CameraView
         style={StyleSheet.absoluteFillObject}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{ barCodeTypes: ['qr'] }}
-      >
-        <View style={styles.overlay}>
-          {statusBanner && (
-            <View
+      />
+
+      {/* Overlay’i dışarıda, absolute ile üstüne koyuyoruz */}
+      <View style={styles.overlay}>
+        {statusBanner && (
+          <View
+            style={[
+              styles.statusBanner,
+              statusBanner.tone === 'error' && styles.statusBannerError,
+              statusBanner.tone === 'info' && styles.statusBannerInfo,
+              statusBanner.tone === 'success' && styles.statusBannerSuccess,
+            ]}
+          >
+            <Ionicons
+              name={
+                statusBanner.tone === 'error'
+                  ? 'alert-circle'
+                  : statusBanner.tone === 'info'
+                  ? 'refresh'
+                  : 'shield-checkmark'
+              }
+              size={16}
+              color={
+                statusBanner.tone === 'error'
+                  ? theme.colors.danger
+                  : statusBanner.tone === 'info'
+                  ? theme.colors.info
+                  : theme.colors.success
+              }
+            />
+            <Text
               style={[
-                styles.statusBanner,
-                statusBanner.tone === 'error' && styles.statusBannerError,
-                statusBanner.tone === 'info' && styles.statusBannerInfo,
-                statusBanner.tone === 'success' && styles.statusBannerSuccess,
+                styles.statusBannerText,
+                {
+                  color:
+                    statusBanner.tone === 'error'
+                      ? theme.colors.danger
+                      : statusBanner.tone === 'info'
+                      ? theme.colors.info
+                      : theme.colors.success,
+                },
               ]}
             >
-              <Ionicons
-                name={statusBanner.tone === 'error' ? 'alert-circle' : statusBanner.tone === 'info' ? 'refresh' : 'shield-checkmark'}
-                size={16}
-                color={
-                  statusBanner.tone === 'error'
-                    ? theme.colors.danger
-                    : statusBanner.tone === 'info'
-                      ? theme.colors.info
-                      : theme.colors.success
-                }
-              />
-              <Text
-                style={[
-                  styles.statusBannerText,
-                  {
-                    color:
-                      statusBanner.tone === 'error'
-                        ? theme.colors.danger
-                        : statusBanner.tone === 'info'
-                          ? theme.colors.info
-                          : theme.colors.success,
-                  },
-                ]}
-              >
-                {statusBanner.text}
-              </Text>
-            </View>
-          )}
-          <View style={styles.scanFrame} />
-          <Text style={styles.instructions}>
-            {scanning ? 'Verifying...' : 'Align QR code within frame'}
-          </Text>
-          <Text style={styles.helperText}>Her credential ekledikten sonra keystore yedeğini güncellemeyi unutma.</Text>
-        </View>
-      </CameraView>
+              {statusBanner.text}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.scanFrame} />
+        <Text style={styles.instructions}>
+          {scanning ? 'Verifying...' : 'Align QR code within frame'}
+        </Text>
+        <Text style={styles.helperText}>
+          Her credential ekledikten sonra keystore yedeğini güncellemeyi
+          unutma.
+        </Text>
+      </View>
 
       {scanned && !scanning && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.rescanButton}
-            onPress={resetScanner}
-          >
+          <TouchableOpacity style={styles.rescanButton} onPress={resetScanner}>
             <Text style={styles.rescanText}>Tap to Scan Again</Text>
           </TouchableOpacity>
         </View>
@@ -254,168 +330,169 @@ export default function ScannerScreen() {
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
-  scannerShell: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 16,
-  },
-  scanFrame: {
-    width: 250,
-    height: 250,
-    borderWidth: 3,
-    borderColor: theme.colors.primary,
-    borderRadius: 18,
-    backgroundColor: 'transparent',
-  },
-  instructions: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 32,
-    textAlign: 'center',
-  },
-  helperText: {
-    color: '#f3f4f6',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  stateContainer: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    color: theme.colors.text,
-    fontSize: 16,
-  },
-  identityContainer: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
-  },
-  identityTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  identityText: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  identityActions: {
-    width: '100%',
-    gap: 12,
-  },
-  identityPrimary: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 14,
-    borderRadius: theme.radii.lg,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  identityPrimaryText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  identitySecondary: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radii.lg,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.cardSecondary,
-  },
-  identitySecondaryText: {
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    padding: 20,
-  },
-  rescanButton: {
-    backgroundColor: theme.colors.primary,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  rescanText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: theme.colors.danger,
-    marginTop: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 24,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  statusBanner: {
-    position: 'absolute',
-    top: 40,
-    left: 24,
-    right: 24,
-    borderRadius: theme.radii.md,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusBannerInfo: {
-    backgroundColor: theme.colors.infoSurface,
-  },
-  statusBannerError: {
-    backgroundColor: theme.colors.dangerSurface,
-  },
-  statusBannerSuccess: {
-    backgroundColor: theme.colors.successSurface,
-  },
-  statusBannerText: {
-    flex: 1,
-    fontSize: 13,
-  },
-});
+const createStyles = (theme) =>
+  StyleSheet.create({
+    scannerShell: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      gap: 16,
+    },
+    scanFrame: {
+      width: 250,
+      height: 250,
+      borderWidth: 3,
+      borderColor: theme.colors.primary,
+      borderRadius: 18,
+      backgroundColor: 'transparent',
+    },
+    instructions: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+      marginTop: 32,
+      textAlign: 'center',
+    },
+    helperText: {
+      color: '#f3f4f6',
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    stateContainer: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+    },
+    loadingText: {
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    identityContainer: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+      gap: 16,
+    },
+    identityTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+    },
+    identityText: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    identityActions: {
+      width: '100%',
+      gap: 12,
+    },
+    identityPrimary: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 14,
+      borderRadius: theme.radii.lg,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+    },
+    identityPrimaryText: {
+      color: '#fff',
+      fontWeight: '700',
+      fontSize: 15,
+    },
+    identitySecondary: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.lg,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.cardSecondary,
+    },
+    identitySecondaryText: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    bottomBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      padding: 20,
+    },
+    rescanButton: {
+      backgroundColor: theme.colors.primary,
+      padding: 16,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    rescanText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    errorTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.colors.danger,
+      marginTop: 16,
+    },
+    errorText: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      marginTop: 8,
+      textAlign: 'center',
+    },
+    button: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 10,
+      marginTop: 24,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    statusBanner: {
+      position: 'absolute',
+      top: 40,
+      left: 24,
+      right: 24,
+      borderRadius: theme.radii.md,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    statusBannerInfo: {
+      backgroundColor: theme.colors.infoSurface,
+    },
+    statusBannerError: {
+      backgroundColor: theme.colors.dangerSurface,
+    },
+    statusBannerSuccess: {
+      backgroundColor: theme.colors.successSurface,
+    },
+    statusBannerText: {
+      flex: 1,
+      fontSize: 13,
+    },
+  });

@@ -377,28 +377,45 @@ export async function rotateIssuerApiKey() {
   return r.json();
 }
 
-export async function issueCredential(api_key, vc, token, template_id) {
-  const authToken = token || getIssuerToken();
-  if (!authToken && !api_key) throw new Error('Not authenticated');
-  
-  const body = { vc };
-  if (api_key) body.api_key = api_key;
-  if (template_id) body.template_id = template_id;
-  
-  const r = await fetch('/api/issuer/issue', {
+export async function issueCredential(orgId, payload, token, templateId) {
+  const res = await fetch('/api/issuer/issue', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Token': authToken
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      org_id: orgId,
+      payload,
+      template_id: templateId,
+    }),
   });
-  if (!r.ok) {
-    const err = await r.json();
-    throw new Error(err.detail || 'issue_failed');
+
+  // Her zaman önce text oku
+  const rawText = await res.text();
+  let data = null;
+
+  if (rawText) {
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      // JSON değilse data null kalsın
+    }
   }
-  return r.json();
+
+  if (!res.ok) {
+    const message =
+      (data && (data.detail || data.error || data.message)) ||
+      rawText ||                           // "Internal Server Error" vs.
+      `HTTP ${res.status}`;
+
+    throw new Error(message);
+  }
+
+  // Başarılıysa JSON döndüyse onu, yoksa boş obje dön
+  return data ?? {};
 }
+
 
 export async function getIssuedCredentials() {
   const token = getIssuerToken();

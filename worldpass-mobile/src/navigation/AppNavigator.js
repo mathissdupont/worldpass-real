@@ -1,5 +1,9 @@
 import React, { useMemo } from 'react';
-import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,6 +66,12 @@ function WalletStackScreen() {
         name="VCQR"
         component={VCQRScreen}
         options={{ title: 'Share Credential' }}
+      />
+      {/* 🔹 Wallet içinden navigation.navigate('Scanner') için ekledik */}
+      <WalletStack.Screen
+        name="Scanner"
+        component={ScannerScreen}
+        options={{ title: 'QR Scanner' }}
       />
     </WalletStack.Navigator>
   );
@@ -178,23 +188,23 @@ function AppTabs() {
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Wallet" 
+      <Tab.Screen
+        name="Wallet"
         component={WalletStackScreen}
         options={{ title: 'Wallet' }}
       />
-      <Tab.Screen 
-        name="Present" 
+      <Tab.Screen
+        name="Present"
         component={PresentStackScreen}
         options={{ title: 'Present' }}
       />
-      <Tab.Screen 
-        name="Verify" 
+      <Tab.Screen
+        name="Verify"
         component={VerifyStackScreen}
         options={{ title: 'Verify' }}
       />
-      <Tab.Screen 
-        name="Settings" 
+      <Tab.Screen
+        name="Settings"
         component={SettingsStackScreen}
         options={{ title: 'Settings' }}
       />
@@ -220,23 +230,35 @@ export default function AppNavigator() {
   const { user, loading } = useAuth();
   const { theme } = useTheme();
 
-  const navTheme = useMemo(() => ({
-    ...(theme.isDark ? NavigationDarkTheme : NavigationDefaultTheme),
-    dark: theme.isDark,
-    colors: {
-      ...(theme.isDark ? NavigationDarkTheme.colors : NavigationDefaultTheme.colors),
-      primary: theme.colors.primary,
-      background: theme.colors.background,
-      card: theme.colors.card,
-      border: theme.colors.border,
-      text: theme.colors.text,
-      notification: theme.colors.danger,
-    },
-  }), [theme]);
+  const navTheme = useMemo(
+    () => ({
+      ...(theme.isDark ? NavigationDarkTheme : NavigationDefaultTheme),
+      dark: theme.isDark,
+      colors: {
+        ...(theme.isDark
+          ? NavigationDarkTheme.colors
+          : NavigationDefaultTheme.colors),
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        card: theme.colors.card,
+        border: theme.colors.border,
+        text: theme.colors.text,
+        notification: theme.colors.danger,
+      },
+    }),
+    [theme]
+  );
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
