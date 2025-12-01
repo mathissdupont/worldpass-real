@@ -149,6 +149,8 @@ export default function WalletScreen() {
     error,
     refresh,
     deleteCredential: removeCredential,
+    exportCredentials: exportCreds,
+    importCredentials: importCreds,
   } = useWallet();
 
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -240,18 +242,25 @@ export default function WalletScreen() {
       onPress: () => navigation.navigate('Scanner'),
     },
     {
+      key: 'import',
+      label: 'İçe Aktar',
+      icon: 'cloud-upload-outline',
+      disabled: !hasIdentity,
+      onPress: handleImport,
+    },
+    {
+      key: 'export',
+      label: 'Dışa Aktar',
+      icon: 'cloud-download-outline',
+      disabled: !hasCredentials,
+      onPress: handleExportAll,
+    },
+    {
       key: 'present',
       label: 'VC Paylaş',
       icon: 'color-wand-outline',
       disabled: !hasCredentials,
       onPress: () => navigation.navigate('Present'),
-    },
-    {
-      key: 'backup',
-      label: hasIdentity ? 'Yedekle' : 'İçe Aktar',
-      icon: hasIdentity ? 'cloud-download-outline' : 'key-outline',
-      disabled: false,
-      onPress: hasIdentity ? handleManageIdentity : handleCreateIdentity,
     },
   ];
 
@@ -626,6 +635,55 @@ export default function WalletScreen() {
     } catch {
       // kullanıcı iptal ederse sessiz geç
     }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      const jsonString = await exportCreds();
+      const fileName = `credentials-export-${Date.now()}.json`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, jsonString, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Tüm Credentialleri Dışa Aktar',
+        });
+      } else {
+        Alert.alert('Başarılı', 'Dosya kaydedildi: ' + fileUri);
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Dışa aktarma hatası: ' + e.message);
+    }
+  };
+
+  const handleImport = async () => {
+    Alert.prompt(
+      'Credential İçe Aktar',
+      'Credential JSON metnini yapıştırın:',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'İçe Aktar',
+          onPress: async (text) => {
+            if (!text) return;
+            const result = await importCreds(text);
+            if (result.success) {
+              Alert.alert(
+                'Başarılı',
+                `${result.count} credential içe aktarıldı!`
+              );
+            } else {
+              Alert.alert('Hata', result.error || 'İçe aktarma başarısız');
+            }
+          },
+        },
+      ],
+      'plain-text'
+    );
   };
 
   return (
