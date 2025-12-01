@@ -181,3 +181,136 @@ export async function verifyCredential(vc) {
     body: JSON.stringify({ vc }),
   });
 }
+
+// Issuer APIs
+export async function getIssuerToken() {
+  return await AsyncStorage.getItem('issuer_token');
+}
+
+export async function setIssuerToken(token) {
+  await AsyncStorage.setItem('issuer_token', token);
+}
+
+export async function clearIssuerToken() {
+  await AsyncStorage.removeItem('issuer_token');
+}
+
+export async function issuerApiRequest(endpoint, options = {}) {
+  const token = await getIssuerToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    headers['X-Token'] = token;
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function registerIssuer(data) {
+  const result = await issuerApiRequest('/api/issuer/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (result.token) {
+    await setIssuerToken(result.token);
+  }
+  return result;
+}
+
+export async function loginIssuer(data) {
+  const result = await issuerApiRequest('/api/issuer/login', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (result.token) {
+    await setIssuerToken(result.token);
+  }
+  return result;
+}
+
+export async function getIssuerProfile() {
+  return issuerApiRequest('/api/issuer/profile');
+}
+
+export async function updateIssuerProfile(data) {
+  return issuerApiRequest('/api/issuer/me', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getIssuerStats() {
+  return issuerApiRequest('/api/issuer/stats');
+}
+
+export async function listIssuerCredentials(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = query ? `/api/issuer/credentials?${query}` : '/api/issuer/credentials';
+  return issuerApiRequest(endpoint);
+}
+
+export async function listIssuerTemplates() {
+  return issuerApiRequest('/api/issuer/templates');
+}
+
+export async function createIssuerTemplate(template) {
+  return issuerApiRequest('/api/issuer/templates', {
+    method: 'POST',
+    body: JSON.stringify(template),
+  });
+}
+
+export async function updateIssuerTemplate(templateId, updates) {
+  return issuerApiRequest(`/api/issuer/templates/${templateId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteIssuerTemplate(templateId) {
+  return issuerApiRequest(`/api/issuer/templates/${templateId}`, {
+    method: 'DELETE',
+  });
+}
+
+// Template management for regular users (from web api.js)
+export async function createTemplate(template) {
+  return apiRequest('/api/user/templates', {
+    method: 'POST',
+    body: JSON.stringify(template),
+  });
+}
+
+export async function listTemplates() {
+  return apiRequest('/api/user/templates');
+}
+
+export async function updateTemplate(templateId, updates) {
+  return apiRequest(`/api/user/templates/${templateId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteTemplate(templateId) {
+  return apiRequest(`/api/user/templates/${templateId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function lookupRecipient(recipientId) {
+  return apiRequest(`/api/recipient/${recipientId}`);
+}

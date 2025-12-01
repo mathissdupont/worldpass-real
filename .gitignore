@@ -32,3 +32,7 @@ __pycache__/
 !mobile/package-lock.json
 !mobile/app.json
 !mobile/tsconfig.json
+!worldpass-mobile/package.json
+!worldpass-mobile/package-lock.json
+!worldpass-mobile/app.json
+!worldpass-mobile/tsconfig.json

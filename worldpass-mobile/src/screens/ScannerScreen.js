@@ -15,6 +15,8 @@ import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatRelativeTime } from '../lib/time';
+import { parseQRData } from '../lib/qr';
+import { verifyVC } from '../lib/crypto';
 
 export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
@@ -124,65 +126,61 @@ export default function ScannerScreen() {
     setScanning(true);
 
     try {
-      console.log('QR raw data (first 200 chars):', String(data).slice(0, 200));
+      // Parse QR data to determine type
+      const parsed = parseQRData(data);
+      
+      if (parsed.type === 'credential') {
+        const vcData = parsed.data;
+        
+        // Verify the credential locally
+        const verifyResult = await verifyVC(vcData);
 
-      const vcData = extractVcFromPayload(data);
+        if (!verifyResult.valid) {
+          Alert.alert(
+            'Invalid Credential',
+            `Verification failed: ${verifyResult.reason}`,
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
 
-      if (!vcData) {
-        Alert.alert(
-          'Geçersiz QR',
-          'Bu QR, WorldPass tarafından beklenen credential formatında değil.',
-          [{ text: 'OK', onPress: resetScanner }],
-        );
-        return;
-      }
+        const subjectDid = vcData?.credentialSubject?.id;
+        if (subjectDid && subjectDid !== walletDid) {
+          Alert.alert(
+            'Wrong identity',
+            'This credential is not issued to your DID.',
+            [{ text: 'OK', onPress: resetScanner }]
+          );
+          return;
+        }
 
-      const subjectDid = vcData?.credentialSubject?.id;
-      if (subjectDid && subjectDid !== walletDid) {
-        Alert.alert(
-          'Yanlış kimlik',
-          'Bu credential senin DID’ine issued edilmemiş.',
-          [{ text: 'OK', onPress: resetScanner }],
-        );
-        return;
-      }
-
-      // Backend doğrulama
-      let result;
-      try {
-        result = await verifyCredential(vcData);
-      } catch (err) {
-        console.log('verifyCredential error:', err?.message);
-        const msg =
-          err?.message?.includes('404') || err?.message?.toLowerCase().includes('not found')
-            ? 'Sunucu bu credential’ı bulamadı veya bu QR eski bir format kullanıyor.'
-            : err?.message || 'Doğrulama isteği başarısız oldu.';
-        Alert.alert('Verification Error', msg, [
-          { text: 'OK', onPress: resetScanner },
-        ]);
-        return;
-      }
-
-      if (result.valid) {
+        // Add to wallet
         await addCredentialToWallet(vcData);
+        
         Alert.alert(
-          'Başarılı',
-          'Credential doğrulandı ve cüzdana kaydedildi!',
-          [{ text: 'OK', onPress: resetScanner }],
+          'Credential Added',
+          'The credential has been verified and added to your wallet.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else if (parsed.type === 'did') {
+        Alert.alert(
+          'DID Scanned',
+          `DID: ${parsed.data.did}`,
+          [{ text: 'OK', onPress: resetScanner }]
         );
       } else {
         Alert.alert(
-          'Verification Failed',
-          result.reason || 'Credential doğrulanamadı.',
-          [{ text: 'OK', onPress: resetScanner }],
+          'QR Code Scanned',
+          `Type: ${parsed.type}\nData: ${JSON.stringify(parsed.data).substring(0, 100)}`,
+          [{ text: 'OK', onPress: resetScanner }]
         );
       }
     } catch (error) {
-      console.error('Scanner error:', error);
+      console.error('Error processing QR code:', error);
       Alert.alert(
         'Error',
-        error.message || 'Credential işlenemedi.',
-        [{ text: 'OK', onPress: resetScanner }],
+        error.message || 'Failed to process QR code',
+        [{ text: 'OK', onPress: resetScanner }]
       );
     } finally {
       setScanning(false);
@@ -201,9 +199,9 @@ export default function ScannerScreen() {
     return (
       <View style={styles.identityContainer}>
         <Ionicons name="shield-outline" size={72} color={theme.colors.primary} />
-        <Text style={styles.identityTitle}>Kimlik olmadan tarama yapamazsın</Text>
+        <Text style={styles.identityTitle}>Identity Required</Text>
         <Text style={styles.identityText}>
-          Yeni bir DID oluştur veya var olan `.wpkeystore` dosyanı içe aktar ve ardından QR kodlarını taramaya başla.
+          Create a new DID or import an existing `.wpkeystore` file to start scanning QR codes.
         </Text>
         <View style={styles.identityActions}>
           <TouchableOpacity
@@ -211,7 +209,7 @@ export default function ScannerScreen() {
             onPress={() => navigation.navigate('IdentityCreate')}
           >
             <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.identityPrimaryText}>Kimlik Oluştur</Text>
+            <Text style={styles.identityPrimaryText}>Create Identity</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.identitySecondary}
@@ -219,14 +217,8 @@ export default function ScannerScreen() {
               navigation.navigate('Settings', { screen: 'IdentityImport' })
             }
           >
-            <Ionicons
-              name="cloud-upload-outline"
-              size={18}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.identitySecondaryText}>
-              .wpkeystore İçe Aktar
-            </Text>
+            <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
+            <Text style={styles.identitySecondaryText}>Import .wpkeystore</Text>
           </TouchableOpacity>
         </View>
       </View>

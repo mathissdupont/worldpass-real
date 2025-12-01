@@ -1,98 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Platform,
-  ActivityIndicator,
-  Alert,
-  ToastAndroid,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
+import QRCodeScanner from 'react-native-qrcode-scanner';
+import { ToastAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
 import { useTheme } from '../context/ThemeContext';
-import { verifyCredential } from '../lib/api';
+import { useIdentity } from '../context/IdentityContext';
+import { useWallet } from '../context/WalletContext';
+import { verifyVC } from '../lib/crypto';
 
-// NFC alma simülasyonu (gerçek NFC için native modül gerekir)
+// NFC simulation (real NFC requires native module)
 const receiveNfc = async (onResult) => {
   if (Platform.OS === 'android') {
-    setTimeout(() => {
-      if (onResult) onResult(true);
-    }, 800);
-    ToastAndroid.show('NFC alma simüle edildi', ToastAndroid.SHORT);
+    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
+    ToastAndroid.show('NFC receiving simulated', ToastAndroid.SHORT);
   } else {
-    Alert.alert(
-      'NFC',
-      'NFC alma şu an sadece Android cihazlarda simüle ediliyor.',
-    );
-    if (onResult) onResult(false);
+    alert('NFC receiving is only supported on Android devices.');
+    onResult && onResult(null);
   }
-};
-
-// VC özetini gösteren yardımcı render
-const renderCredentialSummary = (cred, styles) => {
-  if (!cred) return null;
-
-  const {
-    type,
-    issuer,
-    issuanceDate,
-    expirationDate,
-    credentialSubject,
-    status,
-  } = cred;
-
-  const typeLabel = Array.isArray(type)
-    ? type[type.length - 1]
-    : type || 'VerifiableCredential';
-
-  return (
-    <View style={styles.summaryCard}>
-      <Text style={styles.summaryTitle}>{typeLabel}</Text>
-
-      <Text style={styles.summaryLabel}>Issuer</Text>
-      <Text style={styles.summaryValue}>{issuer || '-'}</Text>
-
-      <Text style={styles.summaryLabel}>Holder</Text>
-      <Text style={styles.summaryValue}>
-        {credentialSubject?.id || credentialSubject?.subjectId || '-'}
-      </Text>
-
-      <Text style={styles.summaryLabel}>Issued</Text>
-      <Text style={styles.summaryValue}>
-        {issuanceDate
-          ? new Date(issuanceDate).toLocaleString()
-          : '-'}
-      </Text>
-
-      {expirationDate && (
-        <>
-          <Text style={styles.summaryLabel}>Expires</Text>
-          <Text style={styles.summaryValue}>
-            {new Date(expirationDate).toLocaleString()}
-          </Text>
-        </>
-      )}
-
-      {status && (
-        <>
-          <Text style={styles.summaryLabel}>Status</Text>
-          <Text
-            style={styles.summaryValue}
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {typeof status === 'object'
-              ? JSON.stringify(status)
-              : String(status)}
-          </Text>
-        </>
-      )}
-    </View>
-  );
 };
 
 export default function VerifyScreen() {
@@ -100,62 +24,66 @@ export default function VerifyScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [vcText, setVcText] = useState('');
-  const [parsedVC, setParsedVC] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null); // { type: 'success'|'error'|'info', message: string }
-
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [loadingVerify, setLoadingVerify] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  
+  // Verification function
   const handleVerify = async () => {
-    if (!vcText.trim()) {
-      setResult({
-        type: 'error',
-        message: 'Önce JSON verisini yapıştırmalısın.',
-      });
-      return;
-    }
-
-    let vc;
+    setLoadingVerify(true);
+    setVerifyResult(null);
+    
     try {
-      vc = JSON.parse(vcText);
-    } catch (e) {
-      setResult({
-        type: 'error',
-        message: 'Geçersiz JSON. Lütfen tam VC JSON’unu yapıştır.',
-      });
-      setParsedVC(null);
-      return;
-    }
+      // Parse the VC JSON
+      const vcObj = JSON.parse(vcText);
 
-    setLoading(true);
-    setResult(null);
+      // Use local crypto verification
+      const localResult = await verifyVC(vcObj);
 
-    try {
-      const resp = await verifyCredential(vc);
-      // Backend ScannerScreen’de resp.valid bekleniyordu
-      if (resp.valid) {
-        setResult({
-          type: 'success',
-          message: 'Credential geçerli olarak doğrulandı.',
+      if (localResult.valid) {
+        setVerifyResult({
+          valid: true,
+          issuer: localResult.issuer,
+          subject: localResult.subject,
+          reason: localResult.reason,
+          proof: vcObj.proof,
+          issuanceDate: vcObj.issuanceDate,
+          expirationDate: vcObj.expirationDate,
+          type: vcObj.type,
         });
-        setParsedVC(vc);
       } else {
-        setResult({
-          type: 'error',
-          message:
-            resp.reason ||
-            'Credential doğrulanamadı veya geçersiz.',
+        setVerifyResult({
+          valid: false,
+          reason: localResult.reason,
+          error: `Verification failed: ${localResult.reason}`,
         });
-        setParsedVC(vc);
       }
-    } catch (err) {
-      setResult({
-        type: 'error',
-        message:
-          err?.message ||
-          'Doğrulama isteği sırasında bir hata oluştu.',
+    } catch (e) {
+      setVerifyResult({ 
+        valid: false, 
+        error: 'Verification error: ' + e.message 
       });
-      setParsedVC(null);
-    } finally {
-      setLoading(false);
+    }
+    setLoadingVerify(false);
+  };
+  const { theme } = useTheme();
+  const { identity, linking } = useIdentity();
+  const { credentials } = useWallet();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const did = identity?.did;
+  const identityReady = Boolean(did);
+
+  const openScanner = () => {
+    navigation.navigate('VerifyScanner');
+  };
+
+  const openIdentity = (screen) => {
+    const parent = navigation.getParent?.();
+    if (screen) {
+      parent?.navigate('Settings', { screen });
+    } else {
+      parent?.navigate('Settings');
     }
   };
 
@@ -283,20 +211,118 @@ export default function VerifyScreen() {
           </TouchableOpacity>
         </View>
 
-        {parsedVC && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Özet</Text>
-            {renderCredentialSummary(parsedVC, styles)}
+        <View style={styles.metaRow}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Creds</Text>
+            <Text style={styles.metaValue}>{credentials.length}</Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>Kimlik</Text>
+            <Text style={styles.metaValue}>{identityReady ? 'Bağlı' : 'Eksik'}</Text>
+          </View>
+        </View>
+      </View>
 
-            <Text style={styles.sectionLabel}>Ham JSON</Text>
-            <ScrollView
-              style={styles.jsonContainer}
-              horizontal={true}
-            >
-              <Text style={styles.jsonText}>
-                {JSON.stringify(parsedVC, null, 2)}
-              </Text>
-            </ScrollView>
+      <View style={[styles.sectionCard, theme.shadows.card]}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Doğrulama</Text>
+          <Text style={styles.sectionSubtitle}>QR, NFC veya manuel JSON ile VC doğrula</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+          <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => setShowScanner(true)}>
+            <Ionicons name="qr-code" size={18} color="#fff" />
+            <Text style={styles.primaryButtonText}>QR Tara</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={() => {
+            setVerifyResult(null);
+            setVcText('');
+            receiveNfc(data => {
+              if (data) {
+                setVcText(data);
+                setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
+              } else {
+                setVerifyResult({ error: 'NFC ile veri alınamadı.' });
+              }
+            });
+          }}>
+            <Ionicons name="swap-horizontal" size={18} color={theme.colors.primary} />
+            <Text style={styles.secondaryButtonText}>NFC ile Al</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.metaLabel}>VC JSON</Text>
+        <TextInput
+          style={{ backgroundColor: '#f9f9f9', borderRadius: 8, padding: 10, minHeight: 80, textAlignVertical: 'top', marginBottom: 8 }}
+          value={vcText}
+          onChangeText={setVcText}
+          placeholder="VC JSON'u buraya yapıştır veya tara/NFC ile al"
+          multiline
+          numberOfLines={6}
+        />
+        <TouchableOpacity style={[styles.primaryButton, { marginBottom: 8 }]} onPress={handleVerify} disabled={loadingVerify || !vcText}>
+          <Text style={styles.primaryButtonText}>{loadingVerify ? 'Doğrulanıyor...' : 'Doğrula'}</Text>
+        </TouchableOpacity>
+        {showScanner && (
+          <QRCodeScanner
+            onRead={e => {
+              setVcText(e.data);
+              setShowScanner(false);
+              setVerifyResult({ info: 'QR ile veri alındı. JSON kutusuna yapıştırıldı.' });
+            }}
+            topContent={<Text>QR kodu tara</Text>}
+            bottomContent={
+              <TouchableOpacity onPress={() => setShowScanner(false)}>
+                <Text style={{ color: '#007aff', marginTop: 16 }}>Kapat</Text>
+              </TouchableOpacity>
+            }
+          />
+        )}
+        {verifyResult && (
+          <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: verifyResult.valid ? '#e0ffe0' : '#ffe0e0' }}>
+            {verifyResult.info && <Text style={{ color: '#007aff' }}>{verifyResult.info}</Text>}
+            {verifyResult.valid !== undefined && (
+              <>
+                <Text style={{ fontWeight: 'bold', color: verifyResult.valid ? 'green' : 'red', fontSize: 16, marginBottom: 8 }}>
+                  {verifyResult.valid ? '✅ Valid Credential' : '❌ Invalid Credential'}
+                </Text>
+                
+                {verifyResult.valid && verifyResult.proof && (
+                  <View style={{ marginTop: 8, padding: 8, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 12, marginBottom: 4 }}>Signature & Proof:</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Type: {verifyResult.proof.type}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Created: {verifyResult.proof.created}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>Verification Method: {verifyResult.proof.verificationMethod}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                      JWS: {verifyResult.proof.jws}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontFamily: 'monospace' }} numberOfLines={1} ellipsizeMode="middle">
+                      Issuer PK: {verifyResult.proof.issuer_pk_b64u}
+                    </Text>
+                  </View>
+                )}
+                
+                {verifyResult.valid && (
+                  <View style={{ marginTop: 8 }}>
+                    {verifyResult.issuer && (
+                      <Text style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                        Issuer: {verifyResult.issuer}
+                      </Text>
+                    )}
+                    {verifyResult.subject && (
+                      <Text style={{ fontSize: 11, fontFamily: 'monospace' }}>
+                        Subject: {verifyResult.subject}
+                      </Text>
+                    )}
+                    {verifyResult.issuanceDate && (
+                      <Text style={{ fontSize: 11 }}>
+                        Issued: {new Date(verifyResult.issuanceDate).toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+            {verifyResult.error && <Text style={{ color: 'red', marginTop: 4 }}>{verifyResult.error}</Text>}
           </View>
         )}
 
