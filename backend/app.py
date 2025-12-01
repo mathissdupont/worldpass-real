@@ -1220,8 +1220,13 @@ async def issuer_issue(
 
     # --- VC'yi imzala (proof ekle) ---
     # issuer'ın private key'i ve public key'i alınır
-    issuer_sk_b64u = issuer["sk_b64u"] if "sk_b64u" in issuer.keys() else None
-    issuer_pk_b64u = issuer["pk_b64u"] if "pk_b64u" in issuer.keys() else None
+    try:
+        issuer_sk_b64u = issuer["sk_b64u"]
+        issuer_pk_b64u = issuer["pk_b64u"]
+    except (KeyError, TypeError):
+        issuer_sk_b64u = None
+        issuer_pk_b64u = None
+    
     verification_method = f"{issuer['did']}#key-1"
     if not issuer_sk_b64u or not issuer_pk_b64u:
         raise HTTPException(status_code=500, detail="issuer_keys_missing")

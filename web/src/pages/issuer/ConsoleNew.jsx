@@ -138,7 +138,9 @@ export default function IssuerConsole() {
         throw new Error('Backend did not return a signed VC');
       }
 
-      setIssueSuccess('Credential issued successfully!');
+      // Show success with VC ID from signed credential
+      const vcId = signedVC.jti || signedVC.id || 'unknown';
+      setIssueSuccess(`Credential ${vcId} issued and signed successfully!`);
       setRecipientDID('');
       setCredentialType('');
       setCredentialData('{}');
