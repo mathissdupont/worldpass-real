@@ -377,21 +377,20 @@ export async function rotateIssuerApiKey() {
   return r.json();
 }
 
-export async function issueCredential(orgId, payload, token, templateId) {
+export async function issueCredential(payload, token, templateId) {
   const res = await fetch('/api/issuer/issue', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { 'X-Token': token } : {}),
     },
     body: JSON.stringify({
-      org_id: orgId,
-      payload,
+      vc: payload,
       template_id: templateId,
     }),
   });
 
-  // Her zaman önce text oku
+  // Always read text first
   const rawText = await res.text();
   let data = null;
 
@@ -399,20 +398,28 @@ export async function issueCredential(orgId, payload, token, templateId) {
     try {
       data = JSON.parse(rawText);
     } catch {
-      // JSON değilse data null kalsın
+      // If not JSON, keep data as null
     }
   }
 
   if (!res.ok) {
+    // Handle FastAPI validation errors (422)
+    if (res.status === 422 && data?.detail && Array.isArray(data.detail)) {
+      const errors = data.detail.map(err => `${err.loc.join('.')}: ${err.msg}`).join(', ');
+      console.error('Validation error details:', data.detail);
+      throw new Error(`Validation error: ${errors}`);
+    }
+    
     const message =
       (data && (data.detail || data.error || data.message)) ||
       rawText ||                           // "Internal Server Error" vs.
       `HTTP ${res.status}`;
 
+    console.error('Issue credential error:', { status: res.status, message, data });
     throw new Error(message);
   }
 
-  // Başarılıysa JSON döndüyse onu, yoksa boş obje dön
+  // If successful and JSON returned, use it, otherwise return empty object
   return data ?? {};
 }
 

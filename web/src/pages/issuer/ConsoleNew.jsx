@@ -129,7 +129,7 @@ export default function IssuerConsole() {
       };
 
       const token = localStorage.getItem('issuer_token');
-      const response = await issueCredential(null, vc, token, selectedTemplate?.id || null);
+      const response = await issueCredential(vc, token, selectedTemplate?.id || null);
       
       // ✅ IMPORTANT: Use the signed VC from the backend response
       const signedVC = response.vc;
