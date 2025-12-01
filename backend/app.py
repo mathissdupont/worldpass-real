@@ -8,6 +8,7 @@ import bcrypt
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
+import logging
 
 # Tamamı paket içi relative olsun:
 from backend.settings import settings
@@ -59,6 +60,9 @@ from typing import Optional
 import dns.resolver
 import httpx
 import pyotp
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -1204,8 +1208,11 @@ async def _ensure_issuer_keys(issuer: dict, db) -> dict:
     # Convert Row to dict if needed, then check for keys
     issuer_dict = dict(issuer)
     
-    # Check if keys already exist
-    if issuer_dict.get("sk_b64u") and issuer_dict.get("pk_b64u"):
+    # Check if keys already exist (explicit None checks to handle empty strings)
+    if (issuer_dict.get("sk_b64u") is not None and 
+        issuer_dict.get("pk_b64u") is not None and 
+        issuer_dict.get("sk_b64u") and 
+        issuer_dict.get("pk_b64u")):
         return issuer_dict
     
     # Generate new keypair
@@ -1213,7 +1220,7 @@ async def _ensure_issuer_keys(issuer: dict, db) -> dict:
     sk_b64u = b64u(sk_bytes)
     pk_b64u = b64u(pk_bytes)
     
-    # Update or generate DID if needed
+    # Generate or update DID if needed (use helper function for consistency)
     issuer_did = issuer_dict.get("did") or f"did:key:z{pk_b64u}"
     
     # Update database
@@ -1230,7 +1237,7 @@ async def _ensure_issuer_keys(issuer: dict, db) -> dict:
     issuer_dict["did"] = issuer_did
     issuer_dict["updated_at"] = now
     
-    print(f"[INFO] Auto-generated signing keys for issuer ID={issuer_dict['id']}, DID={issuer_did}")
+    logger.info(f"Auto-generated signing keys for issuer ID={issuer_dict['id']}, DID={issuer_did}")
     
     return issuer_dict
 
