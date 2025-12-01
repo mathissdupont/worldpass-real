@@ -71,13 +71,27 @@ export default function Credentials() {
       // Check if it's a single credential or a bundle
       let credentials = [];
       if (data.credentials && Array.isArray(data.credentials)) {
-        // Bundle format from export
-        credentials = data.credentials.map(c => c.credential || c);
+        // Bundle format from export - could be wrapped in {credential: ...} or direct
+        credentials = data.credentials.map(c => {
+          // Validate structure
+          if (typeof c !== 'object' || !c) {
+            throw new Error("Invalid credential in bundle");
+          }
+          // If wrapped, unwrap it; otherwise use as-is
+          return c.credential && typeof c.credential === 'object' ? c.credential : c;
+        });
       } else if (data['@context'] || data.type) {
         // Single credential
         credentials = [data];
       } else {
-        throw new Error("Invalid credential format");
+        throw new Error("Invalid credential format - missing @context or type");
+      }
+
+      // Validate each credential has required fields
+      for (const vc of credentials) {
+        if (!vc.type || !vc.issuer) {
+          throw new Error("Credential missing required fields (type or issuer)");
+        }
       }
 
       // Import each credential

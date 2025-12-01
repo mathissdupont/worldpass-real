@@ -242,14 +242,14 @@ export default function WalletScreen() {
       onPress: () => navigation.navigate('Scanner'),
     },
     {
-      key: 'import',
+      key: 'import-cred',
       label: 'İçe Aktar',
       icon: 'cloud-upload-outline',
       disabled: !hasIdentity,
       onPress: handleImport,
     },
     {
-      key: 'export',
+      key: 'export-cred',
       label: 'Dışa Aktar',
       icon: 'cloud-download-outline',
       disabled: !hasCredentials,
@@ -261,6 +261,13 @@ export default function WalletScreen() {
       icon: 'color-wand-outline',
       disabled: !hasCredentials,
       onPress: () => navigation.navigate('Present'),
+    },
+    {
+      key: 'backup',
+      label: 'Kimlik Yedek',
+      icon: 'key-outline',
+      disabled: false,
+      onPress: handleManageIdentity,
     },
   ];
 

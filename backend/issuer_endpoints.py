@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from typing import Optional
 import time
 import json
+import logging
 from backend.database import get_db
 from backend.schemas import (
     IssuerUpdateReq,
@@ -24,6 +25,7 @@ from backend.schemas import (
     IssuerProfileResp,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/issuer", tags=["issuer"])
 
 
@@ -283,7 +285,8 @@ async def export_all_credentials(
                 "status": row["status"],
                 "issued_at": row["created_at"]
             })
-        except:
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to parse credential {row.get('vc_id', 'unknown')}: {e}")
             continue
     
     # Create export bundle
@@ -390,7 +393,8 @@ async def download_credential(
     # Parse credential payload
     try:
         credential = json.loads(row["payload"])
-    except:
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode credential {vc_id}: {e}")
         raise HTTPException(status_code=500, detail="invalid_credential_payload")
     
     # Return as downloadable JSON file
