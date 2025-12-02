@@ -680,6 +680,65 @@ async def user_vc_delete(request: Request, body: UserVCDeleteReq, user=Depends(_
     return UserVCDeleteResp(ok=True)
 
 
+@app.get(f"{API}/user/vcs/export")
+@limiter.limit("10/minute")
+async def user_vc_export(request: Request, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Export all VCs for current user as JSON (bulk download)"""
+    from fastapi.responses import Response
+    
+    expected_did = (user["did"] or "").strip()
+    rows = await db.execute_fetchall(
+        "SELECT id, vc_id, subject_did, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? AND subject_did=? ORDER BY created_at DESC",
+        (user["id"], expected_did)
+    )
+    
+    vcs = []
+    for row in rows:
+        payload_str = row["vc_payload"] or ""
+        vc_payload = None
+
+        try:
+            # Decrypt the VC payload
+            if payload_str and vc_encryptor.is_encrypted(payload_str):
+                vc_payload = vc_encryptor.decrypt_vc(payload_str)
+            else:
+                # Legacy plain JSON format
+                vc_payload = json.loads(payload_str) if payload_str else None
+        except Exception:
+            # Try to recover from issued_vcs
+            recovery = await db.execute_fetchone(
+                "SELECT payload FROM issued_vcs WHERE vc_id=?",
+                (row["vc_id"],)
+            )
+            if recovery and recovery["payload"]:
+                try:
+                    vc_payload = json.loads(recovery["payload"])
+                except Exception:
+                    continue
+
+        if vc_payload:
+            vcs.append(vc_payload)
+    
+    # Create export bundle
+    export_data = {
+        "version": "1.0",
+        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "user_did": expected_did,
+        "credentials": vcs
+    }
+    
+    json_str = json.dumps(export_data, indent=2)
+    filename = f"credentials-{expected_did.split(':')[-1][:8]}-{int(time.time())}.json"
+    
+    return Response(
+        content=json_str,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
 # ---------- user profile management ----------
 @app.get(f"{API}/user/profile", response_model=UserProfileResp)
 @limiter.limit("30/minute")

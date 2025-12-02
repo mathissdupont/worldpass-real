@@ -1,13 +1,15 @@
 // src/pages/Credentials.jsx
 import VCList from "../components/VCList";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, Button, Badge, Alert, Toast as UIToast } from "../components/ui";
 import { t } from "../lib/i18n";
+import { exportUserCredentials, importUserCredential } from "../lib/api";
 
 export default function Credentials() {
   const [toast, setToast] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | loading | success | error
   const [refreshKey, setRefreshKey] = useState(0);
+  const fileInputRef = useRef(null);
 
   const showToast = (s, m) => {
     setStatus(s);
@@ -36,6 +38,88 @@ export default function Credentials() {
       setRefreshKey(k => k + 1);
     } catch (e) {
       showToast("error", t('revoke_failed') + ": " + (e?.message || t('unknown_error')));
+    }
+  }
+
+  async function handleBulkDownload() {
+    showToast("loading", "Exporting credentials...");
+    try {
+      const blob = await exportUserCredentials();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `credentials-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("success", "Credentials exported successfully!");
+    } catch (e) {
+      showToast("error", "Export failed: " + (e?.message || "Unknown error"));
+    }
+  }
+
+  async function handleImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    showToast("loading", "Importing credentials...");
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Check if it's a single credential or a bundle
+      let credentials = [];
+      if (data.credentials && Array.isArray(data.credentials)) {
+        // Bundle format from export - could be wrapped in {credential: ...} or direct
+        credentials = data.credentials.map(c => {
+          // Validate structure
+          if (typeof c !== 'object' || !c) {
+            throw new Error("Invalid credential in bundle");
+          }
+          // If wrapped, unwrap it; otherwise use as-is
+          return c.credential && typeof c.credential === 'object' ? c.credential : c;
+        });
+      } else if (data['@context'] || data.type) {
+        // Single credential
+        credentials = [data];
+      } else {
+        throw new Error("Invalid credential format - missing @context or type");
+      }
+
+      // Validate each credential has required fields
+      for (const vc of credentials) {
+        if (!vc.type || !vc.issuer) {
+          throw new Error("Credential missing required fields (type or issuer)");
+        }
+      }
+
+      // Import each credential
+      let successCount = 0;
+      let errorCount = 0;
+      for (const vc of credentials) {
+        try {
+          await importUserCredential(vc);
+          successCount++;
+        } catch (e) {
+          console.error("Failed to import credential:", e);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        showToast("success", `Imported ${successCount} credential(s)${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+        setRefreshKey(k => k + 1);
+      } else {
+        showToast("error", "Failed to import credentials");
+      }
+    } catch (e) {
+      showToast("error", "Import failed: " + (e?.message || "Invalid file format"));
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }
 
@@ -71,10 +155,45 @@ export default function Credentials() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Badge variant={getStatusBadgeVariant()}>
               {getStatusText()}
             </Badge>
+            
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              title="Import credentials"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span className="hidden sm:inline">Import</span>
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,.wpvc"
+              onChange={handleImport}
+              style={{ display: 'none' }}
+            />
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBulkDownload}
+              title="Export all credentials"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span className="hidden sm:inline">Export All</span>
+            </Button>
             
             <Button
               variant="secondary"

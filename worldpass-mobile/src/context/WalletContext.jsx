@@ -1,5 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getCredentials as loadStoredCredentials, addCredential as storeCredential, deleteCredential as removeStoredCredential, clearCredentials as wipeStoredCredentials } from '../lib/storage';
+import { 
+  getCredentials as loadStoredCredentials, 
+  addCredential as storeCredential, 
+  deleteCredential as removeStoredCredential, 
+  clearCredentials as wipeStoredCredentials,
+  exportCredentials as exportStoredCredentials,
+  importCredentials as importStoredCredentials
+} from '../lib/storage';
 import { useAuth } from './AuthContext';
 
 const WalletContext = createContext({
@@ -10,6 +17,8 @@ const WalletContext = createContext({
   addCredential: async () => {},
   deleteCredential: async () => {},
   clearWallet: async () => {},
+  exportCredentials: async () => {},
+  importCredentials: async () => {},
 });
 
 export function WalletProvider({ children }) {
@@ -79,6 +88,18 @@ export function WalletProvider({ children }) {
     setCredentials([]);
   }, []);
 
+  const exportCredentials = useCallback(async () => {
+    return await exportStoredCredentials();
+  }, []);
+
+  const importCredentials = useCallback(async (jsonString) => {
+    const result = await importStoredCredentials(jsonString);
+    if (result.success) {
+      setCredentials(result.credentials);
+    }
+    return result;
+  }, []);
+
   const value = useMemo(() => ({
     credentials,
     loading,
@@ -87,7 +108,9 @@ export function WalletProvider({ children }) {
     addCredential,
     deleteCredential,
     clearWallet,
-  }), [credentials, loading, error, refresh, addCredential, deleteCredential, clearWallet]);
+    exportCredentials,
+    importCredentials,
+  }), [credentials, loading, error, refresh, addCredential, deleteCredential, clearWallet, exportCredentials, importCredentials]);
 
   return (
     <WalletContext.Provider value={value}>

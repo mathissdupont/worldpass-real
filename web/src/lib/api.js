@@ -460,6 +460,68 @@ export async function revokeCredential(vcId) {
   return r.json();
 }
 
+// Export all user credentials as JSON
+export async function exportUserCredentials() {
+  const headers = buildUserHeaders();
+  const r = await fetch('/api/user/vcs/export', {
+    method: 'GET',
+    headers
+  });
+  if (!r.ok) {
+    throw new Error('export_failed');
+  }
+  return r.blob();
+}
+
+// Import/upload a credential to user's wallet
+export async function importUserCredential(vcData) {
+  const headers = buildUserHeaders({ 'Content-Type': 'application/json' });
+  const r = await fetch('/api/user/vcs/add', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ vc: vcData })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'import_failed');
+  }
+  return r.json();
+}
+
+// Download a single credential from issuer console
+export async function downloadIssuerCredential(vcId) {
+  const token = getIssuerToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const r = await fetch(`/api/issuer/credentials/${vcId}/download`, {
+    method: 'GET',
+    headers: {
+      'X-Token': token
+    }
+  });
+  if (!r.ok) {
+    throw new Error('download_failed');
+  }
+  return r.blob();
+}
+
+// Export all issuer credentials
+export async function exportIssuerCredentials() {
+  const token = getIssuerToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const r = await fetch('/api/issuer/credentials/export/all', {
+    method: 'GET',
+    headers: {
+      'X-Token': token
+    }
+  });
+  if (!r.ok) {
+    throw new Error('export_failed');
+  }
+  return r.blob();
+}
+
 export async function setup2FA() {
   const headers = buildUserHeaders();
   const r = await fetch('/api/auth/2fa/setup', {
