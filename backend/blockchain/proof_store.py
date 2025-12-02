@@ -8,7 +8,7 @@ The blockchain/ledger acts as a "proof layer", not a database.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 from pydantic import BaseModel
 import aiosqlite
@@ -132,7 +132,7 @@ class InMemoryBlockchainProofStore(BlockchainProofStore):
     """
 
     def __init__(self):
-        self._store: dict[str, VCOnChainRecord] = {}
+        self._store: Dict[str, VCOnChainRecord] = {}
 
     async def register_vc(self, vc_id: str, vc_hash: str, issuer_did: str) -> VCOnChainRecord:
         """Register a new VC hash in memory."""

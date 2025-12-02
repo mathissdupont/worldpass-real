@@ -130,10 +130,14 @@ async def revoke_vc(req: RevokeVCRequest, db=Depends(get_db)):
         
         logger.info(f"Revoked VC {req.vc_id} on blockchain ledger")
         
+        # revoked_at should always be set after successful revocation
+        if record.revoked_at is None:
+            raise HTTPException(status_code=500, detail="revocation_timestamp_missing")
+        
         return RevokeVCResponse(
             ok=True,
             vc_id=record.vc_id,
-            revoked_at=record.revoked_at  # type: ignore
+            revoked_at=record.revoked_at
         )
     except ValueError as e:
         logger.warning(f"VC revocation failed: {e}")

@@ -71,7 +71,8 @@ def test_blockchain_integration_full_flow(client):
     
     # 6. Issue a VC
     import time
-    jti = f"vc-blockchain-test-{int(time.time())}"
+    import uuid
+    jti = f"vc-blockchain-test-{uuid.uuid4().hex[:12]}"
     subject_did = "did:key:z6MkTestBlockchainSubject"
     
     vc_payload = {
