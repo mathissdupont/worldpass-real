@@ -53,6 +53,7 @@ from backend.oauth_endpoints import router as oauth_router
 from backend.issuer_endpoints import router as issuer_router
 from backend.payment_endpoints import router as payment_router
 from backend.mock_provider_routes import router as mock_provider_router
+from backend.blockchain.routes import router as blockchain_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -224,6 +225,54 @@ async def present_verify(payload: dict, db=Depends(get_db)):
         )
         await db.commit()
         raise HTTPException(status_code=401, detail="invalid_vc_signature")
+
+    # 3.5) Blockchain verification: Check VC hash matches on-chain record
+    jti = vc.get("jti")
+    if jti:
+        try:
+            from backend.blockchain.proof_store import SqliteBlockchainProofStore
+            from backend.blockchain.vc_hash import compute_vc_hash
+            
+            blockchain_store = SqliteBlockchainProofStore(db)
+            vc_hash = compute_vc_hash(vc)
+            
+            # Verify hash matches on-chain and VC is not revoked
+            hash_valid = await blockchain_store.verify_vc_hash(jti, vc_hash)
+            if not hash_valid:
+                # Check if VC exists on blockchain
+                on_chain_record = await blockchain_store.get_vc(jti)
+                if on_chain_record is None:
+                    # VC not registered on blockchain - this might be ok for legacy VCs
+                    logger.warning(f"VC {jti} not found on blockchain ledger")
+                elif on_chain_record.revoked_at is not None:
+                    # VC is revoked on blockchain
+                    logger.warning(f"VC {jti} is revoked on blockchain")
+                    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+                    await db.execute(
+                        "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (now, "present_verify", issuer or "", subject or "", "fail",
+                         json.dumps({"reason": "blockchain_revoked"})),
+                    )
+                    await db.commit()
+                    raise HTTPException(status_code=401, detail="vc_revoked_on_blockchain")
+                else:
+                    # Hash mismatch - VC has been tampered with
+                    logger.error(f"VC {jti} hash mismatch: computed={vc_hash}, on_chain={on_chain_record.vc_hash}")
+                    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+                    await db.execute(
+                        "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (now, "present_verify", issuer or "", subject or "", "fail",
+                         json.dumps({"reason": "blockchain_hash_mismatch"})),
+                    )
+                    await db.commit()
+                    raise HTTPException(status_code=401, detail="vc_hash_mismatch")
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Don't fail verification if blockchain check fails
+            logger.error(f"Blockchain verification error for VC {jti}: {e}")
 
     # 4) Revocation kontrolü (vc_status tablosı)
     jti = vc.get("jti")
@@ -1448,6 +1497,27 @@ async def issuer_issue(
                 print(f"Failed to auto-add VC to user wallet: {e}")
 
     await db.commit()
+    
+    # Register VC hash on blockchain proof ledger
+    try:
+        from backend.blockchain.proof_store import SqliteBlockchainProofStore
+        from backend.blockchain.vc_hash import compute_vc_hash
+        
+        blockchain_store = SqliteBlockchainProofStore(db)
+        vc_hash = compute_vc_hash(vc)
+        issuer_did = vc.get("issuer", issuer["did"] or "")
+        
+        # Register on blockchain (if not already registered)
+        try:
+            await blockchain_store.register_vc(jti, vc_hash, issuer_did)
+            logger.info(f"Registered VC {jti} on blockchain ledger with hash {vc_hash}")
+        except ValueError as e:
+            # Already exists, that's ok - just log it
+            logger.warning(f"VC {jti} already registered on blockchain: {e}")
+    except Exception as e:
+        # Don't fail the issuance if blockchain registration fails
+        logger.error(f"Failed to register VC on blockchain: {e}")
+    
     # Dispatch webhook event (async, non-blocking)
     try:
         await _dispatch_webhooks(db, issuer["id"], "credential.issued", {
@@ -1502,6 +1572,20 @@ async def issuer_revoke(
         (now, body.vc_id),
     )
     await db.commit()
+    
+    # Revoke on blockchain proof ledger
+    try:
+        from backend.blockchain.proof_store import SqliteBlockchainProofStore
+        
+        blockchain_store = SqliteBlockchainProofStore(db)
+        await blockchain_store.revoke_vc(body.vc_id)
+        logger.info(f"Revoked VC {body.vc_id} on blockchain ledger")
+    except ValueError as e:
+        # VC not found on blockchain - that's ok, might be a legacy VC
+        logger.warning(f"VC {body.vc_id} not found on blockchain for revocation: {e}")
+    except Exception as e:
+        # Don't fail the revocation if blockchain update fails
+        logger.error(f"Failed to revoke VC on blockchain: {e}")
     
     # Dispatch webhook event for revocation
     try:
@@ -1851,6 +1935,9 @@ app.include_router(payment_router, prefix="/api")
 
 # Mount Mock Payment Provider
 app.include_router(mock_provider_router)
+
+# Mount Blockchain router
+app.include_router(blockchain_router)
 
 # ---------- simple VC verify (no presentation) ----------
 @app.post(f"{API}/vc/verify", response_model=VerifyResp)
