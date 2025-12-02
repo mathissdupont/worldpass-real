@@ -5,7 +5,10 @@ import {
   StyleSheet,
   Alert,
   TouchableOpacity,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, Camera } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -119,23 +122,51 @@ export default function ScannerScreen() {
   };
 
   const handleBarCodeScanned = async ({ data }) => {
-    if (scanned || scanning) return;
-    if (!walletDid) return;
+    if (scanned || scanning) {
+      console.log('Scanner busy, ignoring scan');
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Scanner meşgul...', ToastAndroid.SHORT);
+      }
+      return;
+    }
+    if (!walletDid) {
+      console.log('No wallet DID, ignoring scan');
+      Alert.alert('Hata', 'Wallet DID bulunamadı!');
+      return;
+    }
 
+    console.log('🔍 QR Code scanned! Data length:', data?.length);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('QR tarandı! İşleniyor...', ToastAndroid.SHORT);
+    }
+    
     setScanned(true);
     setScanning(true);
 
     try {
       // Parse QR data to determine type
       const parsed = parseQRData(data);
+      console.log('📦 Parsed QR type:', parsed.type);
+      console.log('📄 Full parsed data:', JSON.stringify(parsed.data, null, 2));
       
       if (parsed.type === 'credential') {
         const vcData = parsed.data;
+        console.log('✅ Credential found!');
+        console.log('  Type:', vcData?.type);
+        console.log('  Issuer:', vcData?.issuer);
+        console.log('  Subject:', vcData?.credentialSubject?.id);
+        
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Credential bulundu! Doğrulanıyor...', ToastAndroid.LONG);
+        }
         
         // Verify the credential locally
+        console.log('🔐 Verifying credential...');
         const verifyResult = await verifyVC(vcData);
+        console.log('🔐 Verification result:', JSON.stringify(verifyResult, null, 2));
 
         if (!verifyResult.valid) {
+          setScanning(false);
           Alert.alert(
             'Invalid Credential',
             `Verification failed: ${verifyResult.reason}`,
@@ -145,7 +176,10 @@ export default function ScannerScreen() {
         }
 
         const subjectDid = vcData?.credentialSubject?.id;
+        console.log('Subject DID:', subjectDid, 'Wallet DID:', walletDid);
+        
         if (subjectDid && subjectDid !== walletDid) {
+          setScanning(false);
           Alert.alert(
             'Wrong identity',
             'This credential is not issued to your DID.',
@@ -155,20 +189,32 @@ export default function ScannerScreen() {
         }
 
         // Add to wallet
+        console.log('💾 Adding credential to wallet...');
         await addCredentialToWallet(vcData);
+        console.log('✅ Credential added successfully!');
         
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('✅ Credential eklendi!', ToastAndroid.LONG);
+        }
+        
+        setScanning(false);
         Alert.alert(
-          'Credential Added',
-          'The credential has been verified and added to your wallet.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          '✅ Credential Eklendi',
+          'Credential doğrulandı ve wallet\'a eklendi.',
+          [{ text: 'Tamam', onPress: () => {
+            resetScanner();
+            navigation.navigate('Wallet');
+          }}]
         );
       } else if (parsed.type === 'did') {
+        setScanning(false);
         Alert.alert(
           'DID Scanned',
           `DID: ${parsed.data.did}`,
           [{ text: 'OK', onPress: resetScanner }]
         );
       } else {
+        setScanning(false);
         Alert.alert(
           'QR Code Scanned',
           `Type: ${parsed.type}\nData: ${JSON.stringify(parsed.data).substring(0, 100)}`,
@@ -177,13 +223,12 @@ export default function ScannerScreen() {
       }
     } catch (error) {
       console.error('Error processing QR code:', error);
+      setScanning(false);
       Alert.alert(
         'Error',
         error.message || 'Failed to process QR code',
         [{ text: 'OK', onPress: resetScanner }]
       );
-    } finally {
-      setScanning(false);
     }
   };
 
@@ -197,7 +242,7 @@ export default function ScannerScreen() {
 
   if (identityMissing) {
     return (
-      <View style={styles.identityContainer}>
+      <SafeAreaView style={styles.identityContainer}>
         <Ionicons name="shield-outline" size={72} color={theme.colors.primary} />
         <Text style={styles.identityTitle}>Identity Required</Text>
         <Text style={styles.identityText}>
@@ -221,13 +266,13 @@ export default function ScannerScreen() {
             <Text style={styles.identitySecondaryText}>Import .wpkeystore</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!hasPermission) {
     return (
-      <View style={styles.stateContainer}>
+      <SafeAreaView style={styles.stateContainer}>
         <Ionicons name="camera-off" size={64} color={theme.colors.danger} />
         <Text style={styles.errorTitle}>Camera Access Required</Text>
         <Text style={styles.errorText}>
@@ -242,7 +287,7 @@ export default function ScannerScreen() {
             {requestingPermission ? 'Requesting...' : 'Grant Permission'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -303,18 +348,20 @@ export default function ScannerScreen() {
 
         <View style={styles.scanFrame} />
         <Text style={styles.instructions}>
-          {scanning ? 'Verifying...' : 'Align QR code within frame'}
+          {scanning ? 'İşleniyor...' : scanned ? 'QR kod tarandı!' : 'QR kodu kareye hizalayın'}
         </Text>
         <Text style={styles.helperText}>
-          Her credential ekledikten sonra keystore yedeğini güncellemeyi
-          unutma.
+          {scanned && !scanning
+            ? 'Yeni bir QR taramak için aşağıdaki butona basın'
+            : 'Credential ekledikten sonra keystore yedeğini güncellemeyi unutmayın'}
         </Text>
       </View>
 
       {scanned && !scanning && (
         <View style={styles.bottomBar}>
           <TouchableOpacity style={styles.rescanButton} onPress={resetScanner}>
-            <Text style={styles.rescanText}>Tap to Scan Again</Text>
+            <Ionicons name="scan" size={20} color="#fff" />
+            <Text style={styles.rescanText}>Tekrar Tara</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -429,10 +476,13 @@ const createStyles = (theme) =>
       padding: 20,
     },
     rescanButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
       backgroundColor: theme.colors.primary,
       padding: 16,
       borderRadius: 10,
-      alignItems: 'center',
+      justifyContent: 'center',
     },
     rescanText: {
       color: '#fff',

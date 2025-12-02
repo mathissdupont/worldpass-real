@@ -14,6 +14,7 @@ import {
   ToastAndroid,
   Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -234,6 +235,13 @@ export default function WalletScreen() {
   };
 
   const quickActions = [
+    {
+      key: 'test-qr',
+      label: '🧪 Test QR',
+      icon: 'flask-outline',
+      disabled: false,
+      onPress: () => navigation.navigate('TestQR'),
+    },
     {
       key: 'scan',
       label: 'QR Tara',
@@ -694,7 +702,7 @@ export default function WalletScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {error && (
         <View style={styles.errorBanner}>
           <Ionicons
@@ -813,7 +821,7 @@ export default function WalletScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
@@ -20,7 +21,7 @@ export default function VCQRScreen({ route, navigation }) {
 
   if (!credential) {
     return (
-      <View style={styles.errorContainer}>
+      <SafeAreaView style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={48} color="#ef4444" />
         <Text style={styles.errorText}>No credential provided</Text>
         <TouchableOpacity 
@@ -29,11 +30,12 @@ export default function VCQRScreen({ route, navigation }) {
         >
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  const vcData = JSON.stringify({ type: 'vc', jti: credential.jti, issuer: credential.issuer });
+  // QR'a tam credential datasını koy - scanner'ın parse edebilmesi için
+  const vcData = JSON.stringify(credential);
   const vcTypes = Array.isArray(credential.type) ? credential.type : [credential.type];
   const primaryType = vcTypes.find(t => t !== 'VerifiableCredential') || vcTypes[0] || 'Credential';
 
@@ -101,7 +103,8 @@ export default function VCQRScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* QR Code Card */}
       <View style={styles.qrCard}>
         <View style={styles.qrContainer}>
@@ -217,14 +220,18 @@ export default function VCQRScreen({ route, navigation }) {
           Share only with trusted parties for verification purposes.
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeContainer: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: 16,

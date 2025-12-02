@@ -25,6 +25,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import PresentScreen from '../screens/PresentLandingScreen';
 import VerifyScreen from '../screens/VerifyScreen';
 import IssuerScreen from '../screens/IssuerScreen';
+import TestQRScreen from '../screens/TestQRScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -68,6 +69,11 @@ function WalletStackScreen() {
         name="VCQR"
         component={VCQRScreen}
         options={{ title: 'Share Credential' }}
+      />
+      <WalletStack.Screen
+        name="TestQR"
+        component={TestQRScreen}
+        options={{ title: 'Test QR Code' }}
       />
       {/* 🔹 Wallet içinden navigation.navigate('Scanner') için ekledik */}
       <WalletStack.Screen
