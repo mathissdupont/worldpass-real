@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   meta TEXT
 );
 
+CREATE TABLE IF NOT EXISTS worldpass_blockchain_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vc_id TEXT UNIQUE NOT NULL,
+  vc_hash TEXT NOT NULL,
+  issuer_did TEXT NOT NULL,
+  issued_at INTEGER NOT NULL,
+  revoked_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
