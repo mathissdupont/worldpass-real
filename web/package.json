@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "argon2-browser": "^1.18.0",
+    "framer-motion": "^11.11.17",
     "jsqr": "^1.4.0",
+      "lucide-react": "^0.454.0",
     "monaco-editor": "^0.53.0",
     "qrcode": "^1.5.4",
     "react": "^19.1.1",
