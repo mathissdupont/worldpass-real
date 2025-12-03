@@ -4,27 +4,68 @@ import { loadVCs, removeVC } from "../lib/storage";
 import { t } from "../lib/i18n";
 import { qrToDataURL } from "../lib/qr";
 
+// --- Utility: Classname birleştirici ---
 function cx(...xs){ return xs.filter(Boolean).join(" "); }
 
-// Badge bileşeni (Ufak dokunuş: mobilde satır kaymasını önlemek için whitespace-nowrap)
+// --- Component: Badge (Etiket) ---
 function Badge({ tone="neutral", children }) {
   const map = {
-    neutral: "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)]",
-    ok:   "border-emerald-400/30 bg-[color:var(--panel-2)] text-emerald-300",
-    warn: "border-amber-400/30  bg-[color:var(--panel-2)] text-amber-300",
+    neutral: "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] opacity-70",
+    ok:   "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+    warn: "border-amber-500/20 bg-amber-500/10 text-amber-400",
   };
   return (
-    <span
-      className={cx(
-        "inline-flex items-center gap-1.5 text-[10px] sm:text-xs px-2 py-1 rounded-md border whitespace-nowrap",
-        map[tone]
-      )}
-    >
+    <span className={cx(
+      "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap",
+      map[tone]
+    )}>
       {children}
     </span>
   );
 }
 
+// --- Component: Filtre Butonu (Chip) ---
+function FilterChip({ active, children, onClick }){
+  return (
+    <button onClick={onClick} className={cx(
+      "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap",
+      active 
+       ? "bg-[color:var(--text)] text-[color:var(--bg)] border-transparent" 
+       : "bg-transparent border-[color:var(--border)] text-[color:var(--muted)] hover:bg-[color:var(--panel-2)]"
+    )}>
+      {children}
+    </button>
+  );
+}
+
+// --- Component: Aksiyon Butonu (Responsive: Mobilde sadece ikon) ---
+function ActionButton({ icon, label, onClick, highlight, tone }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cx(
+        "h-9 sm:h-10 flex-1 sm:flex-none flex items-center justify-center sm:px-4 rounded-lg border transition-all active:scale-95",
+        highlight 
+          ? "border-[color:var(--brand)]/30 bg-[color:var(--brand)]/10 text-[color:var(--brand)] shadow-[0_0_10px_-3px_var(--brand)]"
+          : tone === "danger"
+            ? "border-rose-500/20 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10"
+            : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--panel)]"
+      )}
+      title={label}
+    >
+      <span className="text-sm sm:mr-2">
+        {icon === "qr" && "◱"}
+        {icon === "download" && "⇩"}
+        {icon === "revoke" && "⚠"}
+        {icon === "trash" && "✕"}
+      </span>
+      {/* Mobilde hidden, sm (tablet/pc) ve üzeri inline */}
+      <span className="hidden sm:inline text-xs font-medium">{label}</span>
+    </button>
+  );
+}
+
+// --- MAIN PAGE COMPONENT ---
 export default function VCList({ onRevoke }) {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState("");
@@ -35,6 +76,7 @@ export default function VCList({ onRevoke }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 1. Verileri Yükle
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -56,6 +98,7 @@ export default function VCList({ onRevoke }) {
     return () => { cancelled = true; };
   }, []);
 
+  // 2. Filtreleme Mantığı (Arama Kutusu)
   const textFiltered = useMemo(() => {
     if (!filter.trim()) return list;
     const q = filter.trim().toLowerCase();
@@ -71,11 +114,19 @@ export default function VCList({ onRevoke }) {
     });
   }, [list, filter]);
 
+  // 3. Tip Filtreleme Mantığı (Chip'ler)
   const filtered = useMemo(() => {
     if (activeType === "all") return textFiltered;
     return textFiltered.filter(vc => getPrimaryType(vc) === activeType);
   }, [textFiltered, activeType]);
 
+  // 4. İstatistikler
+  const stats = useMemo(() => ({
+    total: list.length,
+    filtered: filtered.length,
+  }), [list, filtered]);
+
+  // 5. Tip Grupları (Facet)
   const typeFacets = useMemo(() => {
     const counts = new Map();
     list.forEach(vc => {
@@ -88,12 +139,7 @@ export default function VCList({ onRevoke }) {
       .map(([type, count]) => ({ type, count }));
   }, [list]);
 
-  const stats = useMemo(() => ({
-    total: list.length,
-    filtered: filtered.length,
-    issuers: new Set(list.map(v => v?.issuer).filter(Boolean)).size,
-  }), [list, filtered]);
-
+  // --- Yardımcı Fonksiyonlar ---
   function safeSort(arr){
     const list = Array.isArray(arr) ? arr : [];
     return [...list].sort((a,b) => {
@@ -109,7 +155,7 @@ export default function VCList({ onRevoke }) {
       const url = await qrToDataURL(data, { width: 256, errorCorrectionLevel: "M" });
       setQrOf({ jti: vc?.jti, issuer: vc?.issuer, dataUrl: url });
     }catch(e){
-      setMsg({ type: "err", text: "QR üretilemedi: " + (e?.message || e) });
+      setMsg({ type: "err", text: "QR üretilemedi." });
     }
   }
 
@@ -124,199 +170,178 @@ export default function VCList({ onRevoke }) {
 
   async function hardRemove(jti){
     if (!jti) return;
-    if (!confirm("Bu credential’ı listeden kaldırmak istediğine emin misin?")) return;
+    if (!confirm("Bu kimliği silmek istediğine emin misin?")) return;
     try {
       const updated = await removeVC(jti);
       setList(safeSort(updated));
       if (previewJti === jti) setPreviewJti(null);
-      setMsg({ type: "ok", text: "Credential kaldırıldı." });
+      setMsg({ type: "ok", text: "Silindi." });
     } catch (e) {
-      console.warn("hardRemove failed", e);
-      setMsg({ type: "err", text: "Credential kaldırılamadı." });
+      setMsg({ type: "err", text: "Hata oluştu." });
     }
   }
 
-  const copy = (txt, ok="Kopyalandı.", fail="Kopyalanamadı.") =>
+  const copy = (txt) =>
     navigator.clipboard.writeText(txt).then(
-      ()=> setMsg({type:"ok", text: ok}),
-      ()=> setMsg({type:"info", text: fail})
+      ()=> setMsg({type:"ok", text: "Kopyalandı"}),
+      ()=> setMsg({type:"err", text: "Hata"})
     );
 
+  // --- JSX RENDER ---
   return (
-    <section className="space-y-4 pb-20 sm:pb-0"> 
-      {/* Header Area */}
-      <div className="flex flex-col gap-4 rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] sm:text-[12px] uppercase tracking-[0.2em] text-[color:var(--muted)] font-bold">{t('wallet_overview')}</p>
-            <h2 className="text-xl sm:text-2xl font-bold mt-1">{t('my_credentials')}</h2>
-            <p className="text-[13px] text-[color:var(--muted)] mt-1 hidden sm:block">{t('credentials_intro')}</p>
+    <section className="flex flex-col gap-6 pb-24 sm:pb-0"> 
+      
+      {/* HEADER SECTION */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-end justify-between px-1">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--text)]">{t('my_credentials')}</h2>
+            <p className="text-xs text-[color:var(--muted)] hidden sm:block mt-1">{t('credentials_intro')}</p>
           </div>
-          <div className="w-full md:w-auto">
-            <input
-              value={filter}
-              onChange={(e)=>setFilter(e.target.value)}
-              placeholder={t('search_placeholder')}
-              className="h-10 w-full md:w-[240px] px-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] outline-none focus:ring-2 focus:ring-[color:var(--brand-2)] text-sm transition-all"
-            />
-          </div>
-        </div>
-
-        {/* IMPROVEMENT 1: Mobile Horizontal Scroll for Stats 
-           Mobilde alt alta 3 kart yerine, yana kaydırılabilir (snap-scroll) bir alan yaptık.
-        */}
-        <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 sm:overflow-visible no-scrollbar">
-          <div className="snap-start min-w-[85%] sm:min-w-0">
-             <StatCard label={t('total_credentials')} value={stats.total} helper={t('including_archived')} />
-          </div>
-          <div className="snap-start min-w-[85%] sm:min-w-0">
-             <StatCard label={t('filtered')} value={stats.filtered} helper={filter ? t('matching_filters') : t('showing_all')} />
-          </div>
-          <div className="snap-start min-w-[85%] sm:min-w-0">
-             <StatCard label={t('unique_issuers')} value={stats.issuers} helper={t('issuer_plural')} />
+          
+          {/* Stats - Minimal */}
+          <div className="flex gap-4 text-right">
+             <div className="hidden sm:block">
+                <div className="text-[10px] text-[color:var(--muted)] uppercase font-bold tracking-wider">Total</div>
+                <div className="font-mono text-lg">{stats.total}</div>
+             </div>
+             <div>
+                <div className="text-[10px] text-[color:var(--muted)] uppercase font-bold tracking-wider text-right sm:text-left">{t('filtered')}</div>
+                <div className="font-mono text-lg text-[color:var(--brand)]">{stats.filtered}</div>
+             </div>
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="relative group">
+          <input
+            value={filter}
+            onChange={(e)=>setFilter(e.target.value)}
+            placeholder={t('search_placeholder')}
+            className="w-full h-11 pl-4 pr-10 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] focus:ring-2 focus:ring-[color:var(--brand)]/50 focus:border-[color:var(--brand)] outline-none transition-all text-sm placeholder:text-[color:var(--muted)] shadow-sm"
+          />
+          <span className="absolute right-3 top-3 text-[color:var(--muted)] opacity-50 group-focus-within:opacity-100 transition-opacity">🔍</span>
+        </div>
+
+        {/* Filter Chips - Horizontal Scroll */}
         {typeFacets.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <FilterChip
-              active={activeType === "all"}
-              onClick={() => setActiveType("all")}
-            >
-              {t('all_types')} <span className="opacity-60 text-[0.9em] ml-1">{list.length}</span>
-            </FilterChip>
-            {typeFacets.map(({ type, count }) => (
-              <FilterChip
-                key={type}
-                active={activeType === type}
-                onClick={() => setActiveType(type)}
-              >
-                {type} <span className="opacity-60 text-[0.9em] ml-1">{count}</span>
-              </FilterChip>
-            ))}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+             <FilterChip active={activeType === "all"} onClick={() => setActiveType("all")}>
+                All Types
+             </FilterChip>
+             {typeFacets.map(({ type, count }) => (
+                <FilterChip key={type} active={activeType === type} onClick={() => setActiveType(type)}>
+                  {type} <span className="ml-1 opacity-50 text-[10px]">{count}</span>
+                </FilterChip>
+             ))}
           </div>
         )}
       </div>
 
+      {/* ERROR STATE */}
       {error && (
-        <div className="rounded-[var(--radius)] border border-rose-400/40 bg-rose-500/5 p-3 text-sm text-rose-200">
+        <div className="rounded-xl border border-rose-400/30 bg-rose-500/5 p-4 text-sm text-rose-300">
           {error}
         </div>
       )}
 
-      {/* Loading State */}
+      {/* LOADING STATE */}
       {loading && (
-        <div className="grid gap-3">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="animate-pulse rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4 h-32" />
-          ))}
+        <div className="flex flex-col gap-3 animate-pulse">
+           {[1,2,3].map(i => (
+             <div key={i} className="h-24 rounded-2xl bg-[color:var(--panel-2)] border border-[color:var(--border)] opacity-50"/>
+           ))}
         </div>
       )}
 
-      {/* Empty State */}
+      {/* EMPTY STATE */}
       {!loading && filtered.length === 0 && (
-        <div className="rounded-[var(--radius)] border border-dashed border-[color:var(--border)] bg-[color:var(--panel-2)] p-8 text-center flex flex-col items-center justify-center min-h-[200px]">
-          <div className="text-4xl mb-2 opacity-20">📇</div>
-          <div className="text-sm text-[color:var(--muted)]">{t('no_credentials_yet')}</div>
-          {filter && (
-            <button
-              onClick={() => { setFilter(""); setActiveType("all"); }}
-              className="mt-3 px-4 py-2 rounded-lg bg-[color:var(--panel)] border border-[color:var(--border)] text-xs font-medium hover:bg-[color:var(--panel-2)] transition-colors"
-            >
-              {t('clear_filters')}
-            </button>
-          )}
-        </div>
+         <div className="py-16 text-center border border-dashed border-[color:var(--border)] rounded-2xl opacity-60 flex flex-col items-center gap-3">
+            <div className="text-3xl">📇</div>
+            <div className="text-sm">{t('no_credentials_yet')}</div>
+         </div>
       )}
 
-      {/* Main List */}
-      <div className="grid gap-3">
+      {/* MAIN LIST */}
+      <div className="flex flex-col gap-3">
         {filtered.map((vc) => {
           const types = Array.isArray(vc?.type) ? vc.type : [vc?.type].filter(Boolean);
-          const title = [types?.find(t => t !== "VerifiableCredential") || types?.[0] || "VC"]
-            .filter(Boolean).join(", ");
+          const title = [types?.find(t => t !== "VerifiableCredential") || types?.[0] || "VC"].filter(Boolean).join(", ");
           const subjectLabel = vc?.credentialSubject?.name || vc?.credentialSubject?.id || "";
-          const issued = vc?.issuanceDate ? new Date(vc.issuanceDate).toLocaleString() : null;
+          const issuedShort = vc?.issuanceDate ? vc.issuanceDate.split('T')[0] : null;
 
           return (
-            <article key={vc?.jti || Math.random()} className="group relative rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel)] p-4 shadow-sm transition-all hover:border-[color:var(--brand-2)]/50">
-              <div className="flex flex-col gap-4">
-                
-                {/* Top Section: Icon + Text */}
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="shrink-0 h-12 w-12 rounded-xl bg-[color:var(--panel-2)] border border-[color:var(--border)] flex items-center justify-center text-base font-bold text-[color:var(--brand)] shadow-sm">
-                    {initials(subjectLabel || title)}
-                  </div>
-                  
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-                      <h3 className="text-sm sm:text-base font-semibold text-[color:var(--text)] leading-tight">
-                        {title}
-                      </h3>
-                      {subjectLabel && (
-                        <span className="hidden sm:inline text-[color:var(--muted)] text-sm">• {subjectLabel}</span>
-                      )}
-                    </div>
-                     {/* Mobile only subject label to save horizontal space on title */}
-                    {subjectLabel && <div className="sm:hidden text-xs text-[color:var(--text)] mb-1 opacity-90">{subjectLabel}</div>}
-
-                    <div className="flex flex-wrap gap-2 mb-2">
-                       {Array.isArray(types) && types.length > 0 && (
-                          <Badge tone="ok">{types[0] === "VerifiableCredential" && types[1] ? types[1] : types[0]}</Badge>
-                        )}
-                         <Badge tone="neutral">JTI: {short(vc?.jti, 4)}</Badge>
-                    </div>
-
-                    <div className="text-[11px] text-[color:var(--muted)] flex flex-wrap gap-x-3 gap-y-1">
-                       {issued && <span>{t('issued')}: <time className="text-[color:var(--text)] opacity-80">{issued.split(',')[0]}</time></span>}
-                       <span className="opacity-50 hidden sm:inline">|</span>
-                       <span>{t('issuer_label')}: <code className="font-mono text-[color:var(--text)] opacity-80">{short(vc?.issuer)}</code></span>
-                    </div>
-                  </div>
+            <article 
+              key={vc?.jti || Math.random()} 
+              className="relative flex flex-col sm:flex-row gap-4 p-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] shadow-sm hover:border-[color:var(--brand-2)]/40 transition-colors group"
+            >
+              {/* Left Side: Icon & Info */}
+              <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                {/* Avatar / Icon */}
+                <div className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[color:var(--panel-2)] to-[color:var(--panel)] border border-[color:var(--border)] flex items-center justify-center text-lg font-bold text-[color:var(--brand)] shadow-inner">
+                  {initials(subjectLabel || title)}
                 </div>
 
-                {/* Middle: Quick Actions (Copy / JSON) 
-                    IMPROVEMENT 3: Text Linkler yerine ufak touch-target butonlar
-                */}
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[color:var(--border)]/50">
-                   {vc?.jti && (
-                     <SmallAction onClick={()=>copy(vc.jti, t('jti_copied'))} label={t('copy_jti')} icon="📋" />
+                {/* Text Content */}
+                <div className="flex flex-col min-w-0 pt-0.5 w-full">
+                   <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold truncate leading-tight text-[color:var(--text)]">{title}</h3>
+                   </div>
+                   
+                   {/* Mobile: Sadece Subject Label (isim) göster */}
+                   {subjectLabel && (
+                     <p className="text-xs text-[color:var(--muted)] mt-0.5 truncate pr-2">{subjectLabel}</p>
                    )}
-                   {vc?.issuer && (
-                     <SmallAction onClick={()=>copy(vc.issuer, t('issuer_copied'))} label={t('copy_issuer')} icon="🏛️" />
-                   )}
-                   <SmallAction 
-                      onClick={()=>setPreviewJti(p => p === vc?.jti ? null : vc?.jti)} 
-                      label={previewJti === vc?.jti ? t('hide_json') : t('show_json')} 
-                      icon="{}" 
-                      active={previewJti === vc?.jti}
-                   />
-                </div>
 
-                {/* Bottom: Main Actions 
-                    IMPROVEMENT 2: Mobile için Grid Layout
-                    Mobilde butonlar 2 sütunlu grid, masaüstünde flex row.
-                */}
-                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-2 mt-1">
-                  <ActionButton icon="qr" label={t('show_qr')} onClick={() => showQR(vc)} highlight />
-                  <ActionButton icon="download" label={t('download')} onClick={() => downloadVC(vc)} />
-                  {vc?.jti && onRevoke && (
-                    <ActionButton icon="revoke" label={t('revoke')} onClick={() => onRevoke(vc.jti)} />
-                  )}
-                  <ActionButton icon="trash" label={t('remove')} onClick={() => hardRemove(vc?.jti)} tone="danger" />
+                   {/* Desktop: Ekstra metadata (Mobilde gizli) */}
+                   <div className="hidden sm:flex items-center gap-3 mt-2 text-[10px] text-[color:var(--muted)] uppercase tracking-wider font-medium">
+                      {issuedShort && <span>{issuedShort}</span>}
+                      {vc?.issuer && <span className="opacity-50">|</span>}
+                      {vc?.issuer && <span className="truncate max-w-[150px]">{short(vc.issuer)}</span>}
+                   </div>
+
+                   {/* Badges - Mobilde sadece Type, Desktopta JTI da var */}
+                   <div className="flex flex-wrap gap-2 mt-2 sm:mt-2">
+                      {types.length > 0 && <Badge tone="ok">{types.find(t=>t!=="VerifiableCredential") || "VC"}</Badge>}
+                      <div className="hidden sm:block"><Badge tone="neutral">JTI: {short(vc?.jti, 4)}</Badge></div>
+                   </div>
                 </div>
               </div>
 
-              {/* JSON Preview Panel */}
+              {/* Right/Bottom Side: Actions Bar */}
+              {/* Mobilde alt kısımda full genişlik, Masaüstünde sağda */}
+              <div className="flex items-center gap-2 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-[color:var(--border)]/50 sm:border-none">
+                 
+                 {/* Show JSON (Toggle) */}
+                 <button 
+                   onClick={()=>setPreviewJti(p => p === vc?.jti ? null : vc?.jti)}
+                   className={cx(
+                     "h-9 w-9 flex items-center justify-center rounded-lg border transition-colors shrink-0",
+                     previewJti === vc?.jti ? "bg-[color:var(--brand)] text-white border-transparent" : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--muted)] hover:text-[color:var(--text)]"
+                   )}
+                   title="Raw JSON"
+                 >
+                   <span className="text-[10px] font-mono">{`{}`}</span>
+                 </button>
+
+                 <div className="w-px h-6 bg-[color:var(--border)] mx-1 hidden sm:block"></div>
+
+                 <ActionButton icon="qr" label={t('show_qr')} onClick={() => showQR(vc)} highlight />
+                 <ActionButton icon="download" label={t('download')} onClick={() => downloadVC(vc)} />
+                 {onRevoke && <ActionButton icon="revoke" label={t('revoke')} onClick={() => onRevoke(vc.jti)} />}
+                 <ActionButton icon="trash" label={t('remove')} onClick={() => hardRemove(vc?.jti)} tone="danger" />
+              </div>
+
+              {/* JSON Expand Area */}
               {previewJti === vc?.jti && (
-                <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                   <div className="flex items-center justify-between text-[10px] text-[color:var(--muted)] mb-1 uppercase tracking-wider pl-1">
-                      <span>Raw Data</span>
-                      <button onClick={()=>copy(JSON.stringify(vc), "JSON kopyalandı")} className="hover:text-[color:var(--brand)]">COPY ALL</button>
+                <div className="absolute top-full left-0 right-0 z-10 mt-2 p-4 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel-2)] shadow-xl animate-in fade-in slide-in-from-top-2">
+                   <div className="flex justify-between items-center mb-2">
+                      <span className="text-[10px] uppercase font-bold text-[color:var(--muted)]">Raw Data</span>
+                      <button onClick={()=>copy(JSON.stringify(vc))} className="text-[10px] text-[color:var(--brand)] hover:underline font-bold">COPY JSON</button>
                    </div>
-                   <pre className="text-[10px] sm:text-xs font-mono bg-[color:var(--panel-2)] text-[color:var(--text)] border border-[color:var(--border)] rounded-xl p-4 max-h-80 overflow-auto shadow-inner">
-                    {JSON.stringify(vc, null, 2)}
-                  </pre>
+                   <pre className="text-[10px] font-mono max-h-60 overflow-auto whitespace-pre-wrap text-[color:var(--text)] opacity-80 break-all bg-[color:var(--panel)] p-2 rounded border border-[color:var(--border)]/50">
+                      {JSON.stringify(vc, null, 2)}
+                   </pre>
                 </div>
               )}
             </article>
@@ -324,153 +349,47 @@ export default function VCList({ onRevoke }) {
         })}
       </div>
 
-      {/* Toast Messages - Fixed bottom on mobile for better visibility */}
+      {/* --- TOAST NOTIFICATION --- */}
       {msg && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-xs px-4 animate-in slide-in-from-bottom-5 fade-in duration-300">
-           <div className={cx(
-             "text-sm font-medium text-center rounded-xl px-4 py-3 border shadow-lg backdrop-blur-md",
-             msg.type==="ok"
-               ? "border-emerald-500/30 bg-emerald-950/80 text-emerald-200"
-               : msg.type==="err"
-               ? "border-rose-500/30 bg-rose-950/80 text-rose-200"
-               : "border-[color:var(--border)] bg-[color:var(--panel)] text-[color:var(--text)]"
-           )}>
-             {msg.text}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full bg-[color:var(--panel)] border border-[color:var(--border)] text-[color:var(--text)] shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 min-w-[200px] justify-center backdrop-blur-md">
+          <span className={cx("text-lg", msg.type === 'ok' ? "text-emerald-400" : "text-rose-400")}>
+            {msg.type === 'ok' ? '✓' : '⚠'}
+          </span>
+          <span className="text-xs font-medium">{msg.text}</span>
+        </div>
+      )}
+
+      {/* --- QR MODAL --- */}
+      {qrOf && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={()=>setQrOf(null)}>
+           <div className="bg-[color:var(--panel)] border border-[color:var(--border)] p-6 rounded-3xl shadow-2xl flex flex-col items-center gap-4 max-w-sm w-full animate-in zoom-in-95" onClick={e=>e.stopPropagation()}>
+              <div className="flex w-full justify-between items-center">
+                 <h3 className="text-lg font-bold text-[color:var(--text)]">{t('vc_qr_title')}</h3>
+                 <button onClick={()=>setQrOf(null)} className="text-[color:var(--muted)] hover:text-[color:var(--text)]">✕</button>
+              </div>
+              
+              <div className="bg-white p-3 rounded-2xl shadow-inner border border-white/10">
+                 <img src={qrOf.dataUrl} className="w-56 h-56 object-contain" alt="Credential QR" />
+              </div>
+              
+              <div className="text-center space-y-1">
+                 <p className="text-sm font-medium text-[color:var(--text)] opacity-90">{t('scan_to_verify')}</p>
+                 <p className="text-xs text-[color:var(--muted)] font-mono">{short(qrOf.jti, 8)}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                 <button onClick={()=>copy(qrOf.dataUrl)} className="h-10 rounded-xl bg-[color:var(--panel-2)] border border-[color:var(--border)] text-xs font-medium hover:bg-[color:var(--border)] transition-colors">Copy URL</button>
+                 <button onClick={()=>setQrOf(null)} className="h-10 rounded-xl bg-[color:var(--brand)] text-white text-xs font-medium hover:opacity-90 transition-opacity">Done</button>
+              </div>
            </div>
         </div>
       )}
 
-      {/* QR Modal - Improved Mobile Sizing */}
-      {qrOf && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={()=>setQrOf(null)}>
-          <div className="w-full max-w-sm rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-5 shadow-2xl relative overflow-hidden" onClick={(e)=>e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">{t('vc_qr_title')}</h3>
-              <button onClick={()=>setQrOf(null)} className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-[color:var(--panel-2)] hover:bg-[color:var(--border)] transition-colors">✕</button>
-            </div>
-            
-            <div className="flex flex-col items-center gap-4">
-             <div className="bg-white p-3 rounded-xl shadow-inner">
-                <img src={qrOf.dataUrl} alt="VC QR" className="w-48 h-48 sm:w-56 sm:h-56 object-contain" />
-             </div>
-
-              <div className="text-xs text-center text-[color:var(--muted)] bg-[color:var(--panel-2)] p-3 rounded-lg w-full break-all border border-[color:var(--border)]">
-                 <div className="mb-1"><span className="font-semibold">{t('jti_label')}:</span> {short(qrOf.jti)}</div>
-                 <div><span className="font-semibold">{t('issuer_label')}:</span> {short(qrOf.issuer)}</div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 w-full">
-                <ActionButton icon="download" label={t('png')} onClick={()=>downloadDataUrl(qrOf.dataUrl, `${qrOf.jti || "vc"}.png`)} />
-                <ActionButton icon="qr" label={t('copy_url')} onClick={()=>copy(qrOf.dataUrl, t('qr_data_url_copied'))} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
 
-/* -------------- Sub Components & Helpers -------------- */
-
-// Küçük yardımcı butonlar (Copy JTI vb.)
-function SmallAction({ onClick, label, icon, active }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cx(
-        "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-colors border",
-        active 
-          ? "bg-[color:var(--brand)] text-white border-[color:var(--brand)]" 
-          : "bg-[color:var(--panel-2)] border-transparent text-[color:var(--muted)] hover:text-[color:var(--text)] hover:border-[color:var(--border)]"
-      )}
-    >
-      <span className="opacity-70">{icon}</span> {label}
-    </button>
-  )
-}
-
-function StatCard({ label, value, helper }){
-  return (
-    <div className="h-full rounded-[var(--radius)] border border-[color:var(--border)] bg-[color:var(--panel-2)] p-3 flex flex-col justify-between shadow-sm min-w-[140px]">
-      <p className="text-[10px] uppercase tracking-wide text-[color:var(--muted)] font-semibold">{label}</p>
-      <div className="text-2xl font-bold text-[color:var(--text)] my-1">{value}</div>
-      <p className="text-[10px] text-[color:var(--muted)] truncate">{helper}</p>
-    </div>
-  );
-}
-
-function FilterChip({ active, children, onClick }){
-  return (
-    <button
-      onClick={onClick}
-      className={cx(
-        "px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all",
-        active
-          ? "border-[color:var(--brand)] bg-[color:var(--brand)]/10 text-[color:var(--brand)] font-medium shadow-sm"
-          : "border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] hover:bg-[color:var(--panel)]"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-// Ana Aksiyon butonları (QR, İndir vs.)
-function ActionButton({ icon, label, onClick, highlight, tone }){
-  return (
-    <button
-      onClick={onClick}
-      className={cx(
-        "h-10 px-3 flex items-center justify-center sm:justify-start gap-2 rounded-lg border text-xs sm:text-sm font-medium transition-all active:scale-95",
-        highlight 
-          ? "border-[color:var(--brand)]/30 bg-[color:var(--brand)]/5 text-[color:var(--brand)] hover:bg-[color:var(--brand)]/10"
-          : tone === "danger"
-            ? "border-rose-500/20 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30"
-            : "border-[color:var(--border)] bg-[color:var(--panel-2)] hover:bg-[color:var(--panel)] text-[color:var(--text)]"
-      )}
-    >
-      <span className={cx("text-base", tone === "danger" ? "text-rose-400" : "text-[color:var(--muted)]")}>
-        {icon === "qr" && "◱"}
-        {icon === "download" && "⇩"}
-        {icon === "revoke" && "⚠"}
-        {icon === "trash" && "✕"}
-      </span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-/* Helpers */
-function short(s, n=10){
-  if (!s) return "-";
-  const t = String(s);
-  return t.length > 2*n ? `${t.slice(0,n)}…${t.slice(-n)}` : t;
-}
-
-function downloadDataUrl(dataUrl, filename){
-  fetch(dataUrl)
-    .then(r => r.blob())
-    .then(blob => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename || "qr.png";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    })
-    .catch(()=>{});
-}
-
-function getPrimaryType(vc){
-  const types = Array.isArray(vc?.type) ? vc.type : [vc?.type].filter(Boolean);
-  return types.find(t => t !== "VerifiableCredential") || types[0] || null;
-}
-
-function initials(text){
-  if (!text) return "VC";
-  const parts = text.split(/\s+/).filter(Boolean);
-  if (!parts.length) return text.slice(0,2).toUpperCase();
-  const first = parts[0][0] || "";
-  const last = parts[parts.length - 1][0] || "";
-  return (first + last).toUpperCase();
-}
+// --- Utils ---
+function short(s, n=10){ if (!s) return ""; const t = String(s); return t.length > 2*n ? `${t.slice(0,n)}...` : t; }
+function getPrimaryType(vc){ const types = Array.isArray(vc?.type) ? vc.type : [vc?.type].filter(Boolean); return types.find(t => t !== "VerifiableCredential") || types[0] || null; }
+function initials(text){ if (!text) return "VC"; const parts = text.split(/\s+/).filter(Boolean); return ((parts[0]?.[0]||"") + (parts[parts.length-1]?.[0]||"")).toUpperCase(); }

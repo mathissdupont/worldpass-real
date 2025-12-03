@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import IssuerLayout from "@/components/issuer/IssuerLayout";
 import { 
   getIssuerProfile, 
   listIssuerTemplates,
@@ -217,8 +216,8 @@ export default function IssuerTemplates() {
   }
 
   return (
-    <IssuerLayout issuer={issuer}>
-      <div className="space-y-6">
+    <div className="space-y-6">
+      {/* Page content */}
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -666,6 +665,6 @@ export default function IssuerTemplates() {
           </div>
         </div>
       )}
-    </IssuerLayout>
+    </div>
   );
 }

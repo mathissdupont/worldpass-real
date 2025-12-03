@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import IssuerLayout from "@/components/issuer/IssuerLayout";
 import DataTable from "@/components/issuer/DataTable";
 import { 
   getIssuerProfile, 
@@ -292,8 +291,7 @@ export default function IssuerAPIWebhooks() {
   ];
 
   return (
-    <IssuerLayout issuer={issuer}>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">API & Webhooks</h1>
@@ -591,6 +589,6 @@ export default function IssuerAPIWebhooks() {
           </div>
         </div>
       )}
-    </IssuerLayout>
+    </div>
   );
 }

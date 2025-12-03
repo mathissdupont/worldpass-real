@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import IssuerLayout from "@/components/issuer/IssuerLayout";
-import { getIssuerProfile, getIssuerCredentialDetail, revokeCredential, downloadIssuerCredential } from "@/lib/api";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getIssuerProfile, getIssuerCredentialDetail, revokeCredential, downloadIssuerCredential, createShareToken } from "@/lib/api";
+import MiniQR from "@/components/MiniQR";
 import { FiCheckCircle, FiXCircle, FiArrowLeft, FiCopy, FiAlertCircle, FiDownload } from "react-icons/fi";
 
 export default function IssuerCredentialDetail() {
   const navigate = useNavigate();
   const { vcId } = useParams();
+  const [searchParams] = useSearchParams();
   const [issuer, setIssuer] = useState(null);
   const [credential, setCredential] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,6 +16,13 @@ export default function IssuerCredentialDetail() {
   const [revoking, setRevoking] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [includeProof, setIncludeProof] = useState(true);
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedShortLink, setCopiedShortLink] = useState(false);
+  const [shareTokenData, setShareTokenData] = useState(null);
+  const [creatingShareToken, setCreatingShareToken] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -26,6 +34,13 @@ export default function IssuerCredentialDetail() {
     loadData(token);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, vcId]);
+
+  // Auto-open share modal if ?share=1 query param
+  useEffect(() => {
+    if (credential && searchParams.get('share') === '1' && !showShare) {
+      setShowShare(true);
+    }
+  }, [credential, searchParams, showShare]);
 
   const loadData = async (token) => {
     try {
@@ -93,6 +108,73 @@ export default function IssuerCredentialDetail() {
     }
   };
 
+  const vcForShare = useMemo(() => {
+    const vc = credential?.credential ?? null;
+    if (!vc) return null;
+    if (includeProof) return vc;
+    try {
+      const clone = JSON.parse(JSON.stringify(vc));
+      delete clone.proof;
+      return clone;
+    } catch {
+      return vc;
+    }
+  }, [credential, includeProof]);
+
+  const shareJson = useMemo(() => {
+    try {
+      return vcForShare ? JSON.stringify(vcForShare) : "";
+    } catch {
+      return "";
+    }
+  }, [vcForShare]);
+
+  const shareLink = useMemo(() => {
+    if (!shareJson) return "";
+    const base = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${base}/receive-info?json=${encodeURIComponent(shareJson)}`;
+  }, [shareJson]);
+
+  const handleCopyJson = async () => {
+    if (!shareJson) return;
+    try {
+      await navigator.clipboard.writeText(shareJson);
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 1800);
+    } catch {}
+  };
+
+  const handleCopyLink = async () => {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1800);
+    } catch {}
+  };
+
+  const handleGenerateShareToken = async () => {
+    setCreatingShareToken(true);
+    try {
+      const result = await createShareToken(vcId, includeProof, 24, 10);
+      setShareTokenData(result);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to create share token: " + err.message);
+    } finally {
+      setCreatingShareToken(false);
+    }
+  };
+
+  const handleCopyShortLink = async () => {
+    if (!shareTokenData?.share_url) return;
+    try {
+      await navigator.clipboard.writeText(shareTokenData.share_url);
+      setCopiedShortLink(true);
+      setTimeout(() => setCopiedShortLink(false), 1800);
+    } catch {}
+  };
+
   if (loading && !issuer) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -103,8 +185,7 @@ export default function IssuerCredentialDetail() {
 
   if (error) {
     return (
-      <IssuerLayout issuer={issuer}>
-        <div className="space-y-6">
+      <div className="space-y-6">
           <button
             onClick={() => navigate("/issuer/console/credentials")}
             className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
@@ -122,7 +203,7 @@ export default function IssuerCredentialDetail() {
             </div>
           </div>
         </div>
-      </IssuerLayout>
+      </div>
     );
   }
 
@@ -169,8 +250,7 @@ export default function IssuerCredentialDetail() {
   };
 
   return (
-    <IssuerLayout issuer={issuer}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Back Button */}
         <button
           onClick={() => navigate("/issuer/console/credentials")}
@@ -204,6 +284,12 @@ export default function IssuerCredentialDetail() {
             >
               <FiDownload className="h-4 w-4" />
               {downloading ? 'Downloading...' : 'Download'}
+            </button>
+            <button
+              onClick={() => setShowShare(true)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+            >
+              Share / QR
             </button>
             <StatusBadge status={credential.status} />
           </div>
@@ -331,6 +417,110 @@ export default function IssuerCredentialDetail() {
           </div>
         )}
       </div>
-    </IssuerLayout>
+      {/* Share Modal */}
+      {showShare && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowShare(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
+              <h3 className="text-xl font-semibold text-gray-900">Share Credential</h3>
+              <button onClick={() => setShowShare(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">×</button>
+            </div>
+            <div className="p-6 grid md:grid-cols-2 gap-6">
+              <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg p-6">
+                <div className="mb-4 bg-white p-4 rounded-lg shadow-sm">
+                  <MiniQR value={shareJson || ''} size={220} />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={includeProof} 
+                      onChange={(e) => setIncludeProof(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="font-medium">Include cryptographic proof</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="text-sm font-semibold text-gray-700">Credential JSON</label>
+                <textarea readOnly value={shareJson} className="w-full h-48 p-3 text-xs font-mono border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button 
+                    onClick={handleCopyJson} 
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    {copiedJson ? '✓ Copied!' : 'Copy JSON'}
+                  </button>
+                  <a 
+                    href={shareLink} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Open Receive Page
+                  </a>
+                  <button 
+                    onClick={handleCopyLink} 
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    {copiedLink ? '✓ Link Copied!' : 'Copy Link'}
+                  </button>
+                  {shareLink && (
+                    <a
+                      href={`mailto:?subject=Your%20WorldPass%20Credential&body=${encodeURIComponent(shareLink)}`}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      📧 Email Link
+                    </a>
+                  )}
+                </div>
+                
+                {/* Token-based short link */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-semibold text-gray-700">🔐 Secure Short Link</label>
+                    {!shareTokenData && (
+                      <button
+                        onClick={handleGenerateShareToken}
+                        disabled={creatingShareToken}
+                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium shadow-sm"
+                      >
+                        {creatingShareToken ? 'Creating...' : '+ Generate Link'}
+                      </button>
+                    )}
+                  </div>
+                  {shareTokenData ? (
+                    <div className="space-y-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <input
+                        readOnly
+                        value={shareTokenData.share_url}
+                        className="w-full p-3 text-xs font-mono border border-blue-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs text-blue-700 font-medium">⏱️ Valid for 24h · 🔢 Max 10 uses</span>
+                        <button
+                          onClick={handleCopyShortLink}
+                          className="px-3 py-1.5 text-xs border border-blue-300 bg-white rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                        >
+                          {copiedShortLink ? '✓ Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      💡 Generate a secure, token-based link that doesn't expose credential data in the URL
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-200 flex justify-end sticky bottom-0 bg-white">
+              <button onClick={() => setShowShare(false)} className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

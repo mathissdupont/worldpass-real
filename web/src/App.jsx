@@ -18,12 +18,13 @@ import ReceiveInfo from "./pages/ReceiveInfo";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
-import IssuerConsole from "./pages/issuer/Console";
-
-import IssuerCredentials from "./pages/issuer/Credentials";
+// New Issuer Console (consolidated)
+import IssuerDashboard from "./pages/issuer/console/Dashboard";
+import IssuerCredentials from "./pages/issuer/console/Credentials";
+import IssuerCredentialDetail from "./pages/issuer/console/CredentialDetail";
 import IssuerTemplates from "./pages/issuer/console/Templates";
-import IssuerSettings from "./pages/issuer/Settings";
-import IssuerWebhooks from "./pages/issuer/Webhooks";
+import IssuerSettings from "./pages/issuer/console/Settings";
+import IssuerWebhooks from "./pages/issuer/console/APIWebhooks";
 import IssuerLayout from "./components/IssuerLayout";
 import Verifier from "./pages/Verifier";
 import Present from "./pages/Present";
@@ -89,10 +90,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <Routes>
-        {/* Issuer Routes - Full page layout with their own navigation */}
-        {/* Dashboard kaldırıldı, tüm işlevler Console.jsx'te */}
+        {/* Issuer Console - consolidated routes */}
         <Route
-          path="/issuer/credentials"
+          path="/issuer/console"
+          element={
+            <IssuerLayout>
+              <IssuerDashboard />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/console/credentials"
           element={
             <IssuerLayout>
               <IssuerCredentials />
@@ -100,11 +108,23 @@ export default function App() {
           }
         />
         <Route
-          path="/issuer/templates"
-          element={<IssuerTemplates />}
+          path="/issuer/console/credentials/:id"
+          element={
+            <IssuerLayout>
+              <IssuerCredentialDetail />
+            </IssuerLayout>
+          }
         />
         <Route
-          path="/issuer/webhooks"
+          path="/issuer/console/templates"
+          element={
+            <IssuerLayout>
+              <IssuerTemplates />
+            </IssuerLayout>
+          }
+        />
+        <Route
+          path="/issuer/console/webhooks"
           element={
             <IssuerLayout>
               <IssuerWebhooks />
@@ -112,18 +132,10 @@ export default function App() {
           }
         />
         <Route
-          path="/issuer/settings"
+          path="/issuer/console/settings"
           element={
             <IssuerLayout>
               <IssuerSettings />
-            </IssuerLayout>
-          }
-        />
-        <Route
-          path="/issuer/console"
-          element={
-            <IssuerLayout>
-              <IssuerConsole />
             </IssuerLayout>
           }
         />
@@ -139,6 +151,12 @@ export default function App() {
                 id="main"
               >
                 <Routes>
+                  {/* Backward-compat redirects for legacy issuer paths */}
+                  <Route path="/issuer/dashboard" element={<Navigate to="/issuer/console" replace />} />
+                  <Route path="/issuer/credentials" element={<Navigate to="/issuer/console/credentials" replace />} />
+                  <Route path="/issuer/templates" element={<Navigate to="/issuer/console/templates" replace />} />
+                  <Route path="/issuer/webhooks" element={<Navigate to="/issuer/console/webhooks" replace />} />
+                  <Route path="/issuer/settings" element={<Navigate to="/issuer/console/settings" replace />} />
                   <Route path="/" element={<Navigate to="/account" replace />} />
 
                   {/* Public */}

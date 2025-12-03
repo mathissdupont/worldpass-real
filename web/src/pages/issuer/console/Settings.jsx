@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import IssuerLayout from "@/components/issuer/IssuerLayout";
 import { getIssuerProfile, updateIssuerProfile } from "@/lib/api";
 import { FiSave, FiCheckCircle } from "react-icons/fi";
 
@@ -123,8 +122,7 @@ export default function IssuerSettings() {
   ];
 
   return (
-    <IssuerLayout issuer={issuer}>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
@@ -334,6 +332,6 @@ export default function IssuerSettings() {
           </div>
         </div>
       </div>
-    </IssuerLayout>
+    </div>
   );
 }

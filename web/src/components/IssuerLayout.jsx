@@ -124,12 +124,11 @@ export default function IssuerLayout({ children }) {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            <NavItem to="/issuer/dashboard" icon="📊" label="Dashboard" onClick={() => setSidebarOpen(false)} />
-            <NavItem to="/issuer/console" icon="✨" label="Kimlik Oluştur" onClick={() => setSidebarOpen(false)} />
-            <NavItem to="/issuer/credentials" icon="📋" label="Kimlik Geçmişi" onClick={() => setSidebarOpen(false)} />
-            <NavItem to="/issuer/templates" icon="📄" label="Şablonlar" onClick={() => setSidebarOpen(false)} />
-            <NavItem to="/issuer/webhooks" icon="⚡" label="Webhooks" onClick={() => setSidebarOpen(false)} />
-            <NavItem to="/issuer/settings" icon="⚙️" label="Ayarlar" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console" icon="📊" label="Dashboard" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console/credentials" icon="📋" label="Kimlikler" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console/templates" icon="📄" label="Şablonlar" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console/webhooks" icon="⚡" label="Webhooks" onClick={() => setSidebarOpen(false)} />
+            <NavItem to="/issuer/console/settings" icon="⚙️" label="Ayarlar" onClick={() => setSidebarOpen(false)} />
           </nav>
 
           {/* User Footer */}

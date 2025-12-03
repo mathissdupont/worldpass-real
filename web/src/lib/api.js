@@ -650,3 +650,38 @@ export async function listTransactions(status = null) {
   if (!r.ok) throw new Error('list_transactions_failed');
   return r.json();
 }
+
+// Share Token API (Issuer)
+export async function createShareToken(vcId, includeProof = true, ttlHours = 24, maxUses = 1) {
+  const token = getIssuerToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const params = new URLSearchParams({
+    include_proof: String(includeProof),
+    ttl_hours: String(ttlHours),
+    max_uses: String(maxUses)
+  });
+  
+  const r = await fetch(`/api/issuer/credentials/${vcId}/share-token?${params.toString()}`, {
+    method: 'POST',
+    headers: {
+      'X-Token': token
+    }
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'create_share_token_failed');
+  }
+  return r.json();
+}
+
+export async function getCredentialByShareToken(shareToken) {
+  const r = await fetch(`/api/issuer/share-token/${shareToken}`, {
+    method: 'GET'
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'get_credential_by_token_failed');
+  }
+  return r.json();
+}

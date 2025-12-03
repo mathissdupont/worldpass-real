@@ -1,5 +1,6 @@
 // web/src/pages/ReceiveInfo.jsx
 import { useState, useRef, useEffect, useCallback } from "react";
+import { importUserCredential } from "@/lib/api";
 import jsQR from "jsqr"; // QR okuma yedeği için şart
 import { qrToDataURL } from "../lib/qr"; // Eğer projenizde varsa, yoksa silebilirsiniz
 
@@ -80,6 +81,48 @@ export default function ReceiveInfo() {
   // Refs for NFC logic
   const ndefRef = useRef(null);
   const nfcAbortRef = useRef(null);
+
+  // Token-based credential retrieval
+  async function fetchCredentialByToken(token) {
+    setMsg({ type: "info", text: "Token ile kimlik bilgisi getiriliyor..." });
+    try {
+      const response = await fetch(`/api/issuer/share-token/${token}`);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "token_fetch_failed" }));
+        throw new Error(error.detail || "token_fetch_failed");
+      }
+      const data = await response.json();
+      if (data.ok && data.vc) {
+        const vcJson = JSON.stringify(data.vc);
+        setJsonText(vcJson);
+        setInfo(data.vc);
+        setMsg({ type: "ok", text: "Kimlik bilgisi başarıyla token ile alındı." });
+      } else {
+        throw new Error("invalid_response");
+      }
+    } catch (err) {
+      setMsg({ type: "err", text: "Token hatası: " + (err.message || "bilinmeyen") });
+      setInfo(null);
+    }
+  }
+
+  // URL param'dan otomatik doldurma (json veya token)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const jsonParam = params.get('json');
+      const tokenParam = params.get('token');
+      
+      if (tokenParam && tokenParam.length > 0) {
+        // Token-based retrieval (preferred for security)
+        fetchCredentialByToken(tokenParam);
+      } else if (jsonParam && jsonParam.length > 0) {
+        // Legacy JSON param
+        setJsonText(jsonParam);
+        processData(jsonParam);
+      }
+    } catch {}
+  }, []);
 
   // Temizlik (Cleanup)
   useEffect(() => {
@@ -413,6 +456,24 @@ export default function ReceiveInfo() {
                           {JSON.stringify(info, null, 2)}
                        </pre>
                     </div>
+
+                  {/* Wallet'e ekleme */}
+                  <div className="mt-3 flex items-center gap-3">
+                   <Button
+                    variant="primary"
+                    onClick={async () => {
+                      try {
+                       await importUserCredential(info);
+                       setMsg({ type: 'ok', text: 'Kimlik bilgisi cüzdanınıza eklendi.' });
+                      } catch (e) {
+                       setMsg({ type: 'err', text: 'Ekleme başarısız: ' + (e?.message || 'hata') });
+                      }
+                    }}
+                   >
+                    Cüzdanıma Ekle
+                   </Button>
+                   <span className="text-xs text-[color:var(--muted)]">Oturum açmış olmanız gerekir.</span>
+                  </div>
 
                     {/* Veri Özeti (Opsiyonel - Eğer standart bir yapıysa güzel görünür) */}
                     {typeof info === 'object' && !Array.isArray(info) && (

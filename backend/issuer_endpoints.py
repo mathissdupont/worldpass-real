@@ -48,6 +48,154 @@ async def _get_current_issuer_from_dep(x_token: Optional[str] = Header(None), db
     return await _get_current_issuer(x_token=x_token, db=db)
 
 
+# ---------- Share Token Management (Short-Lived Credential Sharing) ----------
+@router.post("/credentials/{vc_id}/share-token")
+async def create_share_token(
+    vc_id: str,
+    include_proof: bool = Query(True),
+    ttl_hours: int = Query(24, ge=1, le=168),  # 1 hour to 7 days
+    max_uses: int = Query(1, ge=1, le=100),
+    issuer=Depends(_get_current_issuer_from_dep),
+    db=Depends(get_db)
+):
+    """
+    Create a short-lived share token for a credential.
+    
+    This allows issuers to generate a secure link that can be shared with recipients
+    without embedding the full VC JSON in the URL. The token expires after TTL or max uses.
+    
+    Args:
+        vc_id: Credential ID to share
+        include_proof: Whether to include proof in shared VC
+        ttl_hours: Time to live in hours (1-168, default 24)
+        max_uses: Maximum number of times the token can be used (1-100, default 1)
+        issuer: Current authenticated issuer
+        db: Database connection
+        
+    Returns:
+        {ok: true, token: str, share_url: str, expires_at: int}
+    """
+    import secrets
+    import time
+    
+    # Verify credential belongs to this issuer
+    row = await db.execute_fetchone(
+        "SELECT id FROM issued_vcs WHERE vc_id=? AND issuer_id=?",
+        (vc_id, issuer["id"])
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="credential_not_found_or_not_yours")
+    
+    # Generate secure token
+    token = secrets.token_urlsafe(24)
+    now = int(time.time())
+    expires_at = now + (ttl_hours * 3600)
+    
+    # Store token
+    await db.execute(
+        """
+        INSERT INTO share_tokens (token, vc_id, issuer_id, include_proof, max_uses, used_count, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+        """,
+        (token, vc_id, issuer["id"], 1 if include_proof else 0, max_uses, now, expires_at)
+    )
+    await db.commit()
+    
+    # Build share URL
+    from backend.settings import settings
+    base_url = settings.CORS_ORIGINS.split(",")[0].strip()
+    share_url = f"{base_url}/receive-info?token={token}"
+    
+    return {
+        "ok": True,
+        "token": token,
+        "share_url": share_url,
+        "expires_at": expires_at,
+        "max_uses": max_uses
+    }
+
+
+@router.get("/share-token/{token}")
+async def get_credential_by_token(
+    token: str,
+    db=Depends(get_db)
+):
+    """
+    Retrieve a credential using a share token.
+    
+    This endpoint is called by recipients when they follow a share link.
+    It validates the token, increments usage count, and returns the credential.
+    
+    Args:
+        token: Share token from URL
+        db: Database connection
+        
+    Returns:
+        {ok: true, vc: dict}
+    """
+    import time
+    import json
+    
+    now = int(time.time())
+    
+    # Get token info
+    token_row = await db.execute_fetchone(
+        """
+        SELECT token, vc_id, issuer_id, include_proof, max_uses, used_count, expires_at
+        FROM share_tokens
+        WHERE token=?
+        """,
+        (token,)
+    )
+    
+    if not token_row:
+        raise HTTPException(status_code=404, detail="token_not_found")
+    
+    # Check expiration
+    if token_row["expires_at"] < now:
+        raise HTTPException(status_code=410, detail="token_expired")
+    
+    # Check usage limit
+    if token_row["used_count"] >= token_row["max_uses"]:
+        raise HTTPException(status_code=429, detail="token_max_uses_exceeded")
+    
+    # Get credential
+    vc_row = await db.execute_fetchone(
+        """
+        SELECT payload FROM issued_vcs
+        WHERE vc_id=? AND issuer_id=?
+        """,
+        (token_row["vc_id"], token_row["issuer_id"])
+    )
+    
+    if not vc_row:
+        raise HTTPException(status_code=404, detail="credential_not_found")
+    
+    # Parse VC
+    try:
+        vc = json.loads(vc_row["payload"])
+    except:
+        raise HTTPException(status_code=500, detail="invalid_credential_payload")
+    
+    # Remove proof if requested
+    if not token_row["include_proof"]:
+        vc_copy = json.loads(json.dumps(vc))  # Deep copy
+        vc_copy.pop("proof", None)
+        vc = vc_copy
+    
+    # Increment usage count
+    await db.execute(
+        "UPDATE share_tokens SET used_count = used_count + 1 WHERE token=?",
+        (token,)
+    )
+    await db.commit()
+    
+    return {
+        "ok": True,
+        "vc": vc
+    }
+
+
 # ---------- Issuer Profile & Settings ----------
 @router.patch("/me")
 async def update_issuer_profile(

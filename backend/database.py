@@ -203,6 +203,21 @@ CREATE TABLE IF NOT EXISTS tmp_payloads (
   expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS share_tokens (
+  token TEXT PRIMARY KEY,
+  vc_id TEXT NOT NULL,
+  issuer_id INTEGER NOT NULL,
+  include_proof INTEGER NOT NULL DEFAULT 1,
+  max_uses INTEGER NOT NULL DEFAULT 1,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  FOREIGN KEY(issuer_id) REFERENCES issuers(id),
+  FOREIGN KEY(vc_id) REFERENCES issued_vcs(vc_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_tokens_vc_id ON share_tokens(vc_id);
+
 CREATE TABLE IF NOT EXISTS user_did_rotations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -409,5 +424,27 @@ async def _run_migrations(conn: aiosqlite.Connection):
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_vcs_subject_did ON user_vcs(subject_did)")
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_did_rotations_user_id ON user_did_rotations(user_id)")
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_did_rotations_status ON user_did_rotations(status)")
+
+    # Ensure share_tokens table exists for older DBs
+    try:
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS share_tokens (
+              token TEXT PRIMARY KEY,
+              vc_id TEXT NOT NULL,
+              issuer_id INTEGER NOT NULL,
+              include_proof INTEGER NOT NULL DEFAULT 1,
+              max_uses INTEGER NOT NULL DEFAULT 1,
+              used_count INTEGER NOT NULL DEFAULT 0,
+              created_at INTEGER NOT NULL,
+              expires_at INTEGER NOT NULL,
+              FOREIGN KEY(issuer_id) REFERENCES issuers(id),
+              FOREIGN KEY(vc_id) REFERENCES issued_vcs(vc_id)
+            );
+            """
+        )
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_share_tokens_vc_id ON share_tokens(vc_id)")
+    except Exception as e:
+        print(f"Migration warning: Could not ensure share_tokens table: {e}")
 
     await conn.commit()
