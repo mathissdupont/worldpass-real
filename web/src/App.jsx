@@ -41,6 +41,8 @@ import TransactionsPage from "./pages/pay/TransactionsPage";
 import { getSession } from "./lib/auth";
 import { listOrgs } from "./lib/issuerStore.js";
 import { pageview } from "./lib/evt";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 export default function App() {
   const location = useLocation();
@@ -182,6 +184,8 @@ export default function App() {
                   {/* Public */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
                   <Route path="/verify" element={<Verify />} />
                   <Route path="/verifier" element={<Verifier />} />
                   <Route path="/admin/login" element={<AdminLogin />} />

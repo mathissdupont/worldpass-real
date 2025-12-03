@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/worldpass.db")
     CHALLENGE_TTL_SECONDS: int = 180
-    ADMIN_USER: str = os.getenv("ADMIN_USER", "admin")
-    ADMIN_PASS_HASH: str = os.getenv("ADMIN_PASS_HASH", "$2b$12$rV305vOf0QA17Bq1o4WrPOzsfWpI7y9cSviK5zl3JHcEXqLRjDq4u")  # bcrypt hash
+    ADMIN_USER: str = os.getenv("ADMIN_USER", "mathissdupont")
+    ADMIN_PASS_HASH: str = os.getenv("ADMIN_PASS_HASH", "$2b$12$HFVLw.RWOZRJunjsZBEdN.CC.mkh4uoOiaMLRh2k2JNEHKq30g/X6")  # bcrypt hash
     
     # JWT Secret - must be set in production
     JWT_SECRET: str = os.getenv("JWT_SECRET", "")

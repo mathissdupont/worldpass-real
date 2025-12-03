@@ -791,15 +791,30 @@ const Footer = () => {
           {[
             {
               title: "Ürün",
-              links: ["Özellikler", "Güvenlik", "Nasıl Çalışır?", "Yol Haritası"]
+              links: [
+                { name: "Özellikler", href: "#features" },
+                { name: "Güvenlik", href: "#security" },
+                { name: "Nasıl Çalışır?", href: "#how-it-works" },
+                { name: "Yol Haritası", href: "#" }
+              ]
             },
             {
               title: "Ekip & Topluluk",
-              links: ["Hakkımızda", "Blog (yakında)", "Katkıda Bulun", "İletişim"]
+              links: [
+                { name: "Hakkımızda", href: "#" },
+                { name: "Blog (yakında)", href: "#" },
+                { name: "Katkıda Bulun", href: "#" },
+                { name: "İletişim", href: "#" }
+              ]
             },
             {
               title: "Yasal & Şeffaflık",
-              links: ["Gizlilik Yaklaşımı", "Kullanım Koşulları (taslak)", "Teknik Dokümanlar", "Açık Kaynak Planı"]
+              links: [
+                { name: "Gizlilik Yaklaşımı", href: "/privacy" },
+                { name: "Kullanım Koşulları (taslak)", href: "/terms" },
+                { name: "Teknik Dokümanlar", href: "#" },
+                { name: "Açık Kaynak Planı", href: "#" }
+              ]
             }
           ].map((col, i) => (
             <div key={i}>
@@ -808,18 +823,10 @@ const Footer = () => {
                 {col.links.map((link, j) => (
                   <li key={j}>
                     <a
-                      href={
-                        link === "Gizlilik Yaklaşımı"
-                          ? "/PRIVACY_POLICY.md"
-                          : link === "Kullanım Koşulları (taslak)"
-                          ? "/TERMS_OF_USE.md"
-                          : "#"
-                      }
-                      target={link === "Gizlilik Yaklaşımı" || link === "Kullanım Koşulları (taslak)" ? "_blank" : undefined}
-                      rel={link === "Gizlilik Yaklaşımı" || link === "Kullanım Koşulları (taslak)" ? "noopener noreferrer" : undefined}
+                      href={link.href}
                       className="text-gray-500 hover:text-white text-sm transition-colors"
                     >
-                      {link}
+                      {link.name}
                     </a>
                   </li>
                 ))}
