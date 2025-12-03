@@ -671,7 +671,12 @@ const FAQ = () => {
     }
   ];
 
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState(null);
+  const handleToggle = (index) => {
+    const nextIndex = openIndex === index ? null : index;
+    setOpenIndex(nextIndex);
+    track('faq_toggle', { index, open: nextIndex === index });
+  };
 
   return (
     <section id="faq" className="py-24 bg-zinc-950 relative overflow-hidden">
@@ -693,7 +698,7 @@ const FAQ = () => {
                 className="border border-white/10 rounded-2xl bg-zinc-900/30 backdrop-blur-sm overflow-hidden hover:border-white/20 transition-all"
               >
                 <button 
-                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                  onClick={() => handleToggle(i)}
                   className="w-full flex items-center justify-between p-6 text-left hover:bg-white/5 transition-colors"
                 >
                   <span className="font-semibold text-gray-200 pr-4">{item.q}</span>
@@ -752,6 +757,7 @@ const CTASection = () => {
           </p>
           <motion.button
             whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(99,102,241,0.6)" }}
+                onMouseEnter={() => track('how_it_works_hover', { step: i + 1, title: step.title })}
             whileTap={{ scale: 0.95 }}
             onClick={() => { track('landing_cta', { cta: 'join_early_access_bottom' }); navigate('/register'); }}
             className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-bold text-lg shadow-2xl flex items-center gap-3 mx-auto"
