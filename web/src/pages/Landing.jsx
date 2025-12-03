@@ -801,10 +801,10 @@ const Footer = () => {
             {
               title: "Ekip & Topluluk",
               links: [
-                { name: "Hakkımızda", href: "#" },
+                { name: "Hakkımızda", href: "https://heptapusgroup.com/about" },
                 { name: "Blog (yakında)", href: "#" },
                 { name: "Katkıda Bulun", href: "#" },
-                { name: "İletişim", href: "#" }
+                { name: "İletişim", href: "https://heptapusgroup.com/contact" }
               ]
             },
             {
