@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { apiHealth } from "./lib/api";
 import NavBar from "./components/NavBar";
@@ -40,14 +40,21 @@ import TransactionsPage from "./pages/pay/TransactionsPage";
 
 import { getSession } from "./lib/auth";
 import { listOrgs } from "./lib/issuerStore.js";
+import { pageview } from "./lib/evt";
 
 export default function App() {
+  const location = useLocation();
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiHealth().then(setHealth).catch(() => setHealth({ ok: false }));
   }, []);
+
+  // Send pageview on route changes (analytics gated by env)
+  useEffect(() => {
+    pageview(location.pathname + location.search, document.title);
+  }, [location.pathname, location.search]);
 
   // Kullanıcı rollerini org’lardan türet
   const user = useMemo(() => {

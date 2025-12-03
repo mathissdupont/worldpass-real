@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring, useMotionValue, AnimatePresence } from 'framer-motion';
+import { track } from '@/lib/evt';
+import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, 
@@ -9,7 +10,6 @@ import {
   QrCode, 
   Lock, 
   ChevronDown, 
-  ChevronRight, 
   Menu, 
   X,
   CheckCircle2,
@@ -17,13 +17,8 @@ import {
   ArrowRight,
   Fingerprint,
   Shield,
-  Smartphone,
-  Eye,
-  EyeOff
+  Smartphone
 } from 'lucide-react';
-import LightPillar from '../components/LightPillar';
-import PillNav from '@/components/PillNav/PillNav';
-import { track } from '@/lib/evt';
 
 // --- UTILITY COMPONENTS ---
 
@@ -155,52 +150,129 @@ const FadeIn = ({ children, delay = 0 }) => (
   </motion.div>
 );
 
-// --- NAVBAR (PillNav) ---
+// --- NAVBAR ---
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const items = [
-    { label: 'Özellikler', href: '#features' },
-    { label: 'Nasıl Çalışır?', href: '#how-it-works' },
-    { label: 'Güvenlik', href: '#security' },
-    { label: 'S.S.S.', href: '#faq' },
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { name: 'Özellikler', href: '#features' },
+    { name: 'Nasıl Çalışır?', href: '#how-it-works' },
+    { name: 'Güvenlik', href: '#security' },
+    { name: 'S.S.S.', href: '#faq' },
   ];
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50">
-      <PillNav
-        logo="/worldpass_logo.svg"
-        logoAlt="WorldPass"
-        items={items}
-        activeHref="/"
-        className=""
-        ease="power2.easeOut"
-        baseColor="#000000"
-        pillColor="#ffffff"
-        hoveredPillTextColor="#ffffff"
-        pillTextColor="#000000"
-        onItemClick={(item, index) => track('nav_item_click', { href: item?.href, label: item?.label, index })}
-        onLogoClick={() => track('logo_click', { location: 'navbar' })}
-      />
+    <motion.nav 
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled 
+          ? 'bg-black/60 backdrop-blur-xl border-b border-white/10 py-3' 
+          : 'bg-transparent py-5'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+        <motion.a 
+          href="/" 
+          className="flex items-center gap-2 group"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.8)] transition-shadow">
+            W
+          </div>
+          <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
+            WorldPass
+          </span>
+        </motion.a>
 
-      {/* Auth buttons overlay (desktop) */}
-      <div className="hidden md:flex gap-3 absolute top-4 right-6">
-        <button
-          onClick={() => navigate('/login')}
-          onMouseDown={() => track('cta_click', { id: 'login', location: 'navbar' })}
-          className="px-5 py-2 text-sm font-medium text-gray-300 hover:text-white border border-white/20 rounded-full bg-black/40 backdrop-blur-md"
+        <div className="hidden md:flex items-center gap-1 bg-white/5 rounded-full px-2 py-2 border border-white/10 backdrop-blur-md">
+          {navLinks.map((link) => (
+            <a 
+              key={link.name} 
+              href={link.href} 
+              className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
+            >
+              {link.name}
+            </a>
+          ))}
+        </div>
+
+        <div className="hidden md:flex items-center gap-3">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { track('nav_click', { action: 'login' }); navigate('/login'); }}
+            className="px-5 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+          >
+            Giriş Yap
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(99,102,241,0.5)" }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => { track('nav_click', { action: 'register' }); navigate('/register'); }}
+            className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-medium shadow-lg flex items-center gap-2"
+          >
+            WorldPass’e Katıl <ArrowRight size={16} />
+          </motion.button>
+        </div>
+
+        <button 
+          className="md:hidden text-white" 
+          onClick={() => { setMobileMenuOpen(!mobileMenuOpen); track('nav_toggle', { open: !mobileMenuOpen }); }}
         >
-          Giriş Yap
-        </button>
-        <button
-          onClick={() => navigate('/register')}
-          onMouseDown={() => track('cta_click', { id: 'register', location: 'navbar' })}
-          className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-medium shadow-lg flex items-center gap-2"
-        >
-          Başla <ArrowRight size={16} />
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
-    </div>
+
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-black/90 backdrop-blur-xl border-b border-white/10 overflow-hidden"
+          >
+            <div className="flex flex-col p-6 gap-4">
+              {navLinks.map((link) => (
+                <a 
+                  key={link.name} 
+                  href={link.href} 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="text-gray-300 hover:text-white text-lg py-2"
+                >
+                  {link.name}
+                </a>
+              ))}
+              <div className="flex flex-col gap-2 pt-4 border-t border-white/10">
+                <button
+                  onClick={() => { track('nav_click', { action: 'login' }); navigate('/login'); setMobileMenuOpen(false); }}
+                  className="w-full px-5 py-3 text-sm font-medium text-gray-300 hover:text-white border border-white/20 rounded-full"
+                >
+                  Giriş Yap
+                </button>
+                <button
+                  onClick={() => { track('nav_click', { action: 'register' }); navigate('/register'); setMobileMenuOpen(false); }}
+                  className="w-full px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-medium"
+                >
+                  WorldPass’e Katıl
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.nav>
   );
 };
 
@@ -216,26 +288,6 @@ const Hero = () => {
       <GridPattern />
       <FloatingOrbs />
 
-      {/* LightPillar background */}
-      <div className="absolute inset-0 z-[1]">
-        <div className="w-full h-[600px] relative">
-          <LightPillar
-            topColor="#5227FF"
-            bottomColor="#FF9FFC"
-            intensity={1.0}
-            rotationSpeed={0.3}
-            glowAmount={0.005}
-            pillarWidth={3.0}
-            pillarHeight={0.6}
-            noiseIntensity={0.2}
-            pillarRotation={0}
-            interactive={true}
-            mixBlendMode="screen"
-            className="pointer-events-none"
-          />
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center relative z-10">
         
         <div className="text-center lg:text-left space-y-8">
@@ -245,21 +297,22 @@ const Hero = () => {
               whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.1)" }}
             >
               <Sparkles size={14} className="text-cyan-400" />
-              <ShinyText text="Güvenli Dijital Kimlik Platformu" className="text-gray-300" />
+              <ShinyText text="Erken Aşama Dijital Kimlik Deneyimi" className="text-gray-300" />
             </motion.div>
           </FadeIn>
           
           <div className="space-y-4">
             <BlurText 
-              text="Kimliğiniz Artık Dijital ve Güvende" 
+              text="Kimliğini Dijital Olarak Yanında Taşı" 
               className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white leading-[1.1]"
               delay={0.3}
             />
             
             <FadeIn delay={0.9}>
               <p className="text-lg md:text-xl text-gray-400 max-w-2xl leading-relaxed">
-                WorldPass ile fiziksel kimliklerinizi dijitalleştirin, güvenle saklayın ve sadece istediğiniz kişilerle paylaşın. 
-                <span className="text-cyan-400 font-semibold"> Verileriniz sadece sizde.</span>
+                WorldPass, fiziksel kartlarını dijital bir kimlik cüzdanında toplamayı hedefleyen,
+                halen geliştirme aşamasında olan bir projedir. Basit, anlaşılır ve kullanıcının
+                kontrolünde bir deneyim kurmaya çalışıyoruz.
               </p>
             </FadeIn>
           </div>
@@ -269,17 +322,18 @@ const Hero = () => {
               <motion.button
                 whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(99,102,241,0.6)" }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/register')}
+                onClick={() => { track('landing_cta', { cta: 'join_early_access' }); navigate('/register'); }}
                 className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-semibold flex items-center justify-center gap-2 shadow-xl"
               >
-                Ücretsiz Başla <ChevronRight size={20} />
+                Erken Erişime Katıl <ChevronDown size={20} />
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.15)" }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => { track('landing_cta', { cta: 'see_how_it_works' }); }}
                 className="w-full sm:w-auto px-8 py-4 border border-white/20 text-white rounded-full font-semibold backdrop-blur-md hover:border-white/40 transition-all"
               >
-                Nasıl Çalışır?
+                Nasıl Çalıştığını Gör
               </motion.button>
             </div>
           </FadeIn>
@@ -288,11 +342,11 @@ const Hero = () => {
             <div className="flex items-center justify-center lg:justify-start gap-8 pt-4 text-sm text-gray-500">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-green-500" />
-                <span>100% Ücretsiz</span>
+                <span>Temel kullanım ücretsiz</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-green-500" />
-                <span>Güvenli & Şifreli</span>
+                <span>Geliştirme aşamasında şeffaflık</span>
               </div>
             </div>
           </FadeIn>
@@ -309,7 +363,6 @@ const Hero = () => {
             transition={{ duration: 1, delay: 0.5 }}
             className="relative"
           >
-            {/* Main Card */}
             <div className="w-[400px] h-[550px] bg-gradient-to-br from-zinc-900 via-black to-zinc-900 rounded-3xl border border-white/10 p-6 shadow-2xl relative overflow-hidden backdrop-blur-xl">
               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
               
@@ -322,28 +375,28 @@ const Hero = () => {
                 </div>
                 <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20 flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  DOĞRULANDI
+                  ERKEN ERİŞİM
                 </div>
               </div>
 
               <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-b from-white/20 to-transparent mx-auto mb-6 relative z-10">
                 <div className="w-full h-full rounded-full overflow-hidden bg-zinc-800">
                   <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold">
-                    AK
+                    WP
                   </div>
                 </div>
               </div>
 
               <div className="text-center mb-8 relative z-10 space-y-1">
-                <h3 className="text-2xl font-bold text-white tracking-wide">Ahmet Kaya</h3>
-                <p className="text-gray-500 text-xs uppercase tracking-widest">ID: #WP-8492-AX91</p>
+                <h3 className="text-2xl font-bold text-white tracking-wide">Dijital Kimlik Kartı</h3>
+                <p className="text-gray-500 text-xs uppercase tracking-widest">Örnek arayüz</p>
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span className="text-xs text-green-400">Aktif</span>
+                  <span className="text-xs text-green-400">Deneysel</span>
                 </div>
               </div>
 
-              <div className="space-y-3 relative z-10 mb-6">
+              <div className="space-y-3 relative z10 mb-6">
                 {[
                   { label: "Ehliyet", value: 85 },
                   { label: "Öğrenci Kartı", value: 65 },
@@ -371,11 +424,10 @@ const Hero = () => {
                 whileTap={{ scale: 0.98 }}
                 className="h-14 w-full bg-white text-black rounded-xl flex items-center justify-center font-bold gap-2 cursor-pointer hover:bg-gray-100 transition-colors shadow-lg relative z-10"
               >
-                <QrCode size={20} /> Göster & Paylaş
+                <QrCode size={20} /> Örnek QR Göster
               </motion.div>
             </div>
 
-            {/* Floating Info Cards */}
             <motion.div 
               animate={{ y: [0, -10, 0], rotate: [0, 2, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -386,8 +438,8 @@ const Hero = () => {
                   <Globe size={18} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Erişim</p>
-                  <p className="text-sm font-bold text-white">Global</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Hedef</p>
+                  <p className="text-sm font-bold text-white">Global kullanım</p>
                 </div>
               </div>
             </motion.div>
@@ -402,8 +454,8 @@ const Hero = () => {
                   <Lock size={18} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Güvenlik</p>
-                  <p className="text-sm font-bold text-white">256-bit Şifreli</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Odak</p>
+                  <p className="text-sm font-bold text-white">Güvenli tasarım</p>
                 </div>
               </div>
             </motion.div>
@@ -419,38 +471,38 @@ const Hero = () => {
 const Features = () => {
   const features = [
     {
-      title: "Anlık Paylaşım",
-      desc: "QR kod veya NFC ile kimlik bilgilerinizi saniyeler içinde güvenle paylaşın.",
+      title: "Hızlı Paylaşım",
+      desc: "QR kod ile kimlik bilgilerini saniyeler içinde gösterebileceğin sade bir akış tasarlıyoruz.",
       icon: <Zap className="w-6 h-6" />,
       color: "from-yellow-500 to-orange-500"
     },
     {
-      title: "Blokzincir Doğrulama",
-      desc: "Kimlikleriniz blokzincir teknolojisi ile doğrulanır ve sahtecilikten korunur.",
+      title: "Geleceğe Hazır Altyapı",
+      desc: "Blokzincir ve on-chain doğrulama için düşünülen bir mimari üzerine inşa ediyoruz. Şu an odak MVP deneyiminde.",
       icon: <ShieldCheck className="w-6 h-6" />,
       color: "from-cyan-500 to-blue-500"
     },
     {
-      title: "Çoklu Kimlik Desteği",
-      desc: "Ehliyet, öğrenci kartı, üyelik kartları... Hepsi tek bir güvenli cüzdanda.",
+      title: "Tek Cüzdan, Birden Fazla Kimlik",
+      desc: "Ehliyet, öğrenci kartı, üyelik kartları gibi kimlikleri tek bir dijital cüzdanda toplamayı hedefliyoruz.",
       icon: <Wallet className="w-6 h-6" />,
       color: "from-purple-500 to-pink-500"
     },
     {
-      title: "Tam Kontrol",
-      desc: "Hangi bilgiyi, kiminle, ne kadar süreyle paylaştığınıza siz karar verirsiniz.",
+      title: "Paylaşım Üzerinde Kontrol",
+      desc: "Hangi bilgiyi, kiminle paylaştığın konusunda sana daha fazla kontrol sunan bir arayüz tasarlıyoruz.",
       icon: <Fingerprint className="w-6 h-6" />,
       color: "from-emerald-500 to-teal-500"
     },
     {
-      title: "Uçtan Uca Şifreleme",
-      desc: "Verileriniz cihazınızda AES-256 ile şifrelenir. Biz bile göremeyiz.",
+      title: "Şifreli Saklama Yaklaşımı",
+      desc: "Verilerin şifreli tutulması için AES-256 gibi modern yöntemleri esas alan bir mimari üzerinde çalışıyoruz.",
       icon: <Lock className="w-6 h-6" />,
       color: "from-red-500 to-rose-500"
     },
     {
-      title: "Offline Erişim",
-      desc: "İnternet olmadan da kimliklerinize erişebilir ve paylaşabilirsiniz.",
+      title: "Mobil Öncelikli Deneyim",
+      desc: "Kimliklerine telefondan erişebileceğin, offline senaryoları da düşünerek tasarlanan bir arayüz hedefliyoruz.",
       icon: <Smartphone className="w-6 h-6" />,
       color: "from-indigo-500 to-purple-500"
     }
@@ -465,17 +517,17 @@ const Features = () => {
           <FadeIn>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-medium backdrop-blur-md mb-4">
               <Sparkles size={16} className="text-indigo-400" />
-              <span className="text-gray-400">Özellikler</span>
+              <span className="text-gray-400">Özellikler (MVP Hedefi)</span>
             </div>
           </FadeIn>
           <FadeIn delay={0.1}>
             <h2 className="text-4xl md:text-5xl font-bold text-white">
-              Sınırları Kaldıran <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-cyan-500">Teknoloji</span>
+              Basit Başlayan <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-cyan-500">Dijital Kimlik Deneyimi</span>
             </h2>
           </FadeIn>
           <FadeIn delay={0.2}>
             <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-              WorldPass, geleneksel kimlik sistemlerinin karmaşıklığını modern teknolojinin sadeliği ile birleştiriyor.
+              WorldPass, öncelikle günlük kullanımda işine yarayacak minimum seti sunmaya odaklanan bir proje. Zamanla birlikte, geri bildirimlerle büyümesini istiyoruz.
             </p>
           </FadeIn>
         </div>
@@ -506,9 +558,9 @@ const Features = () => {
 
 const HowItWorks = () => {
   const steps = [
-    { id: "01", title: "Kayıt Ol", desc: "E-posta ile hesap oluştur ve güvenli cüzdanını aktif et.", icon: <Shield /> },
-    { id: "02", title: "Kimliklerini Ekle", desc: "Kurumlar tarafından onaylanmış kimliklerini dijital cüzdanına tanımla.", icon: <Wallet /> },
-    { id: "03", title: "QR ile Paylaş", desc: "Etkinliklerde veya başvurularda QR kodunu okutarak kimliğini doğrula.", icon: <QrCode /> }
+    { id: "01", title: "Kayıt Ol", desc: "E-posta ile basit bir hesap oluştur ve erken erişim cüzdanını aktif et.", icon: <Shield /> },
+    { id: "02", title: "Kimliklerini Ekle", desc: "İstersen örnek verilerle, istersen gerçek kimliklerinle cüzdanını test et.", icon: <Wallet /> },
+    { id: "03", title: "QR ile Göster", desc: "Etkinlikte ya da kulüp ortamında kimliğini QR kod üzerinden gösterebileceğin akışı dene.", icon: <QrCode /> }
   ];
 
   return (
@@ -519,7 +571,7 @@ const HowItWorks = () => {
         <FadeIn>
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Nasıl Çalışır?</h2>
-            <p className="text-gray-400 text-lg">3 basit adımda dijital kimliğe sahip ol</p>
+            <p className="text-gray-400 text-lg">3 sade adımda WorldPass’i dene</p>
           </div>
         </FadeIn>
 
@@ -564,20 +616,19 @@ const SecuritySection = () => {
             <Lock size={40} />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Güven ve <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-500">Kontrol</span> Sizde
+            Güven Tarafında <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-500">Gerçekçi Yaklaşım</span>
           </h2>
           <p className="text-gray-400 mb-8 max-w-3xl mx-auto text-lg leading-relaxed">
-            WorldPass, verilerinizi merkezi sunucularda <strong className="text-white">saklamaz</strong>. 
-            Kimlik bilgileriniz cihazınızda <strong className="text-emerald-400">AES-256 şifreleme</strong> ile korunur. 
-            Biz bile verilerinizi göremeyiz. Kiminle ne paylaştığınızın kaydı sadece sizde.
+            WorldPass’i geliştirirken, verilerin olabildiğince kullanıcı tarafında ve şifreli tutulduğu bir model hedefliyoruz.
+            Şu an için mimariyi kademeli olarak güçlendiriyoruz ve tüm iddiaları açıkça dokümante etmeye çalışıyoruz.
           </p>
           <div className="flex flex-wrap justify-center gap-4 text-sm">
             {[
-              "Uçtan Uca Şifreleme",
-              "GDPR Uyumlu",
-              "Biyometrik Koruma",
-              "Açık Kaynak",
-              "Zero-Knowledge"
+              "Şifreleme Odaklı Tasarım",
+              "Kademeli Güvenlik İyileştirmeleri",
+              "Açıkça İfade Edilmiş Sınırlamalar",
+              "Geliştirici Topluluğu ile Şeffaflık",
+              "Gelecekte On-chain Doğrulama"
             ].map((item, i) => (
               <motion.span 
                 key={i}
@@ -600,27 +651,27 @@ const FAQ = () => {
   const questions = [
     { 
       q: "WorldPass'i kullanmak ücretli mi?", 
-      a: "Bireysel kullanıcılar için WorldPass tamamen ücretsizdir. Kimlik saklama ve doğrulama işlemleri için hiçbir ücret ödemezsiniz." 
+      a: "Şu anki erken aşama sürümde temel kullanım ücretsiz. İleride ek özellikler ve kurumsal senaryolar için farklı planlar düşünebiliriz, bunların hepsini şeffaf bir şekilde paylaşacağız." 
     },
     { 
       q: "Kimlik bilgilerim nerede saklanıyor?", 
-      a: "Verileriniz sadece sizin cihazınızda, şifrelenmiş bir alanda (Secure Enclave) saklanır. Bulut sunucularımızda hiçbir kişisel veriniz tutulmaz. Bu da verilerinizin %100 sizin kontrolünüzde olduğu anlamına gelir." 
+      a: "Hedefimiz, verileri mümkün olduğunca cihaz tarafında şifreli olarak tutmak. Mevcut sürümdeki mimari ve veri akışını, teknik dokümanlarda net bir şekilde anlatmaya çalışıyoruz ki tam olarak neyin nerede durduğunu görebilin." 
     },
     { 
       q: "Telefonumu kaybedersem ne olur?", 
-      a: "Kayıt sırasında size verilen kurtarma anahtarı (Seed Phrase) ile yeni cihazınızda cüzdanınızı saniyeler içinde geri yükleyebilirsiniz. Bu anahtarı güvenli bir yerde saklamanız önemlidir." 
+      a: "Kurtarma anahtarı ve yedekleme işlemleri için aşama aşama bir model üzerinde çalışıyoruz. Şu anda WorldPass'i denerken, kritik verileri tek başına burada saklamamanızı, mutlaka başka bir güvenli yedek de bulundurmanızı öneriyoruz." 
     },
     { 
       q: "Hangi kimlik türlerini ekleyebilirim?", 
-      a: "Şu anda ehliyet, öğrenci kartı, sağlık kartı, üyelik kartları gibi birçok kimlik türünü destekliyoruz. Yakında daha fazla kimlik türü eklenecek." 
+      a: "MVP'de odak, öğrenci kartı ve basit üyelik senaryoları. Ehliyet, sağlık kartı gibi kimlik türleri için henüz deneme aşamasındayız. Geri bildirimlere göre desteklediğimiz türleri genişleteceğiz." 
     },
     { 
       q: "Verilerim gerçekten güvende mi?", 
-      a: "Evet. WorldPass, askeri düzeyde AES-256 şifreleme kullanır. Verileriniz cihazınızdan asla çıkmaz ve merkezi bir sunucuda saklanmaz. Sadece siz erişebilirsiniz." 
+      a: "Güvenlik tarafında iddialı cümleler kurmaktansa, yaptığımızı net anlatmayı tercih ediyoruz. Modern şifreleme yöntemlerini kullanmaya çalışıyoruz, ama hâlâ aktif geliştirme yapan küçük bir ekibiz. Kritik veriler için her zaman ek önlemler almanızı öneririz." 
     }
   ];
 
-  const [openIndex, setOpenIndex] = useState(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <section id="faq" className="py-24 bg-zinc-950 relative overflow-hidden">
@@ -630,7 +681,7 @@ const FAQ = () => {
         <FadeIn>
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Sıkça Sorulan Sorular</h2>
-            <p className="text-gray-400">Merak ettiklerinizin cevapları burada</p>
+            <p className="text-gray-400">WorldPass’i denerken aklına gelebilecek temel sorular</p>
           </div>
         </FadeIn>
         
@@ -691,21 +742,21 @@ const CTASection = () => {
       <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
         <FadeIn>
           <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">
-            Dijital Kimliğinize <br />
+            WorldPass’i <br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400">
-              Bugün Sahip Olun
+              Beraber Şekillendirelim
             </span>
           </h2>
           <p className="text-gray-400 text-lg mb-10 max-w-2xl mx-auto">
-            Milyonlarca kullanıcının güvendiği WorldPass ile güvenli dijital kimlik deneyimi başlıyor. Ücretsiz kayıt ol, hemen başla.
+            WorldPass henüz yolun çok başında. Eğer dijital kimlik alanına ilgi duyuyorsan, erken erişime katılıp geri bildirim vererek bu projenin yönünü birlikte belirleyebiliriz.
           </p>
           <motion.button
             whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(99,102,241,0.6)" }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/register')}
+            onClick={() => { track('landing_cta', { cta: 'join_early_access_bottom' }); navigate('/register'); }}
             className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-bold text-lg shadow-2xl flex items-center gap-3 mx-auto"
           >
-            Ücretsiz Başla <ArrowRight size={24} />
+            Erken Erişime Katıl <ArrowRight size={24} />
           </motion.button>
         </FadeIn>
       </div>
@@ -722,26 +773,26 @@ const Footer = () => {
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <img src="/worldpass_logo.svg" alt="WorldPass" className="w-8 h-8 rounded-lg" />
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">W</div>
               <span className="text-lg font-bold text-white">WorldPass</span>
             </div>
             <p className="text-gray-500 text-sm">
-              Güvenli, şifreli ve tamamen sizin kontrolünüzde dijital kimlik platformu.
+              Öğrenciler ve topluluklar için doğan, gerçek dünyadaki kimlik deneyimini sadeleştirmeyi hedefleyen bir dijital kimlik projesi.
             </p>
           </div>
           
           {[
             {
               title: "Ürün",
-              links: ["Özellikler", "Güvenlik", "Nasıl Çalışır?", "Fiyatlandırma"]
+              links: ["Özellikler", "Güvenlik", "Nasıl Çalışır?", "Yol Haritası"]
             },
             {
-              title: "Şirket",
-              links: ["Hakkımızda", "Blog", "Kariyer", "İletişim"]
+              title: "Ekip & Topluluk",
+              links: ["Hakkımızda", "Blog (yakında)", "Katkıda Bulun", "İletişim"]
             },
             {
-              title: "Yasal",
-              links: ["Gizlilik Politikası", "Kullanım Koşulları", "GDPR", "Çerezler"]
+              title: "Yasal & Şeffaflık",
+              links: ["Gizlilik Yaklaşımı", "Kullanım Koşulları (taslak)", "Teknik Dokümanlar", "Açık Kaynak Planı"]
             }
           ].map((col, i) => (
             <div key={i}>
@@ -761,10 +812,10 @@ const Footer = () => {
         
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="text-sm text-gray-600">
-            &copy; 2025 WorldPass. Tüm hakları saklıdır.
+            &copy; 2025 WorldPass. Erken aşama bir projedir, her şey aktif geliştirme altındadır.
           </div>
           <div className="flex gap-4">
-            {['Twitter', 'LinkedIn', 'GitHub'].map((social) => (
+            {['GitHub', 'LinkedIn', 'Discord'].map((social) => (
               <a 
                 key={social}
                 href="#" 

@@ -1,34 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { gsap } from 'gsap';
+// Removed
 
-const PillNav = ({
-  logo,
-  logoAlt = 'Logo',
-  items = [],
-  activeHref,
-  className = '',
-  ease = 'power3.easeOut',
-  baseColor = '#fff',
-  pillColor = '#060010',
-  hoveredPillTextColor = '#060010',
-  pillTextColor,
-  onMobileMenuClick,
-  initialLoadAnimation = true,
-  onItemClick,
-  onLogoClick,
-}) => {
-  const resolvedPillTextColor = pillTextColor ?? baseColor;
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const circleRefs = useRef([]);
-  const tlRefs = useRef([]);
-  const activeTweenRefs = useRef([]);
-  const logoImgRef = useRef(null);
-  const logoTweenRef = useRef(null);
-  const hamburgerRef = useRef(null);
-  const mobileMenuRef = useRef(null);
-  const navItemsRef = useRef(null);
-  const logoRef = useRef(null);
+export default function Removed() { return null; }
 
   useEffect(() => {
     const layout = () => {
@@ -239,6 +211,4 @@ const PillNav = ({
       </div>
     </div>
   );
-};
-
-export default PillNav;
+ 
