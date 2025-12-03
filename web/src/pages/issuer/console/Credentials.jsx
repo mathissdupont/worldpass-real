@@ -482,6 +482,5 @@ export default function IssuerCredentials() {
           />
         </div>
       </div>
-    </div>
   );
 }

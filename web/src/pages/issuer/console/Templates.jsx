@@ -456,7 +456,6 @@ export default function IssuerTemplates() {
             </table>
           </div>
         )}
-      </div>
 
       {/* Create/Edit Modal */}
       {showModal && (

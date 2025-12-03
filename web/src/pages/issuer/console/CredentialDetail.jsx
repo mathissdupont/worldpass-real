@@ -186,20 +186,19 @@ export default function IssuerCredentialDetail() {
   if (error) {
     return (
       <div className="space-y-6">
-          <button
-            onClick={() => navigate("/issuer/console/credentials")}
-            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-          >
-            <FiArrowLeft className="h-4 w-4" />
-            Back to Credentials
-          </button>
-          <div className="bg-rose-50 border border-rose-200 rounded-xl p-6">
-            <div className="flex items-start gap-3">
-              <FiAlertCircle className="h-5 w-5 text-rose-600 mt-0.5" />
-              <div>
-                <h2 className="text-lg font-semibold text-rose-900 mb-1">Error Loading Credential</h2>
-                <p className="text-sm text-rose-700">{error}</p>
-              </div>
+        <button
+          onClick={() => navigate("/issuer/console/credentials")}
+          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+        >
+          <FiArrowLeft className="h-4 w-4" />
+          Back to Credentials
+        </button>
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <FiAlertCircle className="h-5 w-5 text-rose-600 mt-0.5" />
+            <div>
+              <h2 className="text-lg font-semibold text-rose-900 mb-1">Error Loading Credential</h2>
+              <p className="text-sm text-rose-700">{error}</p>
             </div>
           </div>
         </div>
@@ -250,7 +249,8 @@ export default function IssuerCredentialDetail() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
         {/* Back Button */}
         <button
           onClick={() => navigate("/issuer/console/credentials")}
@@ -417,6 +417,7 @@ export default function IssuerCredentialDetail() {
           </div>
         )}
       </div>
+
       {/* Share Modal */}
       {showShare && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowShare(false)}>
@@ -521,6 +522,6 @@ export default function IssuerCredentialDetail() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
