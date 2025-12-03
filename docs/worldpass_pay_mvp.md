@@ -137,7 +137,7 @@ X-Token: {user_jwt_token}
 ```json
 {
   "transaction_id": 123,
-  "redirect_url": "http://localhost:8000/mock-provider/checkout?tx_id=123&amount=1000&currency=USD&return_url=..."
+  "redirect_url": "https://worldpass-beta.heptapusgroup.com/api/mock-provider/checkout?tx_id=123&amount=1000&currency=USD&return_url=..."
 }
 ```
 
@@ -216,7 +216,7 @@ X-Token: {user_jwt_token}
    ```
 
 3. **Login/Register**:
-   - Go to `http://localhost:5173/login`
+   - Go to `https://worldpass-beta.heptapusgroup.com/login`
    - Create account or login
 
 4. **Create Payment**:

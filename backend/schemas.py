@@ -220,6 +220,14 @@ class ResetPasswordResp(BaseModel):
     ok: bool
     message: str
 
+class ChangePasswordReq(BaseModel):
+    old_password: str
+    new_password: str
+
+class ChangePasswordResp(BaseModel):
+    ok: bool
+    message: str
+
 # User VCs management
 class UserVCAddReq(BaseModel):
     vc: Dict[str, Any]  # Full VC JSON

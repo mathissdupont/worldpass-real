@@ -3,7 +3,7 @@
 
 // PROD ve LOCAL API ayarları
 const API_BASE = 'https://worldpass-beta.heptapusgroup.com/api'; // Production
-const LOCAL_API = 'http://localhost:8000/api'; // Development
+const LOCAL_API = 'https://worldpass-beta.heptapusgroup.com/api'; // Production
 const USE_LOCAL = false; // true yaparsan local backend'e vurur
 
 function getApiBase() {

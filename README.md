@@ -33,7 +33,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The backend will start on `http://localhost:8000`.
+The backend will start on `https://worldpass-beta.heptapusgroup.com`.
 
 ### Web Application
 
@@ -43,7 +43,7 @@ npm install
 npm run dev
 ```
 
-The web app will start on `http://localhost:5173`.
+The web app will start on `https://worldpass-beta.heptapusgroup.com`.
 
 ### Mobile Application
 
@@ -197,7 +197,7 @@ npm start
 ```
 
 Backend wiring (Python)
-- Set `EAS_SERVICE_URL` in backend environment (e.g., `http://localhost:5055`)
+- Set `EAS_SERVICE_URL` in backend environment (e.g., `https://worldpass-beta.heptapusgroup.com:5055`)
 - Use `backend/onchain.py`:
   - `eas_attest(vc, issuer_did, subject_did)`
   - `eas_revoke(uid)`

@@ -7,5 +7,5 @@ Write-Host "Starting Frontend on port 5173..."
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd web; npm run dev"
 
 Write-Host "System is starting up!"
-Write-Host "Backend: http://localhost:8000/docs"
-Write-Host "Frontend: http://localhost:5173"
+Write-Host "Backend: https://worldpass-beta.heptapusgroup.com/docs"
+Write-Host "Frontend: https://worldpass-beta.heptapusgroup.com"

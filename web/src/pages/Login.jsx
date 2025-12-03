@@ -128,7 +128,7 @@ export default function Login(){
                   <p className="text-sm text-[color:var(--muted)] mb-4">
                     {t('create_did_paragraph')}
                   </p>
-                  <IdentityCreate/>
+                  <IdentityCreate onCreated={onLoadedIdent}/>
                   <p className="mt-3 text-xs text-[color:var(--muted)]">
                     {t('after_create_hint')}
                   </p>

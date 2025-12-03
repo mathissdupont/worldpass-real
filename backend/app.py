@@ -38,6 +38,7 @@ from backend.schemas import (
     TwoFASetupResp, TwoFAEnableReq, TwoFAEnableResp, TwoFADisableResp,
     BackupCodesResp, VerifyEmailReq, VerifyEmailResp,
     ForgotPasswordReq, ForgotPasswordResp, ResetPasswordReq, ResetPasswordResp,
+    ChangePasswordReq, ChangePasswordResp,
     VCTemplateCreateReq, VCTemplateCreateResp,
     VCTemplateListResp, VCTemplateItem,
     VCTemplateUpdateReq, VCTemplateUpdateResp,
@@ -735,57 +736,63 @@ async def user_vc_export(request: Request, user=Depends(_get_current_user), db=D
     """Export all VCs for current user as JSON (bulk download)"""
     from fastapi.responses import Response
     
-    expected_did = (user["did"] or "").strip()
-    rows = await db.execute_fetchall(
-        "SELECT id, vc_id, subject_did, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? AND subject_did=? ORDER BY created_at DESC",
-        (user["id"], expected_did)
-    )
-    
-    vcs = []
-    for row in rows:
-        payload_str = row["vc_payload"] or ""
-        vc_payload = None
+    try:
+        expected_did = (user["did"] or "").strip()
+        rows = await db.execute_fetchall(
+            "SELECT id, vc_id, subject_did, vc_payload, vc_hash, created_at, updated_at FROM user_vcs WHERE user_id=? AND subject_did=? ORDER BY created_at DESC",
+            (user["id"], expected_did)
+        )
+        
+        vcs = []
+        for row in rows:
+            payload_str = row["vc_payload"] or ""
+            vc_payload = None
 
-        try:
-            # Decrypt the VC payload
-            if payload_str and vc_encryptor.is_encrypted(payload_str):
-                vc_payload = vc_encryptor.decrypt_vc(payload_str)
-            else:
-                # Legacy plain JSON format
-                vc_payload = json.loads(payload_str) if payload_str else None
-        except Exception:
-            # Try to recover from issued_vcs
-            recovery = await db.execute_fetchone(
-                "SELECT payload FROM issued_vcs WHERE vc_id=?",
-                (row["vc_id"],)
-            )
-            if recovery and recovery["payload"]:
+            try:
+                # Decrypt the VC payload
+                if payload_str and vc_encryptor and vc_encryptor.is_encrypted(payload_str):
+                    vc_payload = vc_encryptor.decrypt_vc(payload_str)
+                else:
+                    # Legacy plain JSON format
+                    vc_payload = json.loads(payload_str) if payload_str else None
+            except Exception as e:
+                logger.warning(f"Failed to decrypt VC {row['vc_id']}: {e}")
+                # Try to recover from issued_vcs
                 try:
-                    vc_payload = json.loads(recovery["payload"])
-                except Exception:
+                    recovery = await db.execute_fetchone(
+                        "SELECT payload FROM issued_vcs WHERE vc_id=?",
+                        (row["vc_id"],)
+                    )
+                    if recovery and recovery["payload"]:
+                        vc_payload = json.loads(recovery["payload"])
+                except Exception as e2:
+                    logger.error(f"Failed to recover VC {row['vc_id']}: {e2}")
                     continue
 
-        if vc_payload:
-            vcs.append(vc_payload)
-    
-    # Create export bundle
-    export_data = {
-        "version": "1.0",
-        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "user_did": expected_did,
-        "credentials": vcs
-    }
-    
-    json_str = json.dumps(export_data, indent=2)
-    filename = f"credentials-{expected_did.split(':')[-1][:8]}-{int(time.time())}.json"
-    
-    return Response(
-        content=json_str,
-        media_type="application/json",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            if vc_payload:
+                vcs.append(vc_payload)
+        
+        # Create export bundle
+        export_data = {
+            "version": "1.0",
+            "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "user_did": expected_did,
+            "credentials": vcs
         }
-    )
+        
+        json_str = json.dumps(export_data, indent=2)
+        filename = f"credentials-{expected_did.split(':')[-1][:8]}-{int(time.time())}.json"
+        
+        return Response(
+            content=json_str,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="export_failed")
 
 
 # ---------- user profile management ----------
@@ -1003,6 +1010,34 @@ async def user_delete(request: Request, user=Depends(_get_current_user), db=Depe
     return UserDeleteResp(ok=True)
 
 
+@app.post(f"{API}/user/change-password", response_model=ChangePasswordResp)
+@limiter.limit("5/minute")
+async def user_change_password(request: Request, body: ChangePasswordReq, user=Depends(_get_current_user), db=Depends(get_db)):
+    """Change user password"""
+    # Verify old password
+    if not bcrypt.checkpw(body.old_password.encode(), user["password_hash"].encode()):
+        raise HTTPException(status_code=400, detail="incorrect_old_password")
+    
+    # Validate new password
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+    
+    if body.old_password == body.new_password:
+        raise HTTPException(status_code=400, detail="new_password_same_as_old")
+    
+    # Hash new password
+    new_password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    
+    # Update password
+    await db.execute(
+        "UPDATE users SET password_hash=?, updated_at=? WHERE id=?",
+        (new_password_hash, int(time.time()), user["id"])
+    )
+    await db.commit()
+    
+    return ChangePasswordResp(ok=True, message="password_changed_successfully")
+
+
 # ---------- issuer register / list / approve ----------
 @app.post(f"{API}/issuer/register", response_model=IssuerRegisterResp)
 async def issuer_register(body: IssuerRegisterReq, db=Depends(get_db)):
@@ -1121,6 +1156,34 @@ async def issuer_profile(issuer=Depends(_get_current_issuer)):
             "meta": json.loads(issuer["meta"] or "{}")
         }
     )
+
+
+@app.post(f"{API}/issuer/change-password", response_model=ChangePasswordResp)
+@limiter.limit("5/minute")
+async def issuer_change_password(request: Request, body: ChangePasswordReq, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Change issuer password"""
+    # Verify old password
+    if not bcrypt.checkpw(body.old_password.encode(), issuer["password_hash"].encode()):
+        raise HTTPException(status_code=400, detail="incorrect_old_password")
+    
+    # Validate new password
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+    
+    if body.old_password == body.new_password:
+        raise HTTPException(status_code=400, detail="new_password_same_as_old")
+    
+    # Hash new password
+    new_password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    
+    # Update password
+    await db.execute(
+        "UPDATE issuers SET password_hash=?, updated_at=? WHERE id=?",
+        (new_password_hash, int(time.time()), issuer["id"])
+    )
+    await db.commit()
+    
+    return ChangePasswordResp(ok=True, message="password_changed_successfully")
 
 
 @app.post(f"{API}/issuer/api-key", response_model=IssuerApiKeyResp)

@@ -3,7 +3,7 @@ import hashlib
 import json
 import requests
 
-EAS_SERVICE_URL = os.getenv('EAS_SERVICE_URL', 'http://localhost:5055')
+EAS_SERVICE_URL = os.getenv('EAS_SERVICE_URL', 'https://worldpass-beta.heptapusgroup.com:5055')
 
 
 def canonicalize_vc(vc: dict) -> str:

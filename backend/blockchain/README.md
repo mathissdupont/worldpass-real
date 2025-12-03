@@ -244,7 +244,7 @@ async with get_db() as db:
 
 ```bash
 # Register VC
-curl -X POST http://localhost:8000/api/blockchain/register-vc \
+curl -X POST https://worldpass-beta.heptapusgroup.com/api/blockchain/register-vc \
   -H "Content-Type: application/json" \
   -d '{
     "vc_id": "vc-123",
@@ -253,7 +253,7 @@ curl -X POST http://localhost:8000/api/blockchain/register-vc \
   }'
 
 # Verify VC
-curl -X POST http://localhost:8000/api/blockchain/verify-vc \
+curl -X POST https://worldpass-beta.heptapusgroup.com/api/blockchain/verify-vc \
   -H "Content-Type: application/json" \
   -d '{
     "vc_id": "vc-123",
@@ -261,12 +261,12 @@ curl -X POST http://localhost:8000/api/blockchain/verify-vc \
   }'
 
 # Revoke VC
-curl -X POST http://localhost:8000/api/blockchain/revoke-vc \
+curl -X POST https://worldpass-beta.heptapusgroup.com/api/blockchain/revoke-vc \
   -H "Content-Type: application/json" \
   -d '{"vc_id": "vc-123"}'
 
 # Get VC proof record
-curl http://localhost:8000/api/blockchain/vc/vc-123
+curl https://worldpass-beta.heptapusgroup.com/api/blockchain/vc/vc-123
 ```
 
 ## Future Enhancements

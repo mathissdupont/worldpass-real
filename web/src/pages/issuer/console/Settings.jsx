@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getIssuerProfile, updateIssuerProfile } from "@/lib/api";
+import { getIssuerProfile, updateIssuerProfile, changeIssuerPassword } from "@/lib/api";
 import { FiSave, FiCheckCircle } from "react-icons/fi";
 
 export default function IssuerSettings() {
@@ -19,6 +19,13 @@ export default function IssuerSettings() {
     timezone: "UTC",
     locale: "en"
   });
+
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("issuer_token");
@@ -84,6 +91,46 @@ export default function IssuerSettings() {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePasswordChange = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setError("All fields are required");
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    
+    setChangingPassword(true);
+    setError(null);
+    try {
+      await changeIssuerPassword(oldPassword, newPassword);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setShowPasswordChange(false);
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      const message = err.message === "incorrect_old_password" 
+        ? "Incorrect old password"
+        : err.message === "password_too_short"
+        ? "Password must be at least 8 characters"
+        : err.message === "new_password_same_as_old"
+        ? "New password must be different from old password"
+        : "Failed to change password";
+      setError(message);
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   if (loading && !issuer) {
@@ -320,16 +367,79 @@ export default function IssuerSettings() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Security</h2>
           <div className="space-y-3">
             <button
-              disabled
-              className="w-full md:w-auto px-4 py-2 border border-gray-300 text-gray-400 rounded-lg bg-gray-50 text-sm font-medium cursor-not-allowed"
-              title="Coming soon"
+              onClick={() => setShowPasswordChange(true)}
+              className="w-full md:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
             >
-              Change Password (Coming Soon)
+              Change Password
             </button>
             <p className="text-xs text-gray-500">
               Update your password regularly to keep your account secure
             </p>
           </div>
+
+          {showPasswordChange && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <h4 className="font-semibold mb-4 text-center">Change Password</h4>
+              <div className="flex flex-col gap-3 max-w-md mx-auto">
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block">Old Password</label>
+                  <input 
+                    type="password"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300"
+                    value={oldPassword}
+                    onChange={e => setOldPassword(e.target.value)}
+                    placeholder="Enter old password"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block">New Password</label>
+                  <input 
+                    type="password"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 8 chars)"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 mb-1 block">Confirm New Password</label>
+                  <input 
+                    type="password"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={handlePasswordChange}
+                    disabled={changingPassword}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {changingPassword && (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" strokeWidth="3" className="opacity-25" />
+                        <path d="M4 12a8 8 0 018-8" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    )}
+                    {changingPassword ? 'Changing...' : 'Change Password'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowPasswordChange(false);
+                      setOldPassword("");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

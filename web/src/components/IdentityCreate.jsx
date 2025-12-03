@@ -112,7 +112,7 @@ const scorePwd = (s) => {
   return Math.min(p, 4);
 };
 
-export default function IdentityCreate() {
+export default function IdentityCreate({ onCreated }) {
   const [did, setDid]   = useState("");
   const [p1, setP1]     = useState("");
   const [p2, setP2]     = useState("");
@@ -153,6 +153,11 @@ export default function IdentityCreate() {
 
       setDid(_did);
       setMsg({type:"ok", text:"Keystore indirildi. Güvenli bir yerde sakla."});
+      
+      // Call onCreated callback with the identity data
+      if (onCreated) {
+        onCreated({ did: _did, sk: b64u(sk), pk: b64u(pk) });
+      }
     } catch (e) {
       setMsg({type:"err", text: "Error: " + (e?.message || String(e))});
     } finally {

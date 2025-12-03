@@ -35,7 +35,7 @@ class Settings(BaseSettings):
                 )
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 24
-    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "https://worldpass-beta.heptapusgroup.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
     # VC Encryption - Used to encrypt VCs at rest in the database
     # Generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     VC_ENCRYPTION_KEY: str = os.getenv("VC_ENCRYPTION_KEY", "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE=")
@@ -45,10 +45,10 @@ class Settings(BaseSettings):
     PROFILE_ENCRYPTION_KEY: str = os.getenv("PROFILE_ENCRYPTION_KEY", os.getenv("VC_ENCRYPTION_KEY", "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE="))
     
     # Public URL for email links (Frontend URL)
-    APP_URL: str = os.getenv("APP_URL", "http://localhost:5173")
+    APP_URL: str = os.getenv("APP_URL", "https://worldpass-beta.heptapusgroup.com")
     
     # Payment Provider Settings
-    PAYMENT_PROVIDER_BASE_URL: str = os.getenv("PAYMENT_PROVIDER_BASE_URL", "http://localhost:8000/mock-provider")
+    PAYMENT_PROVIDER_BASE_URL: str = os.getenv("PAYMENT_PROVIDER_BASE_URL", "https://worldpass-beta.heptapusgroup.com/api/mock-provider")
     PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "mock_webhook_secret_change_in_production")
     
     def validate_production_security(self):

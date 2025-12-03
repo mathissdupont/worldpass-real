@@ -6,7 +6,7 @@ import { FiCheckCircle, FiXCircle, FiArrowLeft, FiCopy, FiAlertCircle, FiDownloa
 
 export default function IssuerCredentialDetail() {
   const navigate = useNavigate();
-  const { vcId } = useParams();
+  const { id: vcId } = useParams();
   const [searchParams] = useSearchParams();
   const [issuer, setIssuer] = useState(null);
   const [credential, setCredential] = useState(null);
@@ -95,10 +95,10 @@ export default function IssuerCredentialDetail() {
   const handleRevoke = async () => {
     setRevoking(true);
     try {
-      const token = localStorage.getItem("issuer_token");
-      await revokeCredential(null, vcId, token);
+      await revokeCredential(vcId);
       setShowRevokeConfirm(false);
       // Reload credential data
+      const token = localStorage.getItem("issuer_token");
       await loadData(token);
     } catch (err) {
       console.error(err);

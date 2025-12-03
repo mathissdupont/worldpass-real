@@ -188,7 +188,7 @@ export default function IssuerDashboard() {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
-            onClick={() => navigate("/issue")}
+            onClick={() => navigate("/issuer/console/issue")}
             className="p-4 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 text-left transition-colors"
           >
             <h4 className="font-medium text-blue-900">Issue Credential</h4>

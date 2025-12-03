@@ -4,6 +4,7 @@ import { apiHealth } from "./lib/api";
 import NavBar from "./components/NavBar";
 import { t } from "./lib/i18n";
 
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Account from "./pages/Account";
@@ -16,6 +17,8 @@ import Settings from "./pages/Settings";
 import ShareInfo from "./pages/ShareInfo";
 import ReceiveInfo from "./pages/ReceiveInfo";
 import AdminIssuers from "./pages/admin/Issuers";
+import IssuerApproval from "./pages/admin/IssuerApproval";
+import AdminLogin from "./pages/admin/Login";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 // New Issuer Console (consolidated)
@@ -90,6 +93,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[color:var(--bg)] text-[color:var(--text)] transition-all duration-300">
       <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<Landing />} />
+        
         {/* Issuer Console - consolidated routes */}
         <Route
           path="/issuer/console"
@@ -139,6 +145,14 @@ export default function App() {
             </IssuerLayout>
           }
         />
+        <Route
+          path="/issuer/console/issue"
+          element={
+            <IssuerLayout>
+              <CredentialIssuerForm />
+            </IssuerLayout>
+          }
+        />
 
         {/* All other routes with NavBar */}
         <Route
@@ -157,20 +171,20 @@ export default function App() {
                   <Route path="/issuer/templates" element={<Navigate to="/issuer/console/templates" replace />} />
                   <Route path="/issuer/webhooks" element={<Navigate to="/issuer/console/webhooks" replace />} />
                   <Route path="/issuer/settings" element={<Navigate to="/issuer/console/settings" replace />} />
-                  <Route path="/" element={<Navigate to="/account" replace />} />
 
                   {/* Public */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/verify" element={<Verify />} />
                   <Route path="/verifier" element={<Verifier />} />
+                  <Route path="/admin/login" element={<AdminLogin />} />
                   {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
                   <Route path="/issuer/register" element={<IssuerRegister />} />
                   <Route path="/issuer/login" element={<IssuerLogin />} />
 
           {/* Protected (oturum + DID gerekli) */}
           <Route
-            path="/account"
+            path="/account/*"
             element={
               <ProtectedRoute>
                 <Account />
@@ -279,6 +293,17 @@ export default function App() {
                       <RoleRoute user={user} roles="admin">
                         <ProtectedRoute>
                           <AdminIssuers />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/admin/issuer-approval"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <IssuerApproval />
                         </ProtectedRoute>
                       </RoleRoute>
                     }

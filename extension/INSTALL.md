@@ -17,7 +17,7 @@
 
 ### Step 2: Connect to WorldPass
 
-1. **Login to WorldPass**: Open http://localhost:5173 (or your WorldPass URL)
+1. **Login to WorldPass**: Open https://worldpass-beta.heptapusgroup.com (or your WorldPass URL)
 2. **Go to Settings**: Click Settings from the menu
 3. **Copy Token**: In the "Browser Extension" section, click "Copy Token"
 4. **Open Extension**: Click the WorldPass icon in your browser toolbar

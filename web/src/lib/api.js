@@ -53,7 +53,7 @@ export async function apiHealth(){
   return r.json();
 }
 
-export async function newChallenge(audience='localhost', exp_secs=120){
+export async function newChallenge(audience='worldpass-beta.heptapusgroup.com', exp_secs=120){
   const r = await fetch('/api/challenge/new',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -113,6 +113,14 @@ export async function listTemplates() {
 
 export async function updateTemplate(token, templateId, updates) {
   if (!token) throw new Error('Not authenticated');
+  
+  // Clean up the updates object - only send fields with actual values
+  const cleanUpdates = {};
+  if (updates.name !== undefined && updates.name !== null) cleanUpdates.name = updates.name;
+  if (updates.description !== undefined && updates.description !== null) cleanUpdates.description = updates.description;
+  if (updates.vc_type !== undefined && updates.vc_type !== null) cleanUpdates.vc_type = updates.vc_type;
+  if (updates.fields !== undefined && updates.fields !== null) cleanUpdates.fields = updates.fields;
+  
   const headers = attachWalletDid({
     'Content-Type': 'application/json',
     'X-Token': token
@@ -120,9 +128,12 @@ export async function updateTemplate(token, templateId, updates) {
   const r = await fetch(`/api/user/templates/${templateId}`, {
     method: 'PUT',
     headers,
-    body: JSON.stringify(updates)
+    body: JSON.stringify(cleanUpdates)
   });
-  if (!r.ok) throw new Error('update_template_failed');
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || 'update_template_failed');
+  }
   return r.json();
 }
 
@@ -682,6 +693,51 @@ export async function getCredentialByShareToken(shareToken) {
   if (!r.ok) {
     const err = await r.json();
     throw new Error(err.detail || 'get_credential_by_token_failed');
+  }
+  return r.json();
+}
+
+// Password Change APIs
+export async function changeUserPassword(oldPassword, newPassword) {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const r = await fetch('/api/user/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ 
+      old_password: oldPassword, 
+      new_password: newPassword 
+    })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'change_password_failed');
+  }
+  return r.json();
+}
+
+export async function changeIssuerPassword(oldPassword, newPassword) {
+  const token = getIssuerToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  const r = await fetch('/api/issuer/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Token': token
+    },
+    body: JSON.stringify({ 
+      old_password: oldPassword, 
+      new_password: newPassword 
+    })
+  });
+  if (!r.ok) {
+    const err = await r.json();
+    throw new Error(err.detail || 'change_password_failed');
   }
   return r.json();
 }

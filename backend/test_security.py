@@ -17,7 +17,7 @@ def test_env_vars():
     print("Testing environment variables...")
     assert settings.ADMIN_USER == "admin"
     # Note: ADMIN_PASS_HASH and JWT_SECRET are using defaults since .env not loaded
-    assert "localhost:5173" in settings.CORS_ORIGINS
+    assert "worldpass-beta.heptapusgroup.com" in settings.CORS_ORIGINS or "localhost:5173" in settings.CORS_ORIGINS
     print("✓ Environment variables loaded correctly")
 
 def test_bcrypt_hashing():

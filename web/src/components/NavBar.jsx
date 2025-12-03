@@ -84,13 +84,12 @@ export default function NavBar({ health, user, features }) {
 
   // Sadeleştirilmiş menü - kullanıcı odaklı
   const navItems = [
-    { to: "/account",       label: "Hesabım",                icon: "account" },
-    { to: "/credentials",   label: "Kimlik Bilgilerim",      icon: "list" },
-    { to: "/verify",        label: "Doğrula",                icon: "verify" },
-    { to: "/present",       label: "Göster",                 icon: "present" },
-    { to: "/receive-info",  label: "Bilgi Al",               icon: "list" },
-    { to: "/settings",      label: "Ayarlar",                icon: "settings" },
-    { to: "/admin/issuers", label: "Yönetici",               icon: "admin",   roles: ["admin"] },
+    { to: "/account",                label: "Hesabım",                icon: "account" },
+    { to: "/credentials",            label: "Kimlik Bilgilerim",      icon: "list" },
+    { to: "/verify",                 label: "Doğrula",                icon: "verify" },
+    { to: "/present",                label: "Göster",                 icon: "present" },
+    { to: "/receive-info",           label: "Bilgi Al",               icon: "list" },
+    { to: "/settings",               label: "Ayarlar",                icon: "settings" },
   ];
 
   const leftMenu = authed

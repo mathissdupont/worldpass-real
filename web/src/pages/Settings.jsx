@@ -6,7 +6,7 @@ import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";
 import { getToken } from "../lib/auth";
 import { fetchProfile, updateProfile } from "../lib/profileApi";
-import { setup2FA, enable2FA, disable2FA } from "../lib/api";
+import { setup2FA, enable2FA, disable2FA, changeUserPassword } from "../lib/api";
 import { qrToDataURL } from "../lib/qr";
 
 const API_BASE = "/api";
@@ -72,6 +72,13 @@ export default function Settings() {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [otpCode, setOtpCode] = useState("");
+
+  // Password Change State
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // ---- Toast ----
   const [toast, setToast] = useState(null); // {type:'ok'|'err'|'info', text:''}
@@ -376,10 +383,42 @@ export default function Settings() {
     }
   };
 
-  const changePassword = () => {
-    alert(
-      t('password_change_demo')
-    );
+  const changePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setToast({ type: "err", text: "All fields are required" });
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setToast({ type: "err", text: "New passwords do not match" });
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setToast({ type: "err", text: "Password must be at least 8 characters" });
+      return;
+    }
+    
+    setChangingPassword(true);
+    try {
+      await changeUserPassword(oldPassword, newPassword);
+      setToast({ type: "ok", text: "Password changed successfully" });
+      setShowPasswordChange(false);
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      const message = err.message === "incorrect_old_password" 
+        ? "Incorrect old password"
+        : err.message === "password_too_short"
+        ? "Password must be at least 8 characters"
+        : err.message === "new_password_same_as_old"
+        ? "New password must be different from old password"
+        : "Failed to change password";
+      setToast({ type: "err", text: message });
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const deleteAccount = async () => {
@@ -527,11 +566,10 @@ export default function Settings() {
                 {isSavingProfile ? t('saving') : t('save_profile')}
               </button>
               <button
-                onClick={changePassword}
+                onClick={() => setShowPasswordChange(true)}
                 className="px-4 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--panel)] hover:bg-[color:var(--panel-2)] transition-all duration-300 hover:scale-105"
-                title="Demo placeholder"
               >
-                {t('change_password_demo')}
+                Change Password
               </button>
             </div>
           </div>
@@ -621,6 +659,70 @@ export default function Settings() {
                     </button>
                   </div>
                   <button onClick={() => setShow2FASetup(false)} className="text-xs text-[color:var(--muted)] underline">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {showPasswordChange && (
+              <div className="mt-4 p-4 bg-[color:var(--panel)] rounded-xl border border-[color:var(--border)] animate-in fade-in zoom-in-95">
+                <h4 className="font-semibold mb-4 text-center">Change Password</h4>
+                <div className="flex flex-col gap-3 max-w-md mx-auto">
+                  <div>
+                    <label className="text-sm text-[color:var(--muted)] mb-1 block">Old Password</label>
+                    <input 
+                      type="password"
+                      className="w-full px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)]"
+                      value={oldPassword}
+                      onChange={e => setOldPassword(e.target.value)}
+                      placeholder="Enter old password"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-[color:var(--muted)] mb-1 block">New Password</label>
+                    <input 
+                      type="password"
+                      className="w-full px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)]"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Enter new password (min 8 chars)"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-[color:var(--muted)] mb-1 block">Confirm New Password</label>
+                    <input 
+                      type="password"
+                      className="w-full px-3 py-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)]"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      onClick={changePassword}
+                      disabled={changingPassword}
+                      className="flex-1 px-4 py-2 bg-[color:var(--brand)] text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {changingPassword && (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <circle cx="12" cy="12" r="10" strokeWidth="3" className="opacity-25" />
+                          <path d="M4 12a8 8 0 018-8" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                      )}
+                      {changingPassword ? 'Changing...' : 'Change Password'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowPasswordChange(false);
+                        setOldPassword("");
+                        setNewPassword("");
+                        setConfirmPassword("");
+                      }}
+                      className="px-4 py-2 border border-[color:var(--border)] rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

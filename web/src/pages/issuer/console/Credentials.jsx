@@ -346,7 +346,7 @@ export default function IssuerCredentials() {
               {exporting ? 'Exporting...' : 'Export All'}
             </button>
             <button
-              onClick={() => navigate("/issue")}
+              onClick={() => navigate("/issuer/console/issue")}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
             >
               Issue New Credential
@@ -363,6 +363,9 @@ export default function IssuerCredentials() {
             >
               <FiFilter className="h-4 w-4" />
               Filters {showFilters ? '▼' : '▶'}
+              {(filters.status || filters.template_type || filters.search || filters.date_from || filters.date_to) && (
+                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Active</span>
+              )}
             </button>
             {(filters.status || filters.template_type || filters.search || filters.date_from || filters.date_to) && (
               <button
