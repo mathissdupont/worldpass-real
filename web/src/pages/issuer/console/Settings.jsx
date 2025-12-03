@@ -332,6 +332,5 @@ export default function IssuerSettings() {
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
 }
