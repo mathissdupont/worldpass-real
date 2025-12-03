@@ -188,9 +188,11 @@ const Navbar = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.8)] transition-shadow">
-            W
-          </div>
+          <img
+            src="/worldpass_logo.svg"
+            alt="WorldPass"
+            className="w-9 h-9 rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.8)] transition-shadow"
+          />
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
             WorldPass
           </span>
@@ -757,7 +759,6 @@ const CTASection = () => {
           </p>
           <motion.button
             whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(99,102,241,0.6)" }}
-                onMouseEnter={() => track('how_it_works_hover', { step: i + 1, title: step.title })}
             whileTap={{ scale: 0.95 }}
             onClick={() => { track('landing_cta', { cta: 'join_early_access_bottom' }); navigate('/register'); }}
             className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-bold text-lg shadow-2xl flex items-center gap-3 mx-auto"
@@ -779,7 +780,7 @@ const Footer = () => {
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">W</div>
+              <img src="/worldpass_logo.svg" alt="WorldPass" className="w-8 h-8 rounded-lg" />
               <span className="text-lg font-bold text-white">WorldPass</span>
             </div>
             <p className="text-gray-500 text-sm">
@@ -806,7 +807,18 @@ const Footer = () => {
               <ul className="space-y-2">
                 {col.links.map((link, j) => (
                   <li key={j}>
-                    <a href="#" className="text-gray-500 hover:text-white text-sm transition-colors">
+                    <a
+                      href={
+                        link === "Gizlilik Yaklaşımı"
+                          ? "/PRIVACY_POLICY.md"
+                          : link === "Kullanım Koşulları (taslak)"
+                          ? "/TERMS_OF_USE.md"
+                          : "#"
+                      }
+                      target={link === "Gizlilik Yaklaşımı" || link === "Kullanım Koşulları (taslak)" ? "_blank" : undefined}
+                      rel={link === "Gizlilik Yaklaşımı" || link === "Kullanım Koşulları (taslak)" ? "noopener noreferrer" : undefined}
+                      className="text-gray-500 hover:text-white text-sm transition-colors"
+                    >
                       {link}
                     </a>
                   </li>
