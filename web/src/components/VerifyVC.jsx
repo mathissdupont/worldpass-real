@@ -1,5 +1,15 @@
 // web/src/components/VerifyVC.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+// Helper to decode base64url to string
+function decodeB64Url(str) {
+   try {
+      // atob expects base64, not base64url
+      let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+      // Pad with =
+      while (b64.length % 4) b64 += "=";
+      return decodeURIComponent(escape(window.atob(b64)));
+   } catch { return null; }
+}
 import { qrToDataURL } from "../lib/qr";
 import { newChallenge, verifyVC, verifyPresentation } from "../lib/api";
 import jsQR from "jsqr";
@@ -187,20 +197,24 @@ export default function VerifyVC() {
   const onInputFile = (e) => handleFile(e.target.files?.[0] || null);
   const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDrag(false); handleFile(e.dataTransfer?.files?.[0] || null); };
 
-  const handleScanned = async (raw) => {
-    if (!raw) return;
-    try {
-      if (/^https?:\/\//.test(raw)) {
-        const r = await fetch(raw);
-        const txt = await r.text();
-        const obj = safeParse(txt);
+   const handleScanned = async (raw) => {
+      if (!raw) return;
+      try {
+         let decoded = raw;
+         // Try base64url decode first
+         const b64Decoded = decodeB64Url(raw);
+         if (b64Decoded) decoded = b64Decoded;
+         if (/^https?:\/\//.test(decoded)) {
+            const r = await fetch(decoded);
+            const txt = await r.text();
+            const obj = safeParse(txt);
             if (obj) { acceptPayload(obj, txt); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
-      }
-      const obj = safeParse(raw);
+         }
+         const obj = safeParse(decoded);
          if (obj) { acceptPayload(obj, JSON.stringify(obj, null, 2)); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
-      setMsg({ type: "err", text: t("file_read_error") });
-    } catch (e) { setMsg({ type: "err", text: t("file_read_error") }); }
-  };
+         setMsg({ type: "err", text: t("file_read_error") });
+      } catch (e) { setMsg({ type: "err", text: t("file_read_error") }); }
+   };
 
   const stopQrScan = async () => {
     try {

@@ -1,3 +1,11 @@
+// Helper: base64url decode string to utf-8
+function decodeB64Url(str) {
+  try {
+    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    return decodeURIComponent(escape(window.atob(b64)));
+  } catch { return null; }
+}
 // web/src/pages/ReceiveInfo.jsx
 import { useState, useRef, useEffect, useCallback } from "react";
 import { importUserCredential } from "@/lib/api";
@@ -147,17 +155,18 @@ export default function ReceiveInfo() {
   // Ortak İşleme Fonksiyonu
   function processData(raw) {
     if (!raw) return;
+    let decoded = raw;
+    // Önce base64url decode dene
+    const b64Decoded = decodeB64Url(raw);
+    if (b64Decoded) decoded = b64Decoded;
     try {
-      // Eğer bir URL ise ve JSON dönüyorsa fetch edilebilir (Opsiyonel)
-      // Şimdilik direkt JSON parse deniyoruz
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(decoded);
       setInfo(parsed);
       setMsg({ type: "ok", text: "Bilgi başarıyla alındı ve işlendi." });
       stopQrScan();
       stopNfcScan();
     } catch {
       setInfo(null);
-      // Hata mesajını sadece kullanıcı bir şey yapıştırdıysa veya taradıysa gösterelim
       if (raw.trim().length > 0) {
         setMsg({ type: "err", text: "Geçersiz format veya hatalı JSON verisi." });
       }

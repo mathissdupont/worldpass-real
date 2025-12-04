@@ -72,6 +72,7 @@ export default function Present() {
   const [msg, setMsg] = useState(null);
   const [publishedPath, setPublishedPath] = useState(null);
   const [qrImage, setQrImage] = useState(null);
+  const [qrBase64, setQrBase64] = useState("");
   const [request, setRequest] = useState(null);
 
   const reqVideoRef = useRef(null);
@@ -373,7 +374,10 @@ export default function Present() {
       const d = await r.json();
       setPublishedPath(d.path);
       const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
-      setQrImage(await qrToDataURL(full, { width: 256, margin: 1 }));
+      // Encode the URL as base64url for QR
+      const encoded = b64u(full);
+      setQrBase64(encoded);
+      setQrImage(await qrToDataURL(encoded, { width: 256, margin: 1 }));
       setMsg({ type: "ok", text: t("uploaded_to_server") });
     } catch (e) { setMsg({ type: "err", text: t("upload_error") + e.message }); }
   };
@@ -526,15 +530,16 @@ export default function Present() {
                        <Button onClick={download} variant="secondary" className="h-auto py-4 flex-col gap-2"><span>{t("download_file")}</span></Button>
                        <Button onClick={publishToServer} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>{t("generate_qr")}</span></Button>
                     </div>
-                    {qrImage && (
-                       <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">
+                      {qrImage && (
+                        <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">
                           <img src={qrImage} alt="QR" className="w-48 h-48" />
                           <div className="mt-4 flex gap-3">
-                             <Button onClick={writeNfc} variant="outline" className="text-xs h-8 px-3 text-slate-600">{t("write_to_nfc")}</Button>
-                             <Button onClick={() => { navigator.clipboard.writeText(out); setMsg({type:'ok', text:t("json_copied")}); }} variant="ghost" className="text-xs h-8 px-3 text-slate-500">JSON Kopyala</Button>
+                            <Button onClick={writeNfc} variant="outline" className="text-xs h-8 px-3 text-slate-600">{t("write_to_nfc")}</Button>
+                            <Button onClick={() => { navigator.clipboard.writeText(qrBase64); setMsg({type:'ok', text:t("json_copied")}); }} variant="ghost" className="text-xs h-8 px-3 text-slate-500">QR Kopyala</Button>
+                            <Button onClick={() => { navigator.clipboard.writeText(out); setMsg({type:'ok', text:t("json_copied")}); }} variant="ghost" className="text-xs h-8 px-3 text-slate-500">JSON Kopyala</Button>
                           </div>
-                       </div>
-                    )}
+                        </div>
+                      )}
                  </div>
               </div>
            </div>
