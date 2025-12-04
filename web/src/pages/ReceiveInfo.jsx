@@ -553,10 +553,16 @@ export default function ReceiveInfo() {
                         variant="primary"
                         onClick={async () => {
                           try {
-                           await importUserCredential(info);
-                           setMsg({ type: 'ok', text: 'Kimlik bilgisi cüzdanınıza eklendi.' });
+                            // Eğer info.vc varsa onu ekle, yoksa info'yu ekle
+                            const vcToAdd = info.vc ? info.vc : info;
+                            if (!vcToAdd.credentialSubject || !vcToAdd.credentialSubject.id) {
+                              setMsg({ type: 'err', text: 'Kimlik bilgisinde "credentialSubject.id" (DID) eksik. Verisi hatalı olabilir.' });
+                              return;
+                            }
+                            await importUserCredential(vcToAdd);
+                            setMsg({ type: 'ok', text: 'Kimlik bilgisi cüzdanınıza eklendi.' });
                           } catch (e) {
-                           setMsg({ type: 'err', text: 'Ekleme başarısız: ' + (e?.message || 'hata') });
+                            setMsg({ type: 'err', text: 'Ekleme başarısız: ' + (e?.message || 'hata') });
                           }
                         }}
                        >
