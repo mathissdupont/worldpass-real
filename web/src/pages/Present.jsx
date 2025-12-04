@@ -366,7 +366,10 @@ export default function Present() {
   };
 
   const publishToServer = async () => {
-    if (!out) return;
+    if (!out) {
+      setMsg({ type: "err", text: "Önce sunum oluşturmalısınız. (No input text present)" });
+      return;
+    }
     try {
       setMsg(null);
       const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: out });
