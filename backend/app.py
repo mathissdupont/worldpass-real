@@ -1320,7 +1320,7 @@ async def list_issuer_templates(issuer=Depends(_get_current_issuer), db=Depends(
     return {"templates": templates}
 
 
-@app.put(f"{API}/issuer/templates/{template_id}")
+@app.put(f"{API}/issuer/templates" + "/{template_id}")
 async def update_issuer_template(template_id: int, body: dict, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
     """Update a VC template"""
     now = int(time.time())
@@ -1367,7 +1367,7 @@ async def update_issuer_template(template_id: int, body: dict, issuer=Depends(_g
     return {"ok": True}
 
 
-@app.delete(f"{API}/issuer/templates/{template_id}")
+@app.delete(f"{API}/issuer/templates" + "/{template_id}")
 async def delete_issuer_template(template_id: int, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
     """Delete a VC template"""
     # Check ownership
