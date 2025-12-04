@@ -158,17 +158,10 @@ export default function ReceiveInfo() {
       setMsg({ type: "err", text: "Veri bulunamadı. Lütfen QR/NFC okutun veya manuel veri girin." });
       return;
     }
-    let decoded = raw;
-    // Eğer base64url ise decode et, değilse direkt kullan
-    try {
-      // Bilgi Al QR: base64url ile encode edilmiş URL ise
-      const tryB64 = decodeB64Url(raw);
-      if (tryB64 && tryB64.startsWith("/api/")) {
-        decoded = tryB64;
-      }
-    } catch {}
-    // Eğer decoded bir URL ise, backend'den credential çek
-    if (/^\/api\//.test(decoded)) {
+    let decoded = raw.trim();
+    
+    // Eğer URL ise (http, https veya /api/ ile başlayan), backend'den credential çek
+    if (/^(https?:\/\/|\/api\/)/.test(decoded)) {
       fetch(decoded).then(r => r.json()).then(parsed => {
         setInfo(parsed);
         setMsg({ type: "ok", text: "Bilgi başarıyla alındı ve işlendi." });
@@ -180,6 +173,7 @@ export default function ReceiveInfo() {
       });
       return;
     }
+    
     // Eğer direkt JSON ise
     try {
       const parsed = JSON.parse(decoded);
@@ -189,7 +183,7 @@ export default function ReceiveInfo() {
       stopNfcScan();
     } catch {
       setInfo(null);
-      if (raw.trim().length > 0) {
+      if (decoded.length > 0) {
         setMsg({ type: "err", text: "Geçersiz format veya hatalı JSON verisi. Lütfen doğru QR kodu okutun veya geçerli veri girin." });
       }
     }

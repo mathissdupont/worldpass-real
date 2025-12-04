@@ -203,16 +203,10 @@ export default function VerifyVC() {
          return;
       }
       try {
-         let decoded = raw;
-         // Önce base64url decode dene
-         try {
-           const tryB64 = decodeB64Url(raw);
-           if (tryB64 && tryB64.startsWith("/api/")) {
-             decoded = tryB64;
-           }
-         } catch {}
-         // Eğer decoded bir URL ise, backend'den credential çek
-         if (/^\/api\//.test(decoded)) {
+         let decoded = raw.trim();
+         
+         // Eğer URL ise (http, https veya /api/ ile başlayan), backend'den credential çek
+         if (/^(https?:\/\/|\/api\/)/.test(decoded)) {
            const r = await fetch(decoded);
            const txt = await r.text();
            const obj = safeParse(txt);
@@ -220,6 +214,7 @@ export default function VerifyVC() {
            setMsg({ type: "err", text: "Backend'den veri alınamadı veya JSON hatalı." });
            return;
          }
+         
          // Eğer direkt JSON ise
          const obj = safeParse(decoded);
          if (obj) { acceptPayload(obj, JSON.stringify(obj, null, 2)); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }

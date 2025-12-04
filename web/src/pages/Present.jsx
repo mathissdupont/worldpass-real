@@ -393,10 +393,9 @@ export default function Present() {
       const d = await r.json();
       setPublishedPath(d.path);
       const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
-      // Bilgi Al QR: base64url
-      const encoded = b64u(full);
-      setQrBase64(encoded);
-      setQrImage(await qrToDataURL(encoded, { width: 256, margin: 1 }));
+      // Bilgi Al QR: direkt URL (base64url URL'i çok uzun oluyor, QR kod oluşturamıyor)
+      setQrBase64(full);
+      setQrImage(await qrToDataURL(full, { width: 256, margin: 1, errorCorrectionLevel: 'M' }));
       setMsg({ type: "ok", text: "Bilgi Al QR'ı oluşturuldu." });
     } catch (e) { setMsg({ type: "err", text: "Yükleme hatası: " + (e?.message || "") }); }
   };
@@ -416,7 +415,7 @@ export default function Present() {
       setPublishedPath(d.path);
       const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
       setQrBase64(full);
-      setQrImage(await qrToDataURL(full, { width: 256, margin: 1 }));
+      setQrImage(await qrToDataURL(full, { width: 256, margin: 1, errorCorrectionLevel: 'M' }));
       setMsg({ type: "ok", text: "Doğrulama QR'ı oluşturuldu." });
     } catch (e) { setMsg({ type: "err", text: "Yükleme hatası: " + (e?.message || "") }); }
   };
@@ -440,7 +439,8 @@ export default function Present() {
         const records = [];
 
         if (writeType === "url" || writeType === "both") {
-           records.push({ recordType: "url", data: full });
+           // Artık direkt URL kullanıyoruz
+           records.push({ recordType: "url", data: qrBase64 || full });
         }
         if (writeType === "json" || writeType === "both") {
           records.push({ recordType: "text", data: out });
