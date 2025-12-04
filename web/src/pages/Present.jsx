@@ -386,7 +386,9 @@ export default function Present() {
     }
     try {
       setMsg(null);
-      const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: out });
+      // Parse the JSON string to send as object
+      const payload = JSON.parse(out);
+      const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const d = await r.json();
       setPublishedPath(d.path);
