@@ -13,6 +13,12 @@ const CredentialIssuerForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  
+  // Template system
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [customFields, setCustomFields] = useState({});
 
   // Get issuer token from localStorage
   const getIssuerToken = () => {
@@ -48,11 +54,49 @@ const CredentialIssuerForm = () => {
       }
     };
 
+    const loadTemplates = async () => {
+      setLoadingTemplates(true);
+      try {
+        const token = getIssuerToken();
+        if (!token) return;
+        
+        const response = await fetch("/api/issuer/templates", {
+          headers: { "X-Token": token }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data.templates || []);
+        }
+      } catch (e) {
+        console.error("Template loading error:", e);
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+
     loadProfile();
+    loadTemplates();
   }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplate(template);
+    setForm({ ...form, credentialType: template.vc_type });
+    
+    // Initialize custom fields with empty values
+    const fields = {};
+    template.fields.forEach(field => {
+      fields[field.name] = '';
+    });
+    setCustomFields(fields);
+  };
+
+  const handleCustomFieldChange = (fieldName, value) => {
+    setCustomFields({ ...customFields, [fieldName]: value });
   };
 
   const handleSubmit = async (e) => {
@@ -72,6 +116,14 @@ const CredentialIssuerForm = () => {
       }
 
       // Build VC payload according to backend expectations
+      const credentialSubject = {
+        id: form.holderDid,
+        name: form.name,
+        surname: form.surname,
+        email: form.email,
+        ...customFields // Add custom fields from template
+      };
+      
       const vcPayload = {
         "@context": [
           "https://www.w3.org/2018/credentials/v1"
@@ -79,12 +131,7 @@ const CredentialIssuerForm = () => {
         "type": ["VerifiableCredential", form.credentialType],
         "issuer": issuerProfile.did,
         "issuanceDate": new Date().toISOString(),
-        "credentialSubject": {
-          "id": form.holderDid,
-          "name": form.name,
-          "surname": form.surname,
-          "email": form.email
-        },
+        "credentialSubject": credentialSubject,
         "jti": `vc-${Date.now()}`
       };
 
@@ -133,6 +180,54 @@ const CredentialIssuerForm = () => {
               <strong>DID:</strong> {issuerProfile.did}
             </p>
           </div>
+
+          {/* Template Selection */}
+          {templates.length > 0 && (
+            <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded">
+              <label className="block text-sm font-semibold mb-2 text-blue-900">
+                Şablon Seç (Opsiyonel)
+              </label>
+              <div className="grid gap-2">
+                {templates.map(template => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => handleTemplateSelect(template)}
+                    className={`text-left p-3 border rounded transition-colors ${
+                      selectedTemplate?.id === template.id
+                        ? 'border-blue-500 bg-blue-100'
+                        : 'border-gray-300 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="font-medium">{template.name}</div>
+                    {template.description && (
+                      <div className="text-xs text-gray-600 mt-1">{template.description}</div>
+                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs px-2 py-0.5 rounded bg-blue-200 text-blue-800">
+                        {template.vc_type}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {template.fields?.length || 0} field
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {selectedTemplate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setCustomFields({});
+                  }}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Şablonu Temizle
+                </button>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -206,6 +301,32 @@ const CredentialIssuerForm = () => {
                 required
               />
             </div>
+
+            {/* Custom Fields from Template */}
+            {selectedTemplate && selectedTemplate.fields && selectedTemplate.fields.length > 0 && (
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <h3 className="text-sm font-semibold mb-3 text-gray-700">
+                  Şablon Field'ları ({selectedTemplate.name})
+                </h3>
+                <div className="space-y-3">
+                  {selectedTemplate.fields.map((field, idx) => (
+                    <div key={idx}>
+                      <label className="block text-sm font-medium mb-1">
+                        {field.name} {field.required && <span className="text-red-500">*</span>}
+                      </label>
+                      <input
+                        type={field.type || 'text'}
+                        value={customFields[field.name] || ''}
+                        onChange={(e) => handleCustomFieldChange(field.name, e.target.value)}
+                        className="w-full border p-2 rounded"
+                        required={field.required}
+                        placeholder={`${field.name} giriniz`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

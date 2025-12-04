@@ -1167,6 +1167,70 @@ async def issuer_profile(issuer=Depends(_get_current_issuer)):
     )
 
 
+@app.get(f"{API}/issuer/me")
+async def get_issuer_me(issuer=Depends(_get_current_issuer)):
+    """Get current issuer profile (alternative endpoint)"""
+    return {
+        "issuer": {
+            "id": issuer["id"],
+            "name": issuer["name"],
+            "email": issuer["email"],
+            "domain": issuer["domain"],
+            "did": issuer["did"],
+            "status": issuer["status"],
+            "created_at": issuer["created_at"],
+            "meta": json.loads(issuer["meta"] or "{}"),
+            "contact_email": issuer.get("contact_email", ""),
+            "support_link": issuer.get("support_link", ""),
+            "timezone": issuer.get("timezone", "UTC"),
+            "locale": issuer.get("locale", "en")
+        }
+    }
+
+
+@app.patch(f"{API}/issuer/me")
+async def update_issuer_me(body: dict, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Update current issuer profile"""
+    now = int(time.time())
+    
+    updates = []
+    params = []
+    
+    if "name" in body:
+        updates.append("name=?")
+        params.append(body["name"])
+    
+    if "domain" in body:
+        updates.append("domain=?")
+        params.append(body["domain"])
+    
+    if "contact_email" in body:
+        updates.append("contact_email=?")
+        params.append(body["contact_email"])
+    
+    if "support_link" in body:
+        updates.append("support_link=?")
+        params.append(body["support_link"])
+    
+    if "timezone" in body:
+        updates.append("timezone=?")
+        params.append(body["timezone"])
+    
+    if "locale" in body:
+        updates.append("locale=?")
+        params.append(body["locale"])
+    
+    if updates:
+        updates.append("updated_at=?")
+        params.append(now)
+        params.append(issuer["id"])
+        sql = f"UPDATE issuers SET {', '.join(updates)} WHERE id=?"
+        await db.execute(sql, tuple(params))
+        await db.commit()
+    
+    return {"ok": True}
+
+
 @app.post(f"{API}/issuer/change-password", response_model=ChangePasswordResp)
 @limiter.limit("5/minute")
 async def issuer_change_password(request: Request, body: ChangePasswordReq, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
@@ -1211,6 +1275,113 @@ async def issuer_rotate_api_key(issuer=Depends(_get_current_issuer), db=Depends(
     await db.commit()
     
     return IssuerApiKeyResp(api_key=api_key)
+
+
+# ---------- Issuer Templates ----------
+@app.post(f"{API}/issuer/templates")
+async def create_issuer_template(body: dict, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Create a new VC template for issuer"""
+    now = int(time.time())
+    
+    cur = await db.execute(
+        """
+        INSERT INTO issuer_templates(issuer_id, name, description, vc_type, schema_json, is_active, created_at, updated_at)
+        VALUES(?, ?, ?, ?, ?, 1, ?, ?)
+        """,
+        (issuer["id"], body["name"], body.get("description", ""), body["vc_type"], json.dumps(body["fields"]), now, now)
+    )
+    await db.commit()
+    template_id = cur.lastrowid
+    
+    return {"ok": True, "template_id": template_id}
+
+
+@app.get(f"{API}/issuer/templates")
+async def list_issuer_templates(issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Get all templates for current issuer"""
+    rows = await db.execute_fetchall(
+        "SELECT id, name, description, vc_type, schema_json, is_active, created_at, updated_at FROM issuer_templates WHERE issuer_id=? ORDER BY created_at DESC",
+        (issuer["id"],)
+    )
+    
+    templates = []
+    for row in rows:
+        templates.append({
+            "id": row["id"],
+            "name": row["name"],
+            "description": row["description"] or "",
+            "vc_type": row["vc_type"],
+            "fields": json.loads(row["schema_json"] or "[]"),
+            "is_active": bool(row["is_active"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]
+        })
+    
+    return {"templates": templates}
+
+
+@app.put(f"{API}/issuer/templates/{template_id}")
+async def update_issuer_template(template_id: int, body: dict, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Update a VC template"""
+    now = int(time.time())
+    
+    # Check ownership
+    existing = await db.execute_fetchone(
+        "SELECT id FROM issuer_templates WHERE id=? AND issuer_id=?",
+        (template_id, issuer["id"])
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="template_not_found")
+    
+    updates = []
+    params = []
+    
+    if "name" in body:
+        updates.append("name=?")
+        params.append(body["name"])
+    
+    if "description" in body:
+        updates.append("description=?")
+        params.append(body["description"])
+    
+    if "vc_type" in body:
+        updates.append("vc_type=?")
+        params.append(body["vc_type"])
+    
+    if "fields" in body:
+        updates.append("schema_json=?")
+        params.append(json.dumps(body["fields"]))
+    
+    if "is_active" in body:
+        updates.append("is_active=?")
+        params.append(1 if body["is_active"] else 0)
+    
+    if updates:
+        updates.append("updated_at=?")
+        params.append(now)
+        params.append(template_id)
+        sql = f"UPDATE issuer_templates SET {', '.join(updates)} WHERE id=?"
+        await db.execute(sql, tuple(params))
+        await db.commit()
+    
+    return {"ok": True}
+
+
+@app.delete(f"{API}/issuer/templates/{template_id}")
+async def delete_issuer_template(template_id: int, issuer=Depends(_get_current_issuer), db=Depends(get_db)):
+    """Delete a VC template"""
+    # Check ownership
+    existing = await db.execute_fetchone(
+        "SELECT id FROM issuer_templates WHERE id=? AND issuer_id=?",
+        (template_id, issuer["id"])
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="template_not_found")
+    
+    await db.execute("DELETE FROM issuer_templates WHERE id=?", (template_id,))
+    await db.commit()
+    
+    return {"ok": True}
 
 
 @app.post(f"{API}/issuer/verify-domain", response_model=IssuerVerifyDomainResp)

@@ -82,6 +82,9 @@ export default function IssueVC({ identity }) {
   const [out, setOut]                 = useState(null);
   const [recipientId, setRecipientId] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   // QR scan state
   const [qrScanning, setQrScanning] = useState(false);
@@ -187,6 +190,44 @@ export default function IssueVC({ identity }) {
 
   useEffect(() => { return () => { stopQrScan(); }; }, []);
 
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      
+      const response = await fetch("/api/issuer/templates", {
+        headers: { "X-Token": token }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data.templates || []);
+      }
+    } catch (e) {
+      console.error("Template loading error:", e);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const handleTemplateSelect = (template) => {
+    setSelectedTemplate(template);
+    setVcType(template.vc_type);
+    
+    // Load fields from template
+    const templateFields = template.fields || [];
+    setCustomFields(templateFields.map(f => ({ key: f.name, value: "" })));
+    
+    setShowTemplates(false);
+    setMsg({ type: "ok", text: `"${template.name}" şablonu yüklendi. Field'ları doldurun.` });
+  };
+
   const issue = useCallback(async () => {
     setMsg(null);
     if (!issuerReady) return setMsg({ type: "err", text: t("issuer_missing_err") });
@@ -283,12 +324,6 @@ export default function IssueVC({ identity }) {
          });
          setMsg({ type: "ok", text: "VC ve erişim URL'si NFC etiketine yazıldı." });
       } catch { setMsg({ type: "err", text: "NFC yazma başarısız." }); }
-  };
-
-  const handleTemplateSelect = (template) => {
-    setVcType(template.vc_type);
-    setShowTemplates(false);
-    setMsg({ type: "ok", text: `"${template.name}" şablonu yüklendi` });
   };
 
   return (
@@ -435,7 +470,42 @@ export default function IssueVC({ identity }) {
                    </div>
                    {showTemplates && (
                       <div className="border border-[color:var(--border)] rounded-xl p-3 bg-gradient-to-br from-[color:var(--panel-2)] to-[color:var(--panel)] animate-in slide-in-from-top">
-                         <TemplateManager onSelectTemplate={handleTemplateSelect} />
+                         {loadingTemplates ? (
+                           <div className="text-center py-4 text-[color:var(--muted)] text-sm">Şablonlar yükleniyor...</div>
+                         ) : templates.length === 0 ? (
+                           <div className="text-center py-4 text-[color:var(--muted)] text-sm">
+                             Henüz şablon oluşturulmamış. 
+                             <button className="text-[color:var(--brand)] underline ml-1" onClick={() => {/* TODO: Open template creator */}}>
+                               Yeni şablon oluştur
+                             </button>
+                           </div>
+                         ) : (
+                           <div className="grid gap-2">
+                             {templates.map(template => (
+                               <button
+                                 key={template.id}
+                                 onClick={() => handleTemplateSelect(template)}
+                                 className="text-left p-3 rounded-lg border border-[color:var(--border)] hover:border-[color:var(--brand)] hover:bg-[color:var(--panel)] transition-all group"
+                               >
+                                 <div className="flex items-start justify-between">
+                                   <div className="flex-1">
+                                     <div className="font-medium text-sm text-[color:var(--fg)] group-hover:text-[color:var(--brand)]">{template.name}</div>
+                                     {template.description && (
+                                       <div className="text-xs text-[color:var(--muted)] mt-0.5">{template.description}</div>
+                                     )}
+                                     <div className="flex items-center gap-2 mt-2">
+                                       <span className="text-xs px-2 py-0.5 rounded bg-[color:var(--panel-2)] text-[color:var(--muted)]">{template.vc_type}</span>
+                                       <span className="text-xs text-[color:var(--muted)]">{template.fields?.length || 0} field</span>
+                                     </div>
+                                   </div>
+                                   <svg className="w-5 h-5 text-[color:var(--muted)] group-hover:text-[color:var(--brand)] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                     <polyline points="9 18 15 12 9 6"/>
+                                   </svg>
+                                 </div>
+                               </button>
+                             ))}
+                           </div>
+                         )}
                       </div>
                    )}
                    {!showTemplates && (
