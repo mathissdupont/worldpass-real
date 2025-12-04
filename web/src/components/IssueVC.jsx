@@ -75,7 +75,8 @@ function generateRecipientId() {
 export default function IssueVC({ identity }) {
   const [subjectName, setSubjectName] = useState("");
   const [subjectDid, setSubjectDid]   = useState("");
-  const [vcType, setVcType]           = useState("StudentCard");
+  const [vcType, setVcType]           = useState("VerifiableCredential");
+  const [customFields, setCustomFields] = useState([]); // [{key: "", value: ""}]
   const [busy, setBusy]               = useState(false);
   const [msg, setMsg]                 = useState(null); 
   const [out, setOut]                 = useState(null);
@@ -197,15 +198,25 @@ export default function IssueVC({ identity }) {
       const issuance = nowIso();
       const newRecipientId = generateRecipientId();
       
+      // credentialSubject'e tüm custom field'ları ekle
+      const credentialSubject = { 
+        id: subjectDid.trim(), 
+        name: subjectName.trim(),
+        recipientId: newRecipientId
+      };
+      
+      // Custom field'ları ekle
+      customFields.forEach(field => {
+        if (field.key.trim() && field.value.trim()) {
+          credentialSubject[field.key.trim()] = field.value.trim();
+        }
+      });
+      
       const vcBody = {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         type: ["VerifiableCredential", vcType],
         issuer: identity.did, issuanceDate: issuance, jti,
-        credentialSubject: { 
-          id: subjectDid.trim(), 
-          name: subjectName.trim(),
-          recipientId: newRecipientId  // Add recipient ID to credential subject
-        },
+        credentialSubject,
       };
 
       const header = { alg: "EdDSA", typ: "JWT" };
@@ -222,18 +233,40 @@ export default function IssueVC({ identity }) {
         },
       };
 
+      // 1) Download
       const blob = new Blob([JSON.stringify(vcSigned, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `${jti}.wpvc`; a.click();
       URL.revokeObjectURL(a.href);
 
+      // 2) Add to issuer's wallet
       addVCToStore(vcSigned);
+      
+      // 3) Send to recipient's wallet via backend
+      try {
+        const response = await fetch("/api/user/vcs/add", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Wallet-Did": subjectDid.trim()
+          },
+          body: JSON.stringify({ vc: vcSigned })
+        });
+        
+        if (response.ok) {
+          setMsg({ type: "ok", text: "VC oluşturuldu, indirildi ve alıcının cüzdanına gönderildi!" });
+        } else {
+          setMsg({ type: "ok", text: "VC oluşturuldu ve indirildi. (Alıcının cüzdanına gönderilemedi)" });
+        }
+      } catch {
+        setMsg({ type: "ok", text: "VC oluşturuldu ve indirildi. (Alıcının cüzdanına gönderilemedi)" });
+      }
+      
       setRecipientId(newRecipientId);
       setOut(vcSigned);
-      setMsg({ type: "ok", text: t("vc_created_downloaded") });
     } catch (e) { setMsg({ type: "err", text: "Hata: " + e.message }); } finally { setBusy(false); }
-  }, [issuerReady, subjectName, subjectDid, vcType, jti, didOk, identity]);
+  }, [issuerReady, subjectName, subjectDid, vcType, customFields, jti, didOk, identity]);
 
   const writeNfc = async () => {
       if (!out || !recipientId) return;
@@ -425,18 +458,86 @@ export default function IssueVC({ identity }) {
                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
                      </svg>
-                     Kimlik Kartı Tipi *
+                     Kimlik Kartı Tipi
                    </label>
-                   <select 
-                      value={vcType} onChange={(e) => setVcType(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all cursor-pointer"
-                   >
-                      <option value="StudentCard">🎓 Öğrenci Kartı</option>
-                      <option value="Membership">🎫 Üyelik Kartı</option>
-                      <option value="KYC">🔐 Kimlik Doğrulama</option>
-                      <option value="EmployeeCard">👔 Çalışan Kartı</option>
-                      <option value="AccessCard">🚪 Erişim Kartı</option>
-                   </select>
+                   <input 
+                      value={vcType} onChange={(e) => setVcType(e.target.value)} 
+                      className="w-full px-3 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel)] text-sm focus:ring-2 focus:ring-[color:var(--brand)]/20 outline-none transition-all"
+                      placeholder="Örn: StudentCard, EmployeeCard, MembershipCard"
+                   />
+                   <p className="text-xs text-[color:var(--muted)]">
+                     Varsayılan: VerifiableCredential
+                   </p>
+                </div>
+                
+                <div className="border-t border-dashed border-[color:var(--border)]"></div>
+                
+                {/* Custom Fields */}
+                <div className="space-y-3">
+                   <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-[color:var(--fg)] flex items-center gap-2">
+                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                           <rect x="3" y="3" width="18" height="18" rx="2"/>
+                           <path d="M3 9h18M9 21V9"/>
+                         </svg>
+                         Ek Bilgiler
+                         <span className="text-xs font-normal text-[color:var(--muted)]">(Opsiyonel)</span>
+                      </label>
+                      <Button 
+                         onClick={() => setCustomFields([...customFields, {key: "", value: ""}])} 
+                         variant="outline"
+                         className="h-7 text-xs"
+                      >
+                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                           <line x1="12" y1="5" x2="12" y2="19"/>
+                           <line x1="5" y1="12" x2="19" y2="12"/>
+                         </svg>
+                         Alan Ekle
+                      </Button>
+                   </div>
+                   
+                   {customFields.length === 0 && (
+                     <p className="text-xs text-[color:var(--muted)] text-center py-3 bg-[color:var(--panel-2)] rounded-lg border border-dashed border-[color:var(--border)]">
+                       Henüz ek alan yok. "Alan Ekle" butonuna tıklayarak yeni bilgi ekleyin.
+                     </p>
+                   )}
+                   
+                   {customFields.map((field, idx) => (
+                     <div key={idx} className="flex gap-2 items-start bg-[color:var(--panel-2)] p-3 rounded-lg border border-[color:var(--border)]">
+                        <div className="flex-1 grid grid-cols-2 gap-2">
+                           <input 
+                              value={field.key} 
+                              onChange={(e) => {
+                                const newFields = [...customFields];
+                                newFields[idx].key = e.target.value;
+                                setCustomFields(newFields);
+                              }}
+                              className="px-2 py-1.5 rounded border border-[color:var(--border)] bg-[color:var(--panel)] text-xs focus:ring-1 focus:ring-[color:var(--brand)]/20 outline-none"
+                              placeholder="Alan adı (örn: studentId)"
+                           />
+                           <input 
+                              value={field.value} 
+                              onChange={(e) => {
+                                const newFields = [...customFields];
+                                newFields[idx].value = e.target.value;
+                                setCustomFields(newFields);
+                              }}
+                              className="px-2 py-1.5 rounded border border-[color:var(--border)] bg-[color:var(--panel)] text-xs focus:ring-1 focus:ring-[color:var(--brand)]/20 outline-none"
+                              placeholder="Değer (örn: 123456)"
+                           />
+                        </div>
+                        <button 
+                           onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
+                           className="p-1.5 rounded hover:bg-rose-100 text-rose-600 transition-colors"
+                           title="Sil"
+                        >
+                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                             <polyline points="3 6 5 6 21 6"/>
+                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                           </svg>
+                        </button>
+                     </div>
+                   ))}
                 </div>
              </div>
           </SectionCard>
@@ -452,18 +553,32 @@ export default function IssueVC({ identity }) {
              {canIssue ? (
                 <div className="space-y-4">
                    <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
-                      <div className="flex justify-between items-center mb-2 border-b border-[color:var(--border)] pb-2">
+                      <div className="flex justify-between items-center mb-3 border-b border-[color:var(--border)] pb-2">
                          <span className="text-xs font-bold uppercase text-[color:var(--muted)]">Önizleme</span>
                          <span className="text-xs font-mono text-[color:var(--muted)]">{jti}</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                         <div><span className="opacity-50 text-xs block">Tip</span> {vcType}</div>
-                         <div><span className="opacity-50 text-xs block">Kime</span> {subjectName}</div>
+                      <div className="space-y-3">
+                         <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div><span className="opacity-50 text-xs block mb-1">Tip</span><span className="font-medium">{vcType}</span></div>
+                            <div><span className="opacity-50 text-xs block mb-1">Kime</span><span className="font-medium">{subjectName}</span></div>
+                         </div>
+                         {customFields.length > 0 && (
+                           <div className="border-t border-dashed border-[color:var(--border)] pt-3">
+                              <span className="opacity-50 text-xs block mb-2">Ek Bilgiler:</span>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                 {customFields.filter(f => f.key.trim() && f.value.trim()).map((field, idx) => (
+                                   <div key={idx} className="bg-[color:var(--panel)] px-2 py-1.5 rounded border border-[color:var(--border)]">
+                                     <span className="opacity-60">{field.key}:</span> <span className="font-medium">{field.value}</span>
+                                   </div>
+                                 ))}
+                              </div>
+                           </div>
+                         )}
                       </div>
                    </div>
                    <div className="flex justify-end">
                       <Button onClick={issue} disabled={busy} variant="primary" className="w-full sm:w-auto shadow-xl shadow-[color:var(--brand)]/20">
-                         {busy ? "Basılıyor..." : "Kartı Bas ve İndir"}
+                         {busy ? "Basılıyor..." : "Kartı Bas ve Gönder"}
                       </Button>
                    </div>
                 </div>
