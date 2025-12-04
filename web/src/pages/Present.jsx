@@ -332,10 +332,12 @@ export default function Present() {
 
   const buildPayload = () => {
     setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
-    if (!presentationPayload) return setMsg({ type: "err", text: t("error_missing_data") });
+    if (!presentationPayload) {
+      setMsg({ type: "err", text: t("error_missing_data") });
+      return;
+    }
     try {
       let payloadToSend = { ...presentationPayload };
-      // Eğer request ve challenge varsa challenge imzası ekle
       if (request?.challenge) {
         const parts = [
           request.challenge,
@@ -353,9 +355,13 @@ export default function Present() {
           },
         };
       }
-      setOut(JSON.stringify(payloadToSend, null, 2));
+      const result = JSON.stringify(payloadToSend, null, 2);
+      setOut(result);
       setMsg({ type: "ok", text: t("presentation_signed_created") });
-    } catch (e) { setMsg({ type: "err", text: t("signature_error") + e.message }); }
+    } catch (e) {
+      setOut("");
+      setMsg({ type: "err", text: t("signature_error") + (e?.message || "") });
+    }
   };
 
   const download = () => {
