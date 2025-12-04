@@ -171,53 +171,55 @@ async def present_verify(payload: dict, db=Depends(get_db)):
     aud = payload.get("aud") or ""
     exp = payload.get("exp", None)
 
-    if not isinstance(ch, str) or not ch:
-        raise HTTPException(status_code=400, detail="missing_challenge")
+    # Challenge opsiyonel: varsa nonce kontrolü yap, yoksa basit doğrulama
+    has_challenge = isinstance(ch, str) and ch
 
-    # 2) Nonce / replay kontrolü (DB truth)
-    row = await db.execute_fetchone(
-        "SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (ch,)
-    )
-    if not row:
-        await db.execute(
-            "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
-            "VALUES(?,?,?,?,?,?)",
-            (now, "present_verify", "", "", "fail",
-             json.dumps({"reason": "replay_or_invalid_nonce"})),
+    # 2) Nonce / replay kontrolü (sadece challenge varsa)
+    if has_challenge:
+        row = await db.execute_fetchone(
+            "SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (ch,)
         )
-        await db.commit()
-        raise HTTPException(status_code=409, detail="replay_or_invalid_nonce")
+        if not row:
+            await db.execute(
+                "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+                "VALUES(?,?,?,?,?,?)",
+                (now, "present_verify", "", "", "fail",
+                 json.dumps({"reason": "replay_or_invalid_nonce"})),
+            )
+            await db.commit()
+            raise HTTPException(status_code=409, detail="replay_or_invalid_nonce")
 
-    if row["expires_at"] < now:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.execute(
-            "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
-            "VALUES(?,?,?,?,?,?)",
-            (now, "present_verify", "", "", "fail",
-             json.dumps({"reason": "nonce_expired"})),
-        )
-        await db.commit()
-        raise HTTPException(status_code=409, detail="nonce_expired")
+        if row["expires_at"] < now:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+            await db.execute(
+                "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
+                "VALUES(?,?,?,?,?,?)",
+                (now, "present_verify", "", "", "fail",
+                 json.dumps({"reason": "nonce_expired"})),
+            )
+            await db.commit()
+            raise HTTPException(status_code=409, detail="nonce_expired")
 
-    # Opsiyonel: payload.exp ile DB'deki expires_at uyumlu mu diye bakılabilir
-    if exp is not None:
-        try:
-            exp_int = int(exp)
-            if exp_int != row["expires_at"]:
-                # çok katı olmasın dersen bu bloğu kaldırabilirsin
+        # Opsiyonel: payload.exp ile DB'deki expires_at uyumlu mu diye bakılabilir
+        if exp is not None:
+            try:
+                exp_int = int(exp)
+                if exp_int != row["expires_at"]:
+                    # çok katı olmasın dersen bu bloğu kaldırabilirsin
+                    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+                    await db.commit()
+                    raise HTTPException(status_code=400, detail="exp_mismatch")
+            except Exception:
                 await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
                 await db.commit()
-                raise HTTPException(status_code=400, detail="exp_mismatch")
-        except Exception:
-            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-            await db.commit()
-            raise HTTPException(status_code=400, detail="bad_exp")
+                raise HTTPException(status_code=400, detail="bad_exp")
 
     # 3) VC imzasını ve issuer bilgisini doğrula
     vc = payload.get("vc") or {}
     ok, reason, issuer, subject = verify_vc(vc, signer)
     if not ok:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        if has_challenge:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
         await db.execute(
             "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
             "VALUES(?,?,?,?,?,?)",
@@ -260,7 +262,8 @@ async def present_verify(payload: dict, db=Depends(get_db)):
                 else:
                     # Hash mismatch - VC has been tampered with
                     logger.error(f"VC {jti} hash mismatch: computed={vc_hash}, on_chain={on_chain_record.vc_hash}")
-                    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+                    if has_challenge:
+                        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
                     await db.execute(
                         "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
                         "VALUES(?,?,?,?,?,?)",
@@ -292,58 +295,64 @@ async def present_verify(payload: dict, db=Depends(get_db)):
     holder_sig_b64u = holder.get("sig_b64u") or ""
     alg = holder.get("alg") or "Ed25519"
 
-    if not (holder_did and holder_pk_b64u and holder_sig_b64u):
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+    if not (holder_did and holder_pk_b64u):
+        if has_challenge:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
         await db.commit()
         raise HTTPException(status_code=400, detail="missing_holder")
 
     if alg != "Ed25519":
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        if has_challenge:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
         await db.commit()
         raise HTTPException(status_code=400, detail="unsupported_alg")
 
     subject_did = (vc.get("credentialSubject") or {}).get("id", "") or ""
     if subject_did != holder_did:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        if has_challenge:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
         await db.commit()
         raise HTTPException(status_code=400, detail="subject_holder_mismatch")
 
     # DID ↔ pk uyumu (senin önceki mantığı koruyorum)
     expected_did = f"did:key:z{holder_pk_b64u}"
     if expected_did != holder_did:
-        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+        if has_challenge:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
         await db.commit()
         raise HTTPException(status_code=400, detail="did_pk_mismatch")
 
-    # 6) Holder imzası: challenge|aud|exp formatı
-    try:
-        pk = b64u_d(holder_pk_b64u)
-        sig = b64u_d(holder_sig_b64u)
+    # 6) Holder imzası: challenge varsa kontrol et, yoksa atla
+    if has_challenge and holder_sig_b64u:
+        try:
+            pk = b64u_d(holder_pk_b64u)
+            sig = b64u_d(holder_sig_b64u)
 
-        # Frontend Present.jsx ile birebir aynı mesaj:
-        # const parts = [req.challenge, req.aud || "", req.exp ? String(req.exp) : ""].join("|");
-        # msgBytes = enc.encode(parts);
-        parts = [
-            ch,
-            aud or "",
-            str(exp) if exp is not None else "",
-        ]
-        msg = "|".join(parts).encode("utf-8")
+            # Frontend Present.jsx ile birebir aynı mesaj:
+            # const parts = [req.challenge, req.aud || "", req.exp ? String(req.exp) : ""].join("|");
+            # msgBytes = enc.encode(parts);
+            parts = [
+                ch,
+                aud or "",
+                str(exp) if exp is not None else "",
+            ]
+            msg = "|".join(parts).encode("utf-8")
 
-        signer.verify(pk, msg, sig)
-    except Exception:
+            signer.verify(pk, msg, sig)
+        except Exception:
+            await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
+            await db.commit()
+            raise HTTPException(status_code=401, detail="bad_holder_signature")
+
+    # 7) Nonce'i tüket (sadece challenge varsa), audit log yaz, sonucu döndür
+    if has_challenge:
         await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
-        await db.commit()
-        raise HTTPException(status_code=401, detail="bad_holder_signature")
-
-    # 7) Nonce'i tüket, audit log yaz, sonucu döndür
-    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (ch,))
     result = "revoked" if revoked else "ok"
     await db.execute(
         "INSERT INTO audit_logs(ts, action, did_issuer, did_subject, result, meta) "
         "VALUES(?,?,?,?,?,?)",
         (now, "present_verify", issuer or "", subject or "", result,
-         json.dumps({"revoked": revoked})),
+         json.dumps({"revoked": revoked, "had_challenge": has_challenge})),
     )
     await db.commit()
 
