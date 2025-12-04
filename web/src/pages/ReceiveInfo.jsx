@@ -159,9 +159,28 @@ export default function ReceiveInfo() {
       return;
     }
     let decoded = raw;
-    // Önce base64url decode dene
-    const b64Decoded = decodeB64Url(raw);
-    if (b64Decoded) decoded = b64Decoded;
+    // Eğer base64url ise decode et, değilse direkt kullan
+    try {
+      // Bilgi Al QR: base64url ile encode edilmiş URL ise
+      const tryB64 = decodeB64Url(raw);
+      if (tryB64 && tryB64.startsWith("/api/")) {
+        decoded = tryB64;
+      }
+    } catch {}
+    // Eğer decoded bir URL ise, backend'den credential çek
+    if (/^\/api\//.test(decoded)) {
+      fetch(decoded).then(r => r.json()).then(parsed => {
+        setInfo(parsed);
+        setMsg({ type: "ok", text: "Bilgi başarıyla alındı ve işlendi." });
+        stopQrScan();
+        stopNfcScan();
+      }).catch(() => {
+        setInfo(null);
+        setMsg({ type: "err", text: "Backend'den veri alınamadı." });
+      });
+      return;
+    }
+    // Eğer direkt JSON ise
     try {
       const parsed = JSON.parse(decoded);
       setInfo(parsed);

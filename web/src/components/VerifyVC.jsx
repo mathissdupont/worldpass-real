@@ -204,15 +204,23 @@ export default function VerifyVC() {
       }
       try {
          let decoded = raw;
-         // Try base64url decode first
-         const b64Decoded = decodeB64Url(raw);
-         if (b64Decoded) decoded = b64Decoded;
-         if (/^https?:\/\//.test(decoded)) {
-            const r = await fetch(decoded);
-            const txt = await r.text();
-            const obj = safeParse(txt);
-            if (obj) { acceptPayload(obj, txt); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
+         // Önce base64url decode dene
+         try {
+           const tryB64 = decodeB64Url(raw);
+           if (tryB64 && tryB64.startsWith("/api/")) {
+             decoded = tryB64;
+           }
+         } catch {}
+         // Eğer decoded bir URL ise, backend'den credential çek
+         if (/^\/api\//.test(decoded)) {
+           const r = await fetch(decoded);
+           const txt = await r.text();
+           const obj = safeParse(txt);
+           if (obj) { acceptPayload(obj, txt); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
+           setMsg({ type: "err", text: "Backend'den veri alınamadı veya JSON hatalı." });
+           return;
          }
+         // Eğer direkt JSON ise
          const obj = safeParse(decoded);
          if (obj) { acceptPayload(obj, JSON.stringify(obj, null, 2)); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
          setMsg({ type: "err", text: "Geçersiz veya hatalı QR kodu. Lütfen doğru QR kodunu okutun." });

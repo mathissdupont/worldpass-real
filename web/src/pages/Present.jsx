@@ -379,25 +379,45 @@ export default function Present() {
     a.download = "presentation.wpvp"; a.click();
   };
 
-  const publishToServer = async () => {
+  // Bilgi Al QR: base64url ile credential URL
+  const publishInfoQR = async () => {
     if (!out) {
       setMsg({ type: "err", text: "Önce sunum oluşturmalısınız." });
       return;
     }
     try {
       setMsg(null);
-      // Parse the JSON string to send as object
       const payload = JSON.parse(out);
       const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const d = await r.json();
       setPublishedPath(d.path);
       const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
-      // Encode the URL as base64url for QR
+      // Bilgi Al QR: base64url
       const encoded = b64u(full);
       setQrBase64(encoded);
       setQrImage(await qrToDataURL(encoded, { width: 256, margin: 1 }));
-      setMsg({ type: "ok", text: "Sunum başarıyla yüklendi ve QR oluşturuldu." });
+      setMsg({ type: "ok", text: "Bilgi Al QR'ı oluşturuldu." });
+    } catch (e) { setMsg({ type: "err", text: "Yükleme hatası: " + (e?.message || "") }); }
+  };
+
+  // Verify QR: direkt URL
+  const publishVerifyQR = async () => {
+    if (!out) {
+      setMsg({ type: "err", text: "Önce sunum oluşturmalısınız." });
+      return;
+    }
+    try {
+      setMsg(null);
+      const payload = JSON.parse(out);
+      const r = await fetch("/api/present/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      setPublishedPath(d.path);
+      const full = window.location.origin.replace(/\/$/, "") + "/" + String(d.path).replace(/^\//, "");
+      setQrBase64(full);
+      setQrImage(await qrToDataURL(full, { width: 256, margin: 1 }));
+      setMsg({ type: "ok", text: "Doğrulama QR'ı oluşturuldu." });
     } catch (e) { setMsg({ type: "err", text: "Yükleme hatası: " + (e?.message || "") }); }
   };
 
@@ -547,7 +567,8 @@ export default function Present() {
                  <div className="p-6 space-y-6">
                     <div className="grid sm:grid-cols-2 gap-4">
                        <Button onClick={download} variant="secondary" className="h-auto py-4 flex-col gap-2"><span>{t("download_file")}</span></Button>
-                       <Button onClick={publishToServer} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>Sunumu Yükle & QR Oluştur</span></Button>
+                       <Button onClick={publishInfoQR} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>Bilgi Al QR'ı Oluştur</span></Button>
+                       <Button onClick={publishVerifyQR} disabled={!!qrImage || !out} variant="outline" className="h-auto py-4 flex-col gap-2"><span>Doğrulama QR'ı Oluştur</span></Button>
                     </div>
                       {qrImage && (
                         <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">
