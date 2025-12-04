@@ -1,4 +1,12 @@
 // web/src/pages/Present.jsx
+// Helper: base64url decode string to utf-8
+function decodeB64Url(str) {
+  try {
+    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    return decodeURIComponent(escape(window.atob(b64)));
+  } catch { return null; }
+}
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { qrToDataURL } from "../lib/qr";
 import jsQR from "jsqr";
@@ -333,7 +341,7 @@ export default function Present() {
   const buildPayload = () => {
     setMsg(null); setOut(""); setPublishedPath(null); setQrImage(null);
     if (!presentationPayload) {
-      setMsg({ type: "err", text: t("error_missing_data") });
+      setMsg({ type: "err", text: "Önce paylaşılacak bilgileri seçin." });
       return;
     }
     try {
@@ -357,10 +365,10 @@ export default function Present() {
       }
       const result = JSON.stringify(payloadToSend, null, 2);
       setOut(result);
-      setMsg({ type: "ok", text: t("presentation_signed_created") });
+      setMsg({ type: "ok", text: "Sunum hazır. Şimdi yükleyebilir veya QR oluşturabilirsiniz." });
     } catch (e) {
       setOut("");
-      setMsg({ type: "err", text: t("signature_error") + (e?.message || "") });
+      setMsg({ type: "err", text: "Sunum oluşturulamadı: " + (e?.message || "") });
     }
   };
 
@@ -373,7 +381,7 @@ export default function Present() {
 
   const publishToServer = async () => {
     if (!out) {
-      setMsg({ type: "err", text: "Önce sunum oluşturmalısınız. (No input text present)" });
+      setMsg({ type: "err", text: "Önce sunum oluşturmalısınız." });
       return;
     }
     try {
@@ -387,8 +395,8 @@ export default function Present() {
       const encoded = b64u(full);
       setQrBase64(encoded);
       setQrImage(await qrToDataURL(encoded, { width: 256, margin: 1 }));
-      setMsg({ type: "ok", text: t("uploaded_to_server") });
-    } catch (e) { setMsg({ type: "err", text: t("upload_error") + e.message }); }
+      setMsg({ type: "ok", text: "Sunum başarıyla yüklendi ve QR oluşturuldu." });
+    } catch (e) { setMsg({ type: "err", text: "Yükleme hatası: " + (e?.message || "") }); }
   };
 
   const writeNfc = async (writeType = "url") => {
@@ -537,7 +545,7 @@ export default function Present() {
                  <div className="p-6 space-y-6">
                     <div className="grid sm:grid-cols-2 gap-4">
                        <Button onClick={download} variant="secondary" className="h-auto py-4 flex-col gap-2"><span>{t("download_file")}</span></Button>
-                       <Button onClick={publishToServer} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>{t("generate_qr")}</span></Button>
+                       <Button onClick={publishToServer} disabled={!!qrImage || !out} variant="primary" className="h-auto py-4 flex-col gap-2"><span>Sunumu Yükle & QR Oluştur</span></Button>
                     </div>
                       {qrImage && (
                         <div className="bg-white rounded-xl p-6 border shadow-inner flex flex-col items-center animate-in zoom-in-95">

@@ -1,6 +1,10 @@
 from pydantic_settings import BaseSettings
 import os
 import warnings
+from dotenv import load_dotenv
+
+# Load .env file from backend directory
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 class Settings(BaseSettings):
     APP_NAME: str = "WorldPass API"
@@ -9,7 +13,7 @@ class Settings(BaseSettings):
     SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/worldpass.db")
     CHALLENGE_TTL_SECONDS: int = 180
     ADMIN_USER: str = os.getenv("ADMIN_USER", "mathissdupont")
-    ADMIN_PASS_HASH: str = os.getenv("ADMIN_PASS_HASH", "$2b$12$HFVLw.RWOZRJunjsZBEdN.CC.mkh4uoOiaMLRh2k2JNEHKq30g/X6")  # bcrypt hash
+    ADMIN_PASS_HASH: str = os.getenv("ADMIN_PASS_HASH", "")  # Must be set in .env
     
     # JWT Secret - must be set in production
     JWT_SECRET: str = os.getenv("JWT_SECRET", "")

@@ -49,7 +49,7 @@ export default function Privacy() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <img src="/worldpass_logo.svg" alt="WorldPass" className="w-9 h-9 rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.8)] transition-shadow" />
+            <img src="/worldpass_logo.svg" alt="WorldPass" className="w-9 h-9" />
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
               WorldPass
             </span>

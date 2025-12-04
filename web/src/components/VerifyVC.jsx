@@ -198,7 +198,10 @@ export default function VerifyVC() {
   const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDrag(false); handleFile(e.dataTransfer?.files?.[0] || null); };
 
    const handleScanned = async (raw) => {
-      if (!raw) return;
+      if (!raw) {
+         setMsg({ type: "err", text: "QR koddan veri okunamadı. Lütfen tekrar deneyin." });
+         return;
+      }
       try {
          let decoded = raw;
          // Try base64url decode first
@@ -212,8 +215,8 @@ export default function VerifyVC() {
          }
          const obj = safeParse(decoded);
          if (obj) { acceptPayload(obj, JSON.stringify(obj, null, 2)); setMsg({ type: "ok", text: t("scanned_payload_loaded") }); return; }
-         setMsg({ type: "err", text: t("file_read_error") });
-      } catch (e) { setMsg({ type: "err", text: t("file_read_error") }); }
+         setMsg({ type: "err", text: "Geçersiz veya hatalı QR kodu. Lütfen doğru QR kodunu okutun." });
+      } catch (e) { setMsg({ type: "err", text: "QR kodu işlenemedi. Lütfen tekrar deneyin." }); }
    };
 
   const stopQrScan = async () => {

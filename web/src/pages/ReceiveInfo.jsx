@@ -154,7 +154,10 @@ export default function ReceiveInfo() {
 
   // Ortak İşleme Fonksiyonu
   function processData(raw) {
-    if (!raw) return;
+    if (!raw) {
+      setMsg({ type: "err", text: "Veri bulunamadı. Lütfen QR/NFC okutun veya manuel veri girin." });
+      return;
+    }
     let decoded = raw;
     // Önce base64url decode dene
     const b64Decoded = decodeB64Url(raw);
@@ -168,7 +171,7 @@ export default function ReceiveInfo() {
     } catch {
       setInfo(null);
       if (raw.trim().length > 0) {
-        setMsg({ type: "err", text: "Geçersiz format veya hatalı JSON verisi." });
+        setMsg({ type: "err", text: "Geçersiz format veya hatalı JSON verisi. Lütfen doğru QR kodu okutun veya geçerli veri girin." });
       }
     }
   }
@@ -453,48 +456,122 @@ export default function ReceiveInfo() {
                    Henüz bilgi alınmadı. Lütfen yukarıdaki yöntemlerden biriyle veri girişi yapın.
                 </div>
              ) : (
-                <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
-                    <div className="flex justify-end mb-2">
+                <div className="animate-in slide-in-from-bottom-2 fade-in duration-300 space-y-4">
+                    <div className="flex justify-end">
                        <Button variant="ghost" onClick={() => { setInfo(null); setJsonText(""); setMsg(null); setActiveStep(0); }} className="text-xs h-8 px-2">
                           Temizle ve Yeni Tara
                        </Button>
                     </div>
-                    
-                    <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)] overflow-hidden">
-                       <pre className="text-xs font-mono text-[color:var(--fg)] overflow-auto max-h-[400px]">
-                          {JSON.stringify(info, null, 2)}
-                       </pre>
-                    </div>
 
-                  {/* Wallet'e ekleme */}
-                  <div className="mt-3 flex items-center gap-3">
-                   <Button
-                    variant="primary"
-                    onClick={async () => {
-                      try {
-                       await importUserCredential(info);
-                       setMsg({ type: 'ok', text: 'Kimlik bilgisi cüzdanınıza eklendi.' });
-                      } catch (e) {
-                       setMsg({ type: 'err', text: 'Ekleme başarısız: ' + (e?.message || 'hata') });
-                      }
-                    }}
-                   >
-                    Cüzdanıma Ekle
-                   </Button>
-                   <span className="text-xs text-[color:var(--muted)]">Oturum açmış olmanız gerekir.</span>
-                  </div>
-
-                    {/* Veri Özeti (Opsiyonel - Eğer standart bir yapıysa güzel görünür) */}
-                    {typeof info === 'object' && !Array.isArray(info) && (
-                       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Object.entries(info).filter(([k,v]) => typeof v !== 'object' && v !== null).map(([k, v]) => (
-                             <div key={k} className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
-                                <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">{k}</span>
-                                <span className="text-sm font-medium text-[color:var(--fg)] truncate" title={String(v)}>{String(v)}</span>
-                             </div>
-                          ))}
+                    {/* Presentation Metadata */}
+                    {(info.type || info.created_at || info.challenge) && (
+                       <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
+                          <h3 className="text-xs font-bold text-[color:var(--muted)] uppercase mb-3 tracking-wider">Sunum Bilgisi</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             {info.type && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Tür</span>
+                                   <span className="text-sm font-medium text-[color:var(--fg)]">{info.type}</span>
+                                </div>
+                             )}
+                             {info.created_at && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Oluşturma Tarihi</span>
+                                   <span className="text-sm font-medium text-[color:var(--fg)]">{new Date(info.created_at * 1000).toLocaleString('tr-TR')}</span>
+                                </div>
+                             )}
+                             {info.challenge && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Challenge</span>
+                                   <span className="text-xs font-mono text-[color:var(--fg)] truncate" title={info.challenge}>{info.challenge.substring(0, 20)}...</span>
+                                </div>
+                             )}
+                          </div>
                        </div>
                     )}
+
+                    {/* Credential Özeti */}
+                    {info.vc && (
+                       <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
+                          <h3 className="text-xs font-bold text-[color:var(--muted)] uppercase mb-3 tracking-wider">Kimlik Bilgisi</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             {Array.isArray(info.vc.type) && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Tür</span>
+                                   <span className="text-sm font-medium text-[color:var(--fg)]">{info.vc.type[info.vc.type.length - 1]}</span>
+                                </div>
+                             )}
+                             {info.vc.issuer && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Issuer</span>
+                                   <span className="text-xs font-mono text-[color:var(--fg)] truncate" title={typeof info.vc.issuer === 'string' ? info.vc.issuer : (info.vc.issuer?.id || '')}>{typeof info.vc.issuer === 'string' ? info.vc.issuer.substring(0, 20) : (info.vc.issuer?.id || 'N/A').substring(0, 20)}...</span>
+                                </div>
+                             )}
+                          </div>
+                       </div>
+                    )}
+
+                    {/* Paylaşılan Bilgiler (Claims) */}
+                    {info.claims && typeof info.claims === 'object' && Object.keys(info.claims).length > 0 && (
+                       <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
+                          <h3 className="text-xs font-bold text-[color:var(--muted)] uppercase mb-3 tracking-wider">Paylaşılan Bilgiler</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             {Object.entries(info.claims).filter(([k,v]) => typeof v !== 'object' && v !== null).map(([k, v]) => (
+                                <div key={k} className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">{k}</span>
+                                   <span className="text-sm font-medium text-[color:var(--fg)] truncate" title={String(v)}>{String(v)}</span>
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+                    )}
+
+                    {/* Holder Bilgisi */}
+                    {info.holder && (
+                       <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
+                          <h3 className="text-xs font-bold text-[color:var(--muted)] uppercase mb-3 tracking-wider">Gönderen (Holder)</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             {info.holder.did && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">DID</span>
+                                   <span className="text-xs font-mono text-[color:var(--fg)] truncate" title={info.holder.did}>{info.holder.did.substring(0, 25)}...</span>
+                                </div>
+                             )}
+                             {info.holder.alg && (
+                                <div className="flex flex-col p-2 bg-[color:var(--panel)] border border-[color:var(--border)] rounded-lg">
+                                   <span className="text-[10px] text-[color:var(--muted)] uppercase font-bold">Algoritma</span>
+                                   <span className="text-sm font-medium text-[color:var(--fg)]">{info.holder.alg}</span>
+                                </div>
+                             )}
+                          </div>
+                       </div>
+                    )}
+
+                    {/* Wallet'e ekleme */}
+                    <div className="flex items-center gap-3 pt-4 border-t border-[color:var(--border)]">
+                       <Button
+                        variant="primary"
+                        onClick={async () => {
+                          try {
+                           await importUserCredential(info);
+                           setMsg({ type: 'ok', text: 'Kimlik bilgisi cüzdanınıza eklendi.' });
+                          } catch (e) {
+                           setMsg({ type: 'err', text: 'Ekleme başarısız: ' + (e?.message || 'hata') });
+                          }
+                        }}
+                       >
+                        Cüzdanıma Ekle
+                       </Button>
+                       <span className="text-xs text-[color:var(--muted)]">Oturum açmış olmanız gerekir.</span>
+                    </div>
+
+                    {/* JSON Detayları - Gelişmiş Kullanıcılar İçin */}
+                    <details className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
+                       <summary className="text-xs font-bold text-[color:var(--muted)] uppercase cursor-pointer">JSON Detayları</summary>
+                       <pre className="text-xs font-mono text-[color:var(--fg)] overflow-auto max-h-[300px] mt-3 bg-[color:var(--panel)] p-2 rounded border border-[color:var(--border)]">
+                          {JSON.stringify(info, null, 2)}
+                       </pre>
+                    </details>
                 </div>
              )}
           </SectionCard>
