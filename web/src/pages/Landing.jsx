@@ -22,19 +22,19 @@ import {
 
 // --- UTILITY COMPONENTS ---
 
-const BlurText = ({ text, delay = 0, className = '' }) => {
-  const words = text.split(' ');
+const BlurText = React.memo(({ text, delay = 0, className = '' }) => {
+  const words = React.useMemo(() => text.split(' '), [text]);
   return (
     <div className={`flex flex-wrap gap-x-3 gap-y-1 ${className}`}>
       {words.map((word, i) => (
         <motion.span
           key={i}
-          initial={{ opacity: 0, filter: 'blur(10px)', y: 20 }}
-          animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ 
-            duration: 0.8, 
-            delay: delay + i * 0.1, 
-            ease: [0.2, 0.65, 0.3, 0.9] 
+            duration: 0.5, 
+            delay: delay + i * 0.05,
+            ease: "easeOut"
           }}
           className="inline-block"
         >
@@ -43,7 +43,7 @@ const BlurText = ({ text, delay = 0, className = '' }) => {
       ))}
     </div>
   );
-};
+});
 
 const ShinyText = ({ text, className = '' }) => {
   return (
@@ -74,70 +74,36 @@ const GridPattern = () => (
   </div>
 );
 
-const FloatingOrbs = () => (
+const FloatingOrbs = React.memo(() => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
     <motion.div 
       animate={{ 
-        scale: [1, 1.2, 1],
-        opacity: [0.3, 0.5, 0.3],
-        x: [0, 100, 0],
-        y: [0, 50, 0]
+        scale: [1, 1.15, 1],
+        opacity: [0.15, 0.25, 0.15]
       }}
       transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-      className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] bg-indigo-600/30 rounded-full blur-[100px]" 
+      className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px]" 
     />
     <motion.div 
       animate={{ 
-        scale: [1, 1.3, 1],
-        opacity: [0.2, 0.4, 0.2],
-        x: [0, -100, 0],
-        y: [0, -50, 0]
+        scale: [1, 1.15, 1],
+        opacity: [0.15, 0.25, 0.15]
       }}
       transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-      className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-cyan-600/20 rounded-full blur-[120px]" 
-    />
-    <motion.div 
-      animate={{ 
-        scale: [1, 1.1, 1],
-        opacity: [0.15, 0.3, 0.15],
-        rotate: [0, 180, 360]
-      }}
-      transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-      className="absolute top-[40%] left-[30%] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[80px]" 
+      className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-purple-500/20 rounded-full blur-[120px]" 
     />
   </div>
-);
+));
 
-const SpotlightCard = ({ children, className = "" }) => {
-  const divRef = useRef(null);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [opacity, setOpacity] = useState(0);
-
-  const handleMouseMove = (e) => {
-    if (!divRef.current) return;
-    const rect = divRef.current.getBoundingClientRect();
-    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  };
-
+const SpotlightCard = React.memo(({ children, className = "" }) => {
   return (
     <div
-      ref={divRef}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setOpacity(1)}
-      onMouseLeave={() => setOpacity(0)}
-      className={`relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/50 backdrop-blur-sm ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-md hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/10 transition-all duration-500 ${className}`}
     >
-      <div
-        className="pointer-events-none absolute -inset-px opacity-0 transition duration-300"
-        style={{
-          opacity,
-          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(99,102,241,0.15), transparent 40%)`,
-        }}
-      />
       <div className="relative h-full">{children}</div>
     </div>
   );
-};
+});
 
 const FadeIn = ({ children, delay = 0 }) => (
   <motion.div
@@ -174,10 +140,10 @@ const Navbar = () => {
     <motion.nav 
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled 
-          ? 'bg-black/60 backdrop-blur-xl border-b border-white/10 py-3' 
+          ? 'bg-black/80 backdrop-blur-2xl border-b border-white/10 py-3 shadow-lg shadow-black/50' 
           : 'bg-transparent py-5'
       }`}
     >
@@ -191,19 +157,19 @@ const Navbar = () => {
           <img
             src="/worldpass_logo.svg"
             alt="WorldPass"
-            className="w-9 h-9 rounded-xl shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(99,102,241,0.8)] transition-shadow"
+            className="w-9 h-9"
           />
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
             WorldPass
           </span>
         </motion.a>
 
-        <div className="hidden md:flex items-center gap-1 bg-white/5 rounded-full px-2 py-2 border border-white/10 backdrop-blur-md">
+        <div className="hidden md:flex items-center gap-1 bg-white/5 rounded-full px-2 py-2 border border-white/5 backdrop-blur-xl">
           {navLinks.map((link) => (
             <a 
               key={link.name} 
               href={link.href} 
-              className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-indigo-500/20 rounded-full transition-all duration-300"
             >
               {link.name}
             </a>
@@ -322,18 +288,18 @@ const Hero = () => {
           <FadeIn delay={1.1}>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
               <motion.button
-                whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(99,102,241,0.6)" }}
+                whileHover={{ scale: 1.05, boxShadow: "0 0 40px rgba(99,102,241,0.5)" }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { track('landing_cta', { cta: 'join_early_access' }); navigate('/register'); }}
-                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full font-semibold flex items-center justify-center gap-2 shadow-xl"
+                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_100%] hover:bg-right text-white rounded-full font-semibold flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/25 transition-all duration-500"
               >
-                Erken Erişime Katıl <ChevronDown size={20} />
+                Erken Erişime Katıl <ArrowRight size={20} />
               </motion.button>
               <motion.button
-                whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.15)" }}
+                whileHover={{ scale: 1.05, borderColor: "rgba(99,102,241,0.5)", backgroundColor: "rgba(99,102,241,0.1)" }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => { track('landing_cta', { cta: 'see_how_it_works' }); }}
-                className="w-full sm:w-auto px-8 py-4 border border-white/20 text-white rounded-full font-semibold backdrop-blur-md hover:border-white/40 transition-all"
+                className="w-full sm:w-auto px-8 py-4 border border-white/10 text-white rounded-full font-semibold backdrop-blur-xl transition-all duration-300"
               >
                 Nasıl Çalıştığını Gör
               </motion.button>
@@ -365,11 +331,11 @@ const Hero = () => {
             transition={{ duration: 1, delay: 0.5 }}
             className="relative"
           >
-            <div className="w-[400px] h-[550px] bg-gradient-to-br from-zinc-900 via-black to-zinc-900 rounded-3xl border border-white/10 p-6 shadow-2xl relative overflow-hidden backdrop-blur-xl">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
+            <div className="w-[400px] h-[550px] bg-gradient-to-br from-zinc-900/90 via-indigo-950/20 to-zinc-900/90 rounded-3xl border border-white/10 p-6 shadow-2xl shadow-indigo-500/10 relative overflow-hidden backdrop-blur-xl">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDk5LDEwMiwyNDEsMC4wNSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30"></div>
               
-              <div className="absolute -top-20 -right-20 w-60 h-60 bg-indigo-500/20 blur-[80px]" />
-              <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-cyan-500/20 blur-[80px]" />
+              <div className="absolute -top-20 -right-20 w-60 h-60 bg-indigo-500/15 blur-[80px]" />
+              <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-purple-500/15 blur-[80px]" />
               
               <div className="flex justify-between items-start mb-8 relative z-10">
                 <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
@@ -431,12 +397,12 @@ const Hero = () => {
             </div>
 
             <motion.div 
-              animate={{ y: [0, -10, 0], rotate: [0, 2, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -right-12 top-24 bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl w-48"
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute -right-12 top-24 bg-gradient-to-br from-indigo-950/90 to-black/90 border border-indigo-500/20 p-4 rounded-xl shadow-2xl shadow-indigo-500/10 w-48 backdrop-blur-xl"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/30">
+                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
                   <Globe size={18} />
                 </div>
                 <div>
@@ -447,9 +413,9 @@ const Hero = () => {
             </motion.div>
 
             <motion.div 
-              animate={{ y: [0, 15, 0], rotate: [0, -2, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-              className="absolute -left-12 bottom-32 bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl w-48"
+              animate={{ y: [0, 15, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              className="absolute -left-12 bottom-32 bg-gradient-to-br from-purple-950/90 to-black/90 border border-purple-500/20 p-4 rounded-xl shadow-2xl shadow-purple-500/10 w-48 backdrop-blur-xl"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 border border-purple-500/30">
@@ -470,8 +436,8 @@ const Hero = () => {
 
 // --- FEATURES SECTION ---
 
-const Features = () => {
-  const features = [
+const Features = React.memo(() => {
+  const features = React.useMemo(() => [
     {
       title: "Hızlı Paylaşım",
       desc: "QR kod ile kimlik bilgilerini saniyeler içinde gösterebileceğin sade bir akış tasarlıyoruz.",
@@ -508,7 +474,7 @@ const Features = () => {
       icon: <Smartphone className="w-6 h-6" />,
       color: "from-indigo-500 to-purple-500"
     }
-  ];
+  ], []);
 
   return (
     <section id="features" className="py-24 bg-black relative overflow-hidden">
@@ -517,14 +483,14 @@ const Features = () => {
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="text-center mb-16 space-y-4">
           <FadeIn>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-medium backdrop-blur-md mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-sm font-medium backdrop-blur-xl mb-4">
               <Sparkles size={16} className="text-indigo-400" />
-              <span className="text-gray-400">Özellikler (MVP Hedefi)</span>
+              <span className="text-indigo-300">Özellikler (MVP Hedefi)</span>
             </div>
           </FadeIn>
           <FadeIn delay={0.1}>
             <h2 className="text-4xl md:text-5xl font-bold text-white">
-              Basit Başlayan <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-cyan-500">Dijital Kimlik Deneyimi</span>
+              Basit Başlayan <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400">Dijital Kimlik Deneyimi</span>
             </h2>
           </FadeIn>
           <FadeIn delay={0.2}>
@@ -537,11 +503,11 @@ const Features = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, i) => (
             <FadeIn key={i} delay={i * 0.1}>
-              <SpotlightCard className="h-full p-8 group hover:border-white/20 transition-all duration-300">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 text-white shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all duration-300`}>
+              <SpotlightCard className="h-full p-8 group">
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 text-white shadow-lg group-hover:scale-110 group-hover:shadow-xl group-hover:shadow-indigo-500/30 transition-all duration-500`}>
                   {feature.icon}
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-cyan-300 transition-colors">
+                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-300 transition-colors duration-300">
                   {feature.title}
                 </h3>
                 <p className="text-gray-400 text-sm leading-relaxed">
@@ -554,16 +520,16 @@ const Features = () => {
       </div>
     </section>
   );
-};
+});
 
 // --- HOW IT WORKS ---
 
-const HowItWorks = () => {
-  const steps = [
+const HowItWorks = React.memo(() => {
+  const steps = React.useMemo(() => [
     { id: "01", title: "Kayıt Ol", desc: "E-posta ile basit bir hesap oluştur ve erken erişim cüzdanını aktif et.", icon: <Shield /> },
     { id: "02", title: "Kimliklerini Ekle", desc: "İstersen örnek verilerle, istersen gerçek kimliklerinle cüzdanını test et.", icon: <Wallet /> },
     { id: "03", title: "QR ile Göster", desc: "Etkinlikte ya da kulüp ortamında kimliğini QR kod üzerinden gösterebileceğin akışı dene.", icon: <QrCode /> }
-  ];
+  ], []);
 
   return (
     <section id="how-it-works" className="py-24 bg-zinc-950 relative overflow-hidden">
@@ -586,11 +552,11 @@ const HowItWorks = () => {
                 whileHover={{ y: -10 }}
                 className="relative z-10 flex flex-col items-center text-center group cursor-pointer"
               >
-                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-zinc-900 to-black border border-white/10 flex items-center justify-center text-4xl font-bold text-white shadow-2xl mb-6 group-hover:border-indigo-500/50 transition-all duration-300 group-hover:shadow-[0_0_40px_rgba(99,102,241,0.3)]">
-                  <span className="absolute text-7xl font-bold text-white/5">{step.id}</span>
-                  <span className="relative text-indigo-400">{step.icon}</span>
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-zinc-900/80 to-indigo-950/50 border border-white/5 flex items-center justify-center text-4xl font-bold text-white shadow-2xl mb-6 group-hover:border-indigo-500/50 group-hover:bg-gradient-to-br group-hover:from-indigo-950/50 group-hover:to-purple-950/50 transition-all duration-500 group-hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]">
+                  <span className="absolute text-7xl font-bold text-indigo-500/5">{step.id}</span>
+                  <span className="relative text-indigo-400 group-hover:scale-110 transition-transform duration-300">{step.icon}</span>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-300 transition-colors">
+                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-300 transition-colors duration-300">
                   {step.title}
                 </h3>
                 <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
@@ -603,22 +569,22 @@ const HowItWorks = () => {
       </div>
     </section>
   );
-};
+});
 
 // --- SECURITY SECTION ---
 
-const SecuritySection = () => {
+const SecuritySection = React.memo(() => {
   return (
     <section id="security" className="py-24 bg-black relative overflow-hidden">
       <GridPattern />
       
       <div className="max-w-5xl mx-auto px-6 text-center relative z-10">
         <FadeIn>
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl mb-6 text-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl mb-6 text-indigo-400 shadow-[0_0_40px_rgba(99,102,241,0.3)]">
             <Lock size={40} />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Güven Tarafında <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-500">Gerçekçi Yaklaşım</span>
+            Güven Tarafında <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400">Gerçekçi Yaklaşım</span>
           </h2>
           <p className="text-gray-400 mb-8 max-w-3xl mx-auto text-lg leading-relaxed">
             WorldPass’i geliştirirken, verilerin olabildiğince kullanıcı tarafında ve şifreli tutulduğu bir model hedefliyoruz.
@@ -635,9 +601,9 @@ const SecuritySection = () => {
               <motion.span 
                 key={i}
                 whileHover={{ scale: 1.05, y: -2 }}
-                className="flex items-center gap-2 px-5 py-3 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all cursor-default backdrop-blur-sm"
+                className="flex items-center gap-2 px-5 py-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-gray-300 hover:border-indigo-500/40 hover:bg-indigo-500/20 transition-all duration-300 cursor-default backdrop-blur-xl"
               >
-                <CheckCircle2 size={16} className="text-emerald-500"/> {item}
+                <CheckCircle2 size={16} className="text-indigo-400"/> {item}
               </motion.span>
             ))}
           </div>
@@ -645,7 +611,7 @@ const SecuritySection = () => {
       </div>
     </section>
   );
-};
+});
 
 // --- FAQ SECTION ---
 
@@ -697,7 +663,7 @@ const FAQ = () => {
             <FadeIn key={i} delay={i * 0.1}>
               <motion.div 
                 whileHover={{ scale: 1.01 }}
-                className="border border-white/10 rounded-2xl bg-zinc-900/30 backdrop-blur-sm overflow-hidden hover:border-white/20 transition-all"
+                className="border border-white/5 rounded-2xl bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 backdrop-blur-xl overflow-hidden hover:border-indigo-500/30 transition-all duration-300"
               >
                 <button 
                   onClick={() => handleToggle(i)}
@@ -737,13 +703,14 @@ const FAQ = () => {
 
 // --- CTA SECTION ---
 
-const CTASection = () => {
+const CTASection = React.memo(() => {
   const navigate = useNavigate();
   
   return (
     <section className="py-24 bg-black relative overflow-hidden">
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-600/20 to-cyan-600/20 blur-[120px]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-indigo-500/20 blur-[150px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.1)_0%,transparent_70%)]" />
       </div>
       
       <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
@@ -769,18 +736,18 @@ const CTASection = () => {
       </div>
     </section>
   );
-};
+});
 
 // --- FOOTER ---
 
-const Footer = () => {
+const Footer = React.memo(() => {
   return (
-    <footer className="bg-zinc-950 border-t border-white/10 pt-16 pb-8">
+    <footer className="bg-zinc-950 border-t border-white/5 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <img src="/worldpass_logo.svg" alt="WorldPass" className="w-8 h-8 rounded-lg" />
+              <img src="/worldpass_logo.svg" alt="WorldPass" className="w-8 h-8" />
               <span className="text-lg font-bold text-white">WorldPass</span>
             </div>
             <p className="text-gray-500 text-sm">
@@ -824,7 +791,7 @@ const Footer = () => {
                   <li key={j}>
                     <a
                       href={link.href}
-                      className="text-gray-500 hover:text-white text-sm transition-colors"
+                      className="text-gray-500 hover:text-indigo-400 text-sm transition-colors duration-300"
                     >
                       {link.name}
                     </a>
@@ -854,7 +821,7 @@ const Footer = () => {
       </div>
     </footer>
   );
-};
+});
 
 // --- MAIN APP ---
 
