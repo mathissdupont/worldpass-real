@@ -51,7 +51,7 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api': 'https://worldpass-beta.heptapusgroup.com',
+      '/api': 'http://localhost:8000',
     },
     fs: {
       allow: [path.resolve(__dirname, '..')],

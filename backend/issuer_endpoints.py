@@ -8,8 +8,8 @@ from typing import Optional
 import time
 import json
 import logging
-from backend.database import get_db
-from backend.schemas import (
+from database import get_db
+from schemas import (
     IssuerUpdateReq,
     IssuerStatsResp,
     IssuerCredentialListReq,
@@ -44,7 +44,7 @@ async def _get_current_issuer_from_dep(x_token: Optional[str] = Header(None), db
     """
     # This will be imported from app.py's _get_current_issuer
     # For now, we'll import it dynamically to avoid circular imports
-    from backend.app import _get_current_issuer
+    from app import _get_current_issuer
     return await _get_current_issuer(x_token=x_token, db=db)
 
 
@@ -102,7 +102,7 @@ async def create_share_token(
     await db.commit()
     
     # Build share URL
-    from backend.settings import settings
+    from settings import settings
     base_url = settings.CORS_ORIGINS.split(",")[0].strip()
     share_url = f"{base_url}/receive-info?token={token}"
     

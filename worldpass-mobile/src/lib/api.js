@@ -14,6 +14,8 @@ const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
 
 const ACCOUNT_PROFILE_ENDPOINT = '/api/user/profile';
 const PROFILE_DATA_ENDPOINT = '/api/user/profile-data';
+const AUTH_CHALLENGE_ENDPOINT = '/api/auth/challenge';
+const AUTH_VERIFY_ENDPOINT = '/api/auth/verify';
 
 export async function getToken() {
   return await AsyncStorage.getItem('user_token');
@@ -78,21 +80,17 @@ function normalizeUserPayload(rawUser = {}) {
 }
 
 // User APIs
-export async function login(email, password) {
-  const data = await apiRequest('/api/user/login', {
+export async function didAuthChallenge(did, audience = 'worldpass-mobile') {
+  return apiRequest(AUTH_CHALLENGE_ENDPOINT, {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ did, audience }),
   });
-  if (data.token) {
-    await setToken(data.token);
-  }
-  return data;
 }
 
-export async function register(email, password, name) {
-  const data = await apiRequest('/api/user/register', {
+export async function didAuthVerify({ did, challenge, signature, displayName }) {
+  const data = await apiRequest(AUTH_VERIFY_ENDPOINT, {
     method: 'POST',
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify({ did, challenge, signature, displayName }),
   });
   if (data.token) {
     await setToken(data.token);

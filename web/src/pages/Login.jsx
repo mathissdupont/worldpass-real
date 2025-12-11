@@ -1,134 +1,141 @@
-// src/pages/Login.jsx
+// src/pages/Login.jsx - DID-based authentication
 import { useState, useEffect } from "react";
-import { verifyUser, setSession, isAuthed } from "../lib/auth";
-import { loadProfile, saveProfile } from "../lib/storage";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { authenticateWithDID, setSession, isAuthed } from "../lib/auth";
+import { useNavigate, useLocation } from "react-router-dom";
 import { t } from "../lib/i18n";
-
 import { useIdentity } from "../lib/identityContext";
 import IdentityLoad from "../components/IdentityLoad";
 import IdentityCreate from "../components/IdentityCreate";
+import { Shield, Key, ArrowRight } from "lucide-react";
+import { ed25519Sign, b64uToBytes } from "../lib/crypto";
 
-export default function Login(){
+export default function LoginDID() {
   const nav = useNavigate();
   const loc = useLocation();
   const { identity, setIdentity } = useIdentity();
 
-  const prof = loadProfile() || {};
-  const [email, setEmail]       = useState(prof.email || "");
-  const [remember, setRemember] = useState(Boolean(prof.email));
-  const [password, setPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [showOtp, setShowOtp] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
-
-  const authed = isAuthed();
-  const back   = loc.state?.from?.pathname || "/account";
-
+  const [displayName, setDisplayName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [didMode, setDidMode] = useState("load"); // 'load' | 'create'
 
+  const authed = isAuthed();
+  const back = loc.state?.from?.pathname || "/account";
+
   useEffect(() => {
-    if (authed && identity?.did) nav(back, { replace: true });
+    if (authed && identity?.did) {
+      nav(back, { replace: true });
+    }
   }, [authed, identity?.did, back, nav]);
 
-  useEffect(()=> setError(""), [email, password]);
+  const handleAuthenticate = async () => {
+    if (!identity?.did) {
+      setError("Please load or create your digital identity first");
+      return;
+    }
 
-  const submit = async (e)=>{
-    e.preventDefault();
     setError("");
     setLoading(true);
-    
-    try{
-      const result = await verifyUser(email, password, otpCode);
-      if(!result) {
-        // verifyUser returns null for invalid credentials (401)
-        throw new Error(t('login.error_invalid_credentials'));
-      }
 
-      if (remember) {
-        saveProfile({ ...loadProfile(), email });
-      } else {
-        const cur = loadProfile();
-        if (cur?.email) saveProfile({ ...cur, email: "" });
-      }
+    try {
+      const result = await authenticateWithDID({
+        did: identity.did,
+        signChallenge: async (challenge) => {
+          // Sign challenge with identity's private key
+          if (!identity.sk_b64u) {
+            throw new Error("Private key not available");
+          }
+          
+          // Decode private key from base64url
+          const skBytes = b64uToBytes(identity.sk_b64u);
+          
+          // Sign the challenge message
+          const messageBytes = new TextEncoder().encode(challenge);
+          const signature = ed25519Sign(skBytes, messageBytes);
+          
+          // Convert signature to base64url
+          const base64url = btoa(String.fromCharCode(...signature))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+          
+          return base64url;
+        },
+        displayName: displayName || identity.displayName || identity.did.slice(0, 20) + "..."
+      });
 
-      setSession({ email });
-      // DID check will happen in the effect or via identity context
-      // If DID exists in result, navigate immediately, otherwise show DID panel
-    }catch(e){
-      // Handle specific error messages from backend
-      let errorMessage = e.message || t('login.error_server');
-      
-      if (e.message && e.message.includes('otp_required')) {
-        setShowOtp(true);
-        setLoading(false);
-        return;
-      }
-      
-      if (e.message && e.message.includes('account_inactive')) {
-        errorMessage = t('login.error_account_inactive');
-      } else if (e.message && (e.message.includes('invalid_credentials') || e.message.includes('Invalid') || e.message.includes('invalid_otp'))) {
-        errorMessage = t('login.error_invalid_credentials');
-      } else if (e.message && e.message.includes('Authentication failed')) {
-        errorMessage = t('login.error_server');
-      }
-      setError(errorMessage);
+      setSession({
+        did: identity.did,
+        displayName: displayName || identity.displayName,
+        token: result.token
+      });
+
+      nav(back, { replace: true });
+    } catch (e) {
+      console.error("Authentication failed:", e);
+      setError(e.message || "Authentication failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const onLoadedIdent = (ident)=>{
+  const onLoadedIdent = (ident) => {
     setIdentity(ident);
-    nav(back, { replace: true });
+    setDisplayName(ident.displayName || "");
   };
 
-  /* ------------------ 1) Oturum açık + DID YOK → DID paneli ------------------ */
-  if (authed && !identity?.did) {
+  /* ------------------ DID not loaded → Identity panel ------------------ */
+  if (!identity?.did) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[color:var(--bg)]">
         <div className="max-w-3xl w-full space-y-4">
           <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] p-8 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-[color:var(--text)]">{t('complete_your_login')}</h3>
-              <span className="text-xs px-3 py-1.5 rounded-lg border border-amber-400/30 bg-[color:var(--panel-2)] text-amber-300">
-                {t('session_ok_did_missing')}
-              </span>
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[color:var(--brand)]/10 border border-[color:var(--brand)]/20 mb-4">
+                <Shield className="w-8 h-8 text-[color:var(--brand)]" />
+              </div>
+              <h2 className="text-2xl font-bold text-[color:var(--text)] mb-2">
+                {t('sign_in')}
+              </h2>
+              <p className="text-sm text-[color:var(--muted)]">
+                Load or create your digital identity to continue
+              </p>
             </div>
-            <p className="text-sm text-[color:var(--muted)] mb-6">{t('session_message')}</p>
 
-            <div className="inline-flex rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] overflow-hidden mb-6">
-              {["load","create"].map(mode=> (
+            {/* Mode Tabs */}
+            <div className="inline-flex rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] overflow-hidden mb-6 w-full">
+              {["load", "create"].map(mode => (
                 <button
                   key={mode}
-                  onClick={()=>setDidMode(mode)}
+                  onClick={() => setDidMode(mode)}
                   className={[
-                    "px-5 py-2 text-sm font-medium transition",
-                    didMode===mode
+                    "flex-1 px-5 py-3 text-sm font-medium transition",
+                    didMode === mode
                       ? "bg-[color:var(--brand)] text-white"
                       : "hover:bg-[color:var(--panel)] text-[color:var(--text)]"
                   ].join(" ")}
                 >
-                  {mode==="load" ? t('load_keystore') : t('create_did')}
+                  {mode === "load" ? t('load_keystore') : t('create_did')}
                 </button>
               ))}
             </div>
 
+            {/* Content */}
             <div>
               {didMode === "load" ? (
                 <>
                   <p className="text-sm text-[color:var(--muted)] mb-4">
                     {t('load_keystore_paragraph')}
                   </p>
-                  <IdentityLoad onLoaded={onLoadedIdent}/>
+                  <IdentityLoad onLoaded={onLoadedIdent} />
                 </>
               ) : (
                 <>
                   <p className="text-sm text-[color:var(--muted)] mb-4">
                     {t('create_did_paragraph')}
                   </p>
-                  <IdentityCreate onCreated={onLoadedIdent}/>
+                  <IdentityCreate onCreated={onLoadedIdent} />
                   <p className="mt-3 text-xs text-[color:var(--muted)]">
                     {t('after_create_hint')}
                   </p>
@@ -141,135 +148,78 @@ export default function Login(){
     );
   }
 
-  /* ------------------ 2) Oturum kapalı → Login formu ------------------ */
+  /* ------------------ DID loaded → Authentication ------------------ */
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[color:var(--bg)]">
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--panel)] shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-[color:var(--text)] mb-2">
-              {t('login.title')}
-            </h1>
-            <p className="text-sm text-[color:var(--muted)]">
-              {t('login.subtitle')}
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-500/10 border border-green-500/20 mb-4">
+              <Key className="w-8 h-8 text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-[color:var(--text)] mb-2">
+              Identity Loaded
+            </h2>
+            <p className="text-sm text-[color:var(--muted)] mb-4">
+              Sign in with your digital identity
             </p>
+            
+            {/* DID Display */}
+            <div className="p-3 rounded-lg bg-[color:var(--panel-2)] border border-[color:var(--border)]">
+              <div className="text-xs text-[color:var(--muted)] mb-1">Your DID</div>
+              <div className="text-xs font-mono text-[color:var(--text)] break-all">
+                {identity.did}
+              </div>
+            </div>
           </div>
 
-          {/* Error Display */}
+          {/* Display Name (optional) */}
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
+                Display Name (optional)
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
+              />
+            </div>
+          </div>
+
+          {/* Error */}
           {error && (
-            <div className="mb-6 p-4 rounded-lg border border-rose-400/30 bg-rose-500/10 text-rose-300 text-sm">
-              {error}
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={submit} className="space-y-5">
-            {/* Email Field */}
-            <div>
-              <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
-                {t('login.email_label')}
-              </label>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                placeholder={t('enter_email_placeholder')}
-                className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent transition"
-                value={email}
-                onChange={e=>setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
-                {t('login.password_label')}
-              </label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                placeholder="••••••••"
-                className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent transition"
-                value={password}
-                onChange={e=>setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            {/* OTP Field */}
-            {showOtp && (
-              <div className="animate-in fade-in slide-in-from-top-2">
-                <label className="block text-sm font-medium text-[color:var(--text)] mb-2">
-                  Two-Factor Code
-                </label>
-                <input
-                  type="text"
-                  autoComplete="one-time-code"
-                  required={showOtp}
-                  placeholder="000000"
-                  maxLength={6}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:border-transparent transition text-center tracking-widest font-mono"
-                  value={otpCode}
-                  onChange={e=>setOtpCode(e.target.value.replace(/\D/g,''))}
-                  disabled={loading}
-                  autoFocus
-                />
-              </div>
+          {/* Sign In Button */}
+          <button
+            onClick={handleAuthenticate}
+            disabled={loading}
+            className="w-full px-6 py-3 rounded-lg bg-[color:var(--brand)] hover:bg-[color:var(--brand-hover)] text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <span>Sign In with DID</span>
+                <ArrowRight className="w-5 h-5" />
+              </>
             )}
+          </button>
 
-            {/* Remember Me */}
-            <label className="flex items-center gap-2 text-sm text-[color:var(--text)] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e)=>setRemember(e.target.checked)}
-                disabled={loading}
-                className="w-4 h-4 rounded border-[color:var(--border)] bg-[color:var(--panel-2)] text-[color:var(--brand)] focus:ring-2 focus:ring-[color:var(--brand)] focus:ring-offset-0"
-              />
-              {t('login.remember_me')}
-            </label>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading || !email || !password}
-              className="w-full py-3 rounded-lg bg-[color:var(--brand)] text-white font-medium hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[color:var(--brand)] focus:ring-offset-2 focus:ring-offset-[color:var(--panel)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                  </svg>
-                  {t('login.loading')}
-                </span>
-              ) : (
-                t('login.submit')
-              )}
-            </button>
-          </form>
-
-          {/* Footer Links */}
-          <div className="mt-6 pt-6 border-t border-[color:var(--border)] space-y-3">
-            <p className="text-center text-sm text-[color:var(--muted)]">
-              {t('login.link_register_text')}{" "}
-              <Link 
-                to="/register" 
-                className="text-[color:var(--brand)] hover:underline font-medium"
-              >
-                {t('login.link_register')}
-              </Link>
-            </p>
-            <p className="text-center text-sm">
-              <Link 
-                to="/issuer/register" 
-                className="text-[color:var(--muted)] hover:text-[color:var(--text)] transition"
-              >
-                {t('login.link_org_login')}
-              </Link>
+          {/* Help Text */}
+          <div className="mt-6 text-center">
+            <p className="text-xs text-[color:var(--muted)]">
+              Your private key never leaves your device. Authentication is done via cryptographic signature.
             </p>
           </div>
         </div>

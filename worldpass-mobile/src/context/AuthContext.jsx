@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { login as loginApi, register as registerApi, getUserProfile, clearToken } from '../lib/api';
+import { didAuthChallenge, didAuthVerify, getUserProfile, clearToken } from '../lib/api';
+import { base64UrlToBytes, bytesToBase64Url, ed25519Sign } from '../lib/crypto';
 import { clearAllData } from '../lib/storage';
 
 const AuthContext = createContext({
@@ -7,7 +8,6 @@ const AuthContext = createContext({
   loading: true,
   error: null,
   signIn: async () => {},
-  signUp: async () => {},
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -44,24 +44,29 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const signIn = useCallback(async (email, password) => {
+  const signIn = useCallback(async ({ identity, displayName }) => {
+    if (!identity?.did || !identity?.sk_b64u) {
+      const err = new Error('identity_missing');
+      setError(err.message);
+      throw err;
+    }
+
     try {
       setError(null);
-      await loginApi(email, password);
+      // 1) challenge al
+      const { challenge } = await didAuthChallenge(identity.did, 'worldpass-mobile');
+
+      // 2) imzala
+      const skBytes = base64UrlToBytes(identity.sk_b64u);
+      const msgBytes = new TextEncoder().encode(challenge);
+      const sigBytes = await ed25519Sign(skBytes, msgBytes);
+      const signature = bytesToBase64Url(sigBytes);
+
+      // 3) verify + token al
+      await didAuthVerify({ did: identity.did, challenge, signature, displayName });
       await refreshProfile();
     } catch (err) {
       setError(err.message || 'login_failed');
-      throw err;
-    }
-  }, [refreshProfile]);
-
-  const signUp = useCallback(async (name, email, password) => {
-    try {
-      setError(null);
-      await registerApi(email, password, name);
-      await refreshProfile();
-    } catch (err) {
-      setError(err.message || 'register_failed');
       throw err;
     }
   }, [refreshProfile]);
@@ -77,10 +82,9 @@ export function AuthProvider({ children }) {
     loading,
     error,
     signIn,
-    signUp,
     signOut,
     refreshProfile,
-  }), [user, loading, error, signIn, signUp, signOut, refreshProfile]);
+  }), [user, loading, error, signIn, signOut, refreshProfile]);
 
   return (
     <AuthContext.Provider value={value}>

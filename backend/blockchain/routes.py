@@ -11,9 +11,9 @@ from typing import Optional
 from datetime import datetime
 import logging
 
-from backend.database import get_db
-from backend.blockchain.proof_store import SqliteBlockchainProofStore, VCOnChainRecord
-from backend.blockchain.vc_hash import compute_vc_hash, verify_vc_hash
+from database import get_db
+from blockchain.proof_store import SqliteBlockchainProofStore, VCOnChainRecord
+from blockchain.vc_hash import compute_vc_hash, verify_vc_hash
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/blockchain", tags=["blockchain"])

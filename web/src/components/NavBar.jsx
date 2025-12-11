@@ -96,7 +96,6 @@ export default function NavBar({ health, user, features }) {
     ? navItems.filter(i => hasAccess(i, user, features))
     : [
         {to:"/login",        label:"Giriş",              icon:"login"},
-        {to:"/register",     label:"Kayıt Ol",           icon:"register"},
         {to:"/issuer/login", label:"Kurum Girişi",       icon:"shield"},
         {to:"/verify",       label:"Doğrula",            icon:"verify"},
       ];

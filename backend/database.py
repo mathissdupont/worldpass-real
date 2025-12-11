@@ -1,6 +1,6 @@
 import aiosqlite
 from typing import AsyncGenerator
-from backend.settings import settings
+from settings import settings
 
 SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
@@ -42,11 +42,11 @@ CREATE TABLE IF NOT EXISTS worldpass_blockchain_ledger (
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT UNIQUE NOT NULL,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL,  -- bcrypt hash
-  did TEXT NOT NULL DEFAULT '', -- user's DID
+  email TEXT UNIQUE,            -- Optional: for legacy accounts or additional contact
+  first_name TEXT,              -- Optional: for display purposes
+  last_name TEXT,               -- Optional: for display purposes
+  password_hash TEXT,           -- Deprecated: kept for legacy accounts only
+  did TEXT UNIQUE NOT NULL,     -- Primary identifier: user's DID
   did_bound_at INTEGER,
   pending_did TEXT,
   pending_did_token TEXT,
@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_did ON users(did);
 
 CREATE TABLE IF NOT EXISTS user_vcs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -345,6 +346,29 @@ async def _run_migrations(conn: aiosqlite.Connection):
       await conn.execute("UPDATE users SET did='' WHERE did IS NULL")
     except Exception as e:
       print(f"Migration warning: Could not normalize user did column: {e}")
+    
+    # Create unique index on did column (for DID-first authentication)
+    try:
+        # Check if unique index already exists
+        cursor = await conn.execute("PRAGMA index_list(users)")
+        indexes = await cursor.fetchall()
+        has_did_unique = any('did' in str(idx) and idx[2] == 1 for idx in indexes)
+        
+        if not has_did_unique:
+            # For existing databases, we need to handle duplicate/empty DIDs
+            # First, generate unique DIDs for any empty ones
+            cursor = await conn.execute("SELECT id FROM users WHERE did = '' OR did IS NULL")
+            empty_did_users = await cursor.fetchall()
+            for row in empty_did_users:
+                import secrets
+                temp_did = f"did:temp:{secrets.token_urlsafe(16)}"
+                await conn.execute("UPDATE users SET did = ? WHERE id = ?", (temp_did, row[0]))
+            
+            # Now create the unique index
+            await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_did_unique ON users(did)")
+            print("Migration: Added unique index on users.did")
+    except Exception as e:
+        print(f"Migration warning: Could not create unique index on did: {e}")
     
     # Check if password_hash column exists in issuers table
     cursor = await conn.execute("PRAGMA table_info(issuers)")

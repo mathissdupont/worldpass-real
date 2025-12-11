@@ -6,7 +6,6 @@ import { t } from "./lib/i18n";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Account from "./pages/Account";
 import Profile from "./pages/Profile";
 import Issue from "./pages/Issue";
@@ -14,7 +13,6 @@ import CredentialIssuerForm from "./components/CredentialIssuerForm";
 import Verify from "./pages/Verify";
 import Credentials from "./pages/Credentials";
 import Settings from "./pages/Settings";
-import ShareInfo from "./pages/ShareInfo";
 import ReceiveInfo from "./pages/ReceiveInfo";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerApproval from "./pages/admin/IssuerApproval";
@@ -183,7 +181,6 @@ export default function App() {
 
                   {/* Public */}
                   <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/verify" element={<Verify />} />
@@ -271,7 +268,11 @@ export default function App() {
           />
           <Route
             path="/share-info"
-            element={<Navigate to="/present" replace />}
+            element={
+              <ProtectedRoute>
+                <ReceiveInfo />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/receive-info"

@@ -10,10 +10,10 @@ from datetime import datetime, timedelta
 import os
 import logging
 
-# Tamamı paket içi relative olsun:
-from backend.settings import settings
-from backend.database import get_db, init_db
-from backend.schemas import (
+# Local imports (no backend. prefix when running from backend dir)
+from settings import settings
+from database import get_db, init_db
+from schemas import (
     HealthResp, ChallengeReq, ChallengeResp,
     VerifyReq, VerifyResp,
     RevokeReq, RevokeResp,
@@ -46,15 +46,15 @@ from backend.schemas import (
     RecipientLookupResp,
     IssuerVerifyDomainReq, IssuerVerifyDomainResp,
 )
-from backend.core.crypto_ed25519 import Ed25519Signer, b64u_d
-from backend.core.vc import verify_vc
-from backend.core.vc_crypto import VCEncryptor, generate_encryption_key
-from backend.core.profile_crypto import get_profile_encryptor
-from backend.oauth_endpoints import router as oauth_router
-from backend.issuer_endpoints import router as issuer_router
-from backend.payment_endpoints import router as payment_router
-from backend.mock_provider_routes import router as mock_provider_router
-from backend.blockchain.routes import router as blockchain_router
+from core.crypto_ed25519 import Ed25519Signer, b64u_d
+from core.vc import verify_vc
+from core.vc_crypto import VCEncryptor, generate_encryption_key
+from core.profile_crypto import get_profile_encryptor
+from oauth_endpoints import router as oauth_router
+from issuer_endpoints import router as issuer_router
+from payment_endpoints import router as payment_router
+from mock_provider_routes import router as mock_provider_router
+from blockchain.routes import router as blockchain_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -138,6 +138,159 @@ async def new_challenge(body: ChallengeReq, db=Depends(get_db)):
     await db.commit()
 
     return ChallengeResp(challenge=nonce, nonce=nonce, expires_at=exp)
+
+
+# ---------- DID-based Authentication ----------
+from did_auth_schemas import DIDChallengeReq, DIDChallengeResp, DIDAuthVerifyReq, DIDAuthVerifyResp
+
+@app.post(f"{API}/auth/challenge", response_model=DIDChallengeResp)
+async def did_auth_challenge(body: DIDChallengeReq, db=Depends(get_db)):
+    """Generate a challenge for DID-based authentication"""
+    nonce = base64.urlsafe_b64encode(secrets.token_bytes(24)).decode().rstrip("=")
+    now = int(time.time())
+    exp = now + 300  # 5 minutes
+
+    # Store challenge
+    await db.execute(
+        "INSERT OR REPLACE INTO used_nonces(nonce, created_at, expires_at) VALUES(?,?,?)",
+        (nonce, now, exp),
+    )
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "did_auth_challenge", "ok", json.dumps({"did": body.did, "aud": body.audience})),
+    )
+    await db.commit()
+
+    # Challenge message format: "WorldPass Auth\nDID: {did}\nNonce: {nonce}\nAudience: {audience}"
+    challenge_msg = f"WorldPass Auth\nDID: {body.did}\nNonce: {nonce}\nAudience: {body.audience}"
+    
+    return DIDChallengeResp(challenge=challenge_msg, nonce=nonce, expires_at=exp)
+
+
+@app.post(f"{API}/auth/verify", response_model=DIDAuthVerifyResp)
+async def did_auth_verify(body: DIDAuthVerifyReq, db=Depends(get_db)):
+    """Verify DID signature and create/login user"""
+    now = int(time.time())
+
+    # 1. Verify challenge hasn't expired
+    row = await db.execute_fetchone(
+        "SELECT nonce, expires_at FROM used_nonces WHERE nonce=?", (body.challenge,)
+    )
+    if not row:
+        raise HTTPException(status_code=401, detail="invalid_challenge")
+    
+    if row["expires_at"] < now:
+        await db.execute("DELETE FROM used_nonces WHERE nonce=?", (body.challenge,))
+        await db.commit()
+        raise HTTPException(status_code=401, detail="challenge_expired")
+
+    # 2. Extract public key from DID and verify signature
+    try:
+        # did:key:z... format
+        if not body.did.startswith("did:key:z"):
+            raise HTTPException(status_code=400, detail="unsupported_did_format")
+        
+        pk_b64u = body.did.split("did:key:z")[1]
+        pk_bytes = b64u_d(pk_b64u)
+        
+        # Reconstruct challenge message
+        challenge_msg = f"WorldPass Auth\nDID: {body.did}\nNonce: {body.challenge}\nAudience: worldpass-web"
+        
+        # Verify signature
+        sig_bytes = b64u_d(body.signature)
+        if not signer.verify(pk_bytes, challenge_msg.encode(), sig_bytes):
+            raise HTTPException(status_code=401, detail="invalid_signature")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DID verification error: {e}")
+        raise HTTPException(status_code=400, detail="verification_failed")
+
+    # 3. Consume challenge
+    await db.execute("DELETE FROM used_nonces WHERE nonce=?", (body.challenge,))
+
+    # 4. Get or create user by DID
+    user = await db.execute_fetchone(
+        "SELECT id, did, display_name, created_at, updated_at FROM users WHERE did=?",
+        (body.did,)
+    )
+
+    if not user:
+        # Create new user with DID (legacy schemas require email/first/last/password not-null)
+        display_name = body.displayName or body.did[:20] + "..."
+        placeholder_email = body.did  # use DID as email placeholder
+        placeholder_pwd = "did-auth"   # marker string; not used for auth
+        await db.execute(
+            """
+            INSERT INTO users(
+              email, first_name, last_name, password_hash,
+              did, did_bound_at, display_name, theme, avatar, phone, lang,
+              otp_enabled, created_at, updated_at, status
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+              placeholder_email,
+              "",  # first_name
+              "",  # last_name
+              placeholder_pwd,
+              body.did,
+              now,
+              display_name,
+              "light",
+              "",
+              "",
+              "en",
+              0,
+              now,
+              now,
+              "active",
+            )
+        )
+        user_id = (await db.execute_fetchone("SELECT last_insert_rowid() as id"))["id"]
+
+        user = {
+            "id": user_id,
+            "did": body.did,
+            "display_name": display_name,
+            "created_at": now,
+            "updated_at": now
+        }
+    else:
+        # Update display name if provided
+        if body.displayName and body.displayName != user["display_name"]:
+            await db.execute(
+                "UPDATE users SET display_name=?, updated_at=? WHERE id=?",
+                (body.displayName, now, user["id"])
+            )
+            user = dict(user)
+            user["display_name"] = body.displayName
+
+    # 5. Generate JWT token
+    token_data = {
+        "sub": str(user["id"]),
+        "did": body.did,
+        "exp": datetime.utcnow() + timedelta(days=7)
+    }
+    token = jwt.encode(token_data, settings.JWT_SECRET, algorithm="HS256")
+
+    # 6. Audit log
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "did_auth_success", "ok", json.dumps({"did": body.did, "user_id": user["id"]})),
+    )
+    await db.commit()
+
+    return DIDAuthVerifyResp(
+        token=token,
+        user={
+            "id": user["id"],
+            "did": user["did"],
+            "displayName": user["display_name"],
+            "createdAt": user["created_at"]
+        },
+        message="authenticated"
+    )
 
 
 # ---------- /present/verify ----------
@@ -233,8 +386,8 @@ async def present_verify(payload: dict, db=Depends(get_db)):
     jti = vc.get("jti")
     if jti:
         try:
-            from backend.blockchain.proof_store import SqliteBlockchainProofStore
-            from backend.blockchain.vc_hash import compute_vc_hash
+            from blockchain.proof_store import SqliteBlockchainProofStore
+            from blockchain.vc_hash import compute_vc_hash
             
             blockchain_store = SqliteBlockchainProofStore(db)
             vc_hash = compute_vc_hash(vc)
@@ -396,10 +549,10 @@ async def _require_admin(x_token: Optional[str] = Header(None)):
 
 
 # ---------- user register / login ----------
-@app.post(f"{API}/user/register", response_model=UserRegisterResp)
+@app.post(f"{API}/user/register", response_model=UserRegisterResp, deprecated=True)
 @limiter.limit("5/minute")
 async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_db)):
-    """Register a new user with secure password hashing"""
+    """[DEPRECATED] Register a new user with secure password hashing. Use /api/auth/verify with DID authentication instead."""
     email = body.email.lower().strip()
     
     # Check if user already exists
@@ -456,10 +609,10 @@ async def user_register(request: Request, body: UserRegisterReq, db=Depends(get_
     )
 
 
-@app.post(f"{API}/user/login", response_model=UserLoginResp)
+@app.post(f"{API}/user/login", response_model=UserLoginResp, deprecated=True)
 @limiter.limit("10/minute")
 async def user_login(request: Request, body: UserLoginReq, db=Depends(get_db)):
-    """Authenticate user and return JWT token"""
+    """[DEPRECATED] Authenticate user and return JWT token. Use /api/auth/verify with DID authentication instead."""
     email = body.email.lower().strip()
     
     # Find user
@@ -543,13 +696,19 @@ async def _get_current_user(
     x_wallet_did: Optional[str] = Header(None),
     db=Depends(get_db)
 ):
-    """Get current authenticated user from JWT token"""
+    """Get current authenticated user from JWT token (supports both legacy and DID-based tokens)"""
     if not x_token:
         raise HTTPException(status_code=401, detail="missing_token")
     
     try:
         payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-        user_id: int = payload.get("user_id")
+        
+        # Support both token formats:
+        # - New format (DID-based): {"sub": user_id, "did": "did:key:z...", "exp": ...}
+        # - Legacy format: {"user_id": 123, "exp": ...}
+        user_id = payload.get("sub") or payload.get("user_id")
+        token_did = payload.get("did")  # Only present in new DID-based tokens
+        
         if not user_id:
             raise HTTPException(status_code=401, detail="invalid_token")
         
@@ -559,6 +718,13 @@ async def _get_current_user(
         )
         if not user:
             raise HTTPException(status_code=401, detail="user_not_found")
+        
+        # For DID-based tokens, verify that token DID matches user DID
+        if token_did:
+            user_did = (user["did"] or "").strip()
+            if token_did != user_did:
+                raise HTTPException(status_code=401, detail="token_did_mismatch")
+        
         wallet_did = (user["did"] or "").strip()
         current_path = request.url.path
         route_key = (request.method.upper(), current_path)
@@ -1485,7 +1651,7 @@ async def admin_approve_issuer(body: ApproveIssuerReq, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="issuer_not_found")
 
     # Generate signing keys for the issuer if not already present
-    from backend.core.crypto_ed25519 import b64u
+    from core.crypto_ed25519 import b64u
     sk_bytes, pk_bytes = signer.generate_keypair()
     sk_b64u = b64u(sk_bytes)
     pk_b64u = b64u(pk_bytes)
@@ -1554,7 +1720,7 @@ async def _ensure_issuer_keys(issuer: dict, db) -> dict:
     Returns:
         Updated issuer dict with keys
     """
-    from backend.core.crypto_ed25519 import b64u
+    from core.crypto_ed25519 import b64u
     
     # Convert Row to dict if needed, then check for keys
     issuer_dict = dict(issuer)
@@ -1633,8 +1799,8 @@ async def issuer_issue(
     issuer_pk_b64u = issuer["pk_b64u"]
     
     verification_method = f"{issuer['did']}#key-1"
-    from backend.core.vc import sign_vc
-    from backend.core.crypto_ed25519 import b64u_d
+    from core.vc import sign_vc
+    from core.crypto_ed25519 import b64u_d
     sk_bytes = b64u_d(issuer_sk_b64u)
     signed_vc = sign_vc(vc, signer, sk_bytes, issuer_pk_b64u, verification_method)
     vc = signed_vc
@@ -1743,8 +1909,8 @@ async def issuer_issue(
     
     # Register VC hash on blockchain proof ledger
     try:
-        from backend.blockchain.proof_store import SqliteBlockchainProofStore
-        from backend.blockchain.vc_hash import compute_vc_hash
+        from blockchain.proof_store import SqliteBlockchainProofStore
+        from blockchain.vc_hash import compute_vc_hash
         
         blockchain_store = SqliteBlockchainProofStore(db)
         vc_hash = compute_vc_hash(vc)
@@ -1818,7 +1984,7 @@ async def issuer_revoke(
     
     # Revoke on blockchain proof ledger
     try:
-        from backend.blockchain.proof_store import SqliteBlockchainProofStore
+        from blockchain.proof_store import SqliteBlockchainProofStore
         
         blockchain_store = SqliteBlockchainProofStore(db)
         await blockchain_store.revoke_vc(body.vc_id)

@@ -12,31 +12,32 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useIdentity } from '../context/IdentityContext';
 
 export default function LoginScreen({ navigation }) {
   const { signIn, error: authError } = useAuth();
   const { theme } = useTheme();
+  const { identity } = useIdentity();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  const hasEmptyFields = !email.trim() || !password;
+  const hasIdentity = Boolean(identity?.did && identity?.sk_b64u);
   const combinedError = formError || authError;
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handleSubmit = async () => {
-    if (hasEmptyFields) {
-      setFormError('Email and password are required');
+    if (!hasIdentity) {
+      setFormError('Load or import your DID keystore first');
       return;
     }
 
     try {
       setFormError(null);
       setSubmitting(true);
-      await signIn(email.trim(), password);
+      await signIn({ identity, displayName });
       // successful login → AppNavigator user dolunca tablere geçecek
     } catch (err) {
       setFormError(err?.message || 'Login failed');
@@ -62,25 +63,19 @@ export default function LoginScreen({ navigation }) {
 
           {/* Form */}
           <View style={styles.form}>
-            <TextInput
-              placeholder="Email"
-              placeholderTextColor={theme.colors.textMuted}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-              returnKeyType="next"
-            />
+            <View style={styles.identityCard}>
+              <Text style={styles.label}>Loaded DID</Text>
+              <Text style={styles.didText} numberOfLines={1}>
+                {identity?.did || 'No identity loaded'}
+              </Text>
+            </View>
 
             <TextInput
-              placeholder="Password"
+              placeholder="Display name (optional)"
               placeholderTextColor={theme.colors.textMuted}
               style={styles.input}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
+              value={displayName}
+              onChangeText={setDisplayName}
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
             />
@@ -92,27 +87,17 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                (submitting || hasEmptyFields) && styles.primaryButtonDisabled,
+                (submitting || !hasIdentity) && styles.primaryButtonDisabled,
               ]}
               onPress={handleSubmit}
-              disabled={submitting || hasEmptyFields}
+              disabled={submitting || !hasIdentity}
               activeOpacity={0.8}
             >
               {submitting ? (
                 <ActivityIndicator color={theme.colors.onPrimary} />
               ) : (
-                <Text style={styles.primaryButtonText}>Sign In</Text>
+                <Text style={styles.primaryButtonText}>Sign in with DID</Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Register')}
-              style={styles.linkContainer}
-            >
-              <Text style={styles.linkText}>
-                Don&apos;t have an account?{' '}
-                <Text style={styles.linkHighlight}>Register</Text>
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -124,7 +109,7 @@ export default function LoginScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Text style={styles.secondaryButtonText}>
-                Import wallet identity (.wpkeystore)
+                Import keystore (.wpkeystore)
               </Text>
             </TouchableOpacity>
           </View>
@@ -226,6 +211,24 @@ function createStyles(theme) {
       fontSize: theme.typography.sizes.sm,
       fontWeight: theme.typography.weights.semibold,
       textAlign: 'center',
+    },
+    identityCard: {
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.lg,
+      padding: theme.spacing.md,
+      marginBottom: theme.spacing.md,
+    },
+    label: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.textMuted,
+      marginBottom: theme.spacing.xs,
+    },
+    didText: {
+      fontSize: theme.typography.sizes.sm,
+      color: theme.colors.text,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
   });
 }

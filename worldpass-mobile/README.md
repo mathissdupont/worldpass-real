@@ -9,7 +9,7 @@ React Native + Expo mobile app for WorldPass verifiable credentials system.
 - 📷 **QR Scanner**: Scan QR codes to receive and verify credentials
 - 🔐 **Secure Storage**: Credentials encrypted with Expo SecureStore
 - 🔒 **Biometric Auth**: Optional Face ID/Touch ID protection
-- 👤 **Auth Flow**: Email/password login & registration with token storage
+- 👤 **DID Auth**: Password-free authentication with Ed25519 signatures
 - ⚡ **Cross-Platform**: Runs on iOS and Android
 
 ### Identity Management
@@ -25,9 +25,10 @@ React Native + Expo mobile app for WorldPass verifiable credentials system.
 - 📊 **Profile Progress**: Track your profile completion
 
 ### Security
-- 🛡️ **Two-Factor Authentication (2FA)**: TOTP-based 2FA with QR setup
+- 🔐 **DID Authentication**: Password-free login with Ed25519 signatures
 - 🔑 **Biometric Unlock**: Face ID / Touch ID support
-- 🔄 **Session Management**: Secure token-based authentication
+- 🔄 **Session Management**: Secure JWT token-based authentication
+- 🛡️ **Challenge-Response**: Replay attack protection with 5-minute nonce expiry
 
 ### Credential Management
 - 📋 **VC List**: View all your verifiable credentials
@@ -106,8 +107,7 @@ src/
 ├── navigation/
 │   └── AppNavigator.js      # Tab & stack navigation setup
 └── screens/
-    ├── LoginScreen.js       # Email/password sign in
-    ├── RegisterScreen.js    # Account creation
+    ├── LoginScreen.js       # DID-based authentication
     ├── WalletScreen.js      # Credential list + detail modal
     ├── ScannerScreen.js     # QR code scanner
     ├── SettingsScreen.js    # Profile, DID, security & sign-out
@@ -160,12 +160,21 @@ The app requires:
 ## Backend Integration
 
 The app connects to WorldPass backend at:
-- **Auth**: `/api/user/login`, `/api/user/register`
-- **Profile**: `/api/user/profile`
+- **Auth**: `/api/auth/challenge`, `/api/auth/verify` (DID-based authentication)
+- **Profile**: `/api/user/profile`, `/api/user/profile-data`
 - **DID Link**: `/api/user/did-link`
-- **2FA**: `/api/user/2fa/setup`, `/api/user/2fa/enable`, `/api/user/2fa/disable`
 - **Verify VC**: `/api/verify`
 - **Payments**: `/api/payments/transactions`
 - **Lookup**: `/api/recipient/lookup/:id`
 
-Authentication uses JWT token in `X-Token` header and wallet DID in `X-Wallet-Did` header.
+### Authentication Flow
+1. User loads keystore (.wpkeystore) containing DID and private key
+2. App requests challenge from `/api/auth/challenge` with DID
+3. Backend generates nonce and returns challenge message
+4. App signs challenge with Ed25519 private key (never leaves device)
+5. App sends signature to `/api/auth/verify`
+6. Backend verifies signature using DID's public key
+7. Backend returns JWT token for session
+8. Token stored in AsyncStorage and used in `X-Token` header
+
+**No passwords stored or transmitted**. Authentication is purely cryptographic.

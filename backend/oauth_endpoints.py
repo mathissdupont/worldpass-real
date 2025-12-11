@@ -1,15 +1,15 @@
 import html
 from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from backend.database import get_db
-from backend.oauth import register_oauth_client, authorize_oauth, token_oauth, get_user_info
-from backend.schemas import (
+from database import get_db
+from oauth import register_oauth_client, authorize_oauth, token_oauth, get_user_info
+from schemas import (
     OAuthClientRegisterReq, OAuthClientRegisterResp,
     OAuthAuthorizeReq, OAuthAuthorizeResp,
     OAuthTokenReq, OAuthTokenResp,
     OAuthUserInfo,
 )
-from backend.settings import settings
+from settings import settings
 
 router = APIRouter()
 API = settings.API_PREFIX

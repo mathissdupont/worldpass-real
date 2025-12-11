@@ -21,7 +21,6 @@ import TwoFactorScreen from '../screens/TwoFactorScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import VCQRScreen from '../screens/VCQRScreen';
 import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
 import PresentScreen from '../screens/PresentLandingScreen';
 import VerifyScreen from '../screens/VerifyScreen';
 import IssuerScreen from '../screens/IssuerScreen';
@@ -245,11 +244,15 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen
         name="IdentityImport"
         component={IdentityImportScreen}
-        options={{ headerShown: true, title: 'Wallet Identity' }}
+        options={{ headerShown: true, title: 'Import Wallet Identity' }}
+      />
+      <Stack.Screen
+        name="IdentityCreate"
+        component={IdentityCreateScreen}
+        options={{ headerShown: true, title: 'Create New DID' }}
       />
     </Stack.Navigator>
   );

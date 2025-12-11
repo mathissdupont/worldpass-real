@@ -1,4 +1,4 @@
-// /src/lib/auth.js
+// /src/lib/auth.js - DID-based authentication
 import { loadProfile, saveProfile } from "./storage";
 
 const KEY_SESSION = "wp_session";
@@ -31,24 +31,22 @@ export function setToken(token){
   localStorage.setItem(KEY_TOKEN, token);
   emitTokenChanged(token);
   
-  // Also save to chrome.storage.local if extension is available
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.set({ worldpass_token: token }).catch(() => {
-      // Silently fail if not in extension context
-    });
+    chrome.storage.local.set({ worldpass_token: token }).catch(() => {});
   }
 }
 
-export function isAuthed(){ return !!getSession()?.email; }
+export function isAuthed(){ 
+  return !!getSession()?.did; 
+}
 
-export function setSession({ email, token }){
-  localStorage.setItem(KEY_SESSION, JSON.stringify({ email, at: Date.now() }));
+export function setSession({ did, displayName, token }){
+  localStorage.setItem(KEY_SESSION, JSON.stringify({ did, displayName, at: Date.now() }));
   if (token) {
     setToken(token);
   }
-  // profile'e de yansıt
   const p = loadProfile() || {};
-  saveProfile({ ...p, email });
+  saveProfile({ ...p, did, displayName });
 }
 
 export function clearSession(){ 
@@ -56,85 +54,127 @@ export function clearSession(){
   localStorage.removeItem(KEY_TOKEN);
   emitTokenChanged(null);
   
-  // Also remove from chrome.storage.local if extension is available
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.remove(['worldpass_token', 'worldpass_credentials', 'last_sync']).catch(() => {
-      // Silently fail if not in extension context
+    chrome.storage.local.remove(['worldpass_token', 'worldpass_credentials', 'last_sync']).catch(() => {});
+  }
+}
+
+/**
+ * Authenticate with DID using challenge-response
+ * @param {string} did - The user's DID
+ * @param {Function} signChallenge - Function that signs the challenge (async)
+ * @param {string} displayName - Optional display name
+ * @returns {Promise<{token: string, user: object}>}
+ */
+export async function authenticateWithDID({ did, signChallenge, displayName }) {
+  try {
+    // 1. Get challenge from backend
+    const challengeResp = await fetch(`${API_BASE}/auth/challenge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ did, audience: "worldpass-web" })
     });
+
+    if (!challengeResp.ok) {
+      throw new Error("Failed to get challenge");
+    }
+
+    const { challenge, nonce } = await challengeResp.json();
+
+    // 2. Sign the challenge with user's private key
+    const signature = await signChallenge(challenge);
+
+    // 3. Verify and authenticate
+    const authResp = await fetch(`${API_BASE}/auth/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        did,
+        challenge: nonce,
+        signature,
+        displayName: displayName || did.slice(0, 20) + "..."
+      })
+    });
+
+    if (!authResp.ok) {
+      const error = await authResp.json().catch(() => ({ detail: "Authentication failed" }));
+      throw new Error(error.detail || "Authentication failed");
+    }
+
+    const data = await authResp.json();
+    
+    // Store token and session
+    setToken(data.token);
+    setSession({ 
+      did, 
+      displayName: displayName || data.user?.displayName || did.slice(0, 20) + "...",
+      token: data.token 
+    });
+    
+    return data;
+  } catch (error) {
+    console.error("DID authentication failed:", error);
+    throw error;
   }
 }
 
-export async function registerUser({ email, firstName, lastName, password, did }) {
-  email = email.toLowerCase().trim();
-  
-  // Register with backend - no localStorage fallback
-  const response = await fetch(`${API_BASE}/user/register`, {
-    method: "POST",
+/**
+ * Update user profile (display name, etc)
+ */
+export async function updateProfile(updates) {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(`${API_BASE}/user/profile`, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
     },
-    body: JSON.stringify({
-      email,
-      firstName,
-      lastName,
-      password,
-      did: did || "",
-    }),
+    body: JSON.stringify(updates)
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Registration failed" }));
-    if (error.detail === "email_already_registered") {
-      throw new Error("Email already registered.");
-    }
-    throw new Error(error.detail || "Registration failed. Please check your connection.");
+    const error = await response.json().catch(() => ({ detail: "Update failed" }));
+    throw new Error(error.detail || "Update failed");
   }
 
   const data = await response.json();
   
-  // Store token and session
-  setToken(data.token);
-  setSession({ email, token: data.token });
+  // Update local session
+  const session = getSession();
+  if (session && updates.displayName) {
+    setSession({ ...session, displayName: updates.displayName });
+  }
   
-  // Store user info in profile
-  const name = `${firstName} ${lastName}`.trim();
-  const p = await loadProfile().catch(() => ({}));
-  await saveProfile({ ...p, email, displayName: name });
-  
-  return { email, name, did: did || "" };
+  return data;
 }
 
-export async function verifyUser(email, password, otpCode) {
-  email = (email || "").toLowerCase().trim();
-  
-  const body = { email, password };
-  if (otpCode) body.otp_code = otpCode;
-  
-  // Authenticate with backend - no localStorage fallback
-  const response = await fetch(`${API_BASE}/user/login`, {
-    method: "POST",
+/**
+ * Get current user profile
+ */
+export async function getUserProfile() {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(`${API_BASE}/user/profile`, {
     headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+      "Authorization": `Bearer ${token}`
+    }
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Authentication failed" }));
-    if (error.detail === "invalid_credentials") {
-      return null; // Invalid credentials
-    }
-    throw new Error(error.detail || "Authentication failed. Please check your connection.");
+    throw new Error("Failed to fetch profile");
   }
 
-  const data = await response.json();
-  
-  // Store token
-  setToken(data.token);
-  
-  return { 
-    email: data.user.email, 
-    name: `${data.user.first_name} ${data.user.last_name}`.trim(),
-    did: data.user.did 
-  };
+  return response.json();
+}
+
+// Keep for backwards compatibility but deprecate
+export async function verifyUser() {
+  throw new Error("Email/password authentication is deprecated. Please use DID authentication.");
+}
+
+export async function registerUser() {
+  throw new Error("Email/password registration is deprecated. Please use DID authentication.");
 }
