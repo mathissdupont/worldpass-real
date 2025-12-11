@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Platform,
   ToastAndroid,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, Camera } from 'expo-camera';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -26,6 +28,8 @@ export default function ScannerScreen() {
   const [scanned, setScanned] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [pasting, setPasting] = useState(false);
 
   const { identity, linking, error: identityError, linkTelemetry } = useIdentity();
   const { addCredential: addCredentialToWallet } = useWallet();
@@ -121,8 +125,8 @@ export default function ScannerScreen() {
     return null;
   };
 
-  const handleBarCodeScanned = async ({ data }) => {
-    if (scanned || scanning) {
+  const handleBarCodeScanned = async ({ data }, force = false) => {
+    if (!force && (scanned || scanning)) {
       console.log('Scanner busy, ignoring scan');
       if (Platform.OS === 'android') {
         ToastAndroid.show('Scanner meşgul...', ToastAndroid.SHORT);
@@ -232,6 +236,22 @@ export default function ScannerScreen() {
     }
   };
 
+  const handlePasteFromClipboard = async () => {
+    setPasting(true);
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text) {
+        Alert.alert('Panoda veri yok', 'Panoda JSON/QR içeriği bulunamadı.');
+        return;
+      }
+      await handleBarCodeScanned({ data: text }, true);
+    } catch (err) {
+      Alert.alert('Hata', err?.message || 'Panodan okuma başarısız');
+    } finally {
+      setPasting(false);
+    }
+  };
+
   if (hasPermission === null) {
     return (
       <View style={styles.stateContainer}>
@@ -298,6 +318,7 @@ export default function ScannerScreen() {
         style={StyleSheet.absoluteFillObject}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         barcodeScannerSettings={{ barCodeTypes: ['qr'] }}
+        enableTorch={torchOn}
       />
 
       {/* Overlay’i dışarıda, absolute ile üstüne koyuyoruz */}
@@ -355,6 +376,28 @@ export default function ScannerScreen() {
             ? 'Yeni bir QR taramak için aşağıdaki butona basın'
             : 'Credential ekledikten sonra keystore yedeğini güncellemeyi unutmayın'}
         </Text>
+        <View style={styles.toolRow}>
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={() => setTorchOn((v) => !v)}
+          >
+            <Ionicons name={torchOn ? 'flash' : 'flash-off'} size={18} color="#fff" />
+            <Text style={styles.toolText}>{torchOn ? 'Fener Açık' : 'Fener'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={handlePasteFromClipboard}
+            disabled={pasting}
+          >
+            {pasting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="clipboard-outline" size={18} color="#fff" />
+            )}
+            <Text style={styles.toolText}>Panodan</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {scanned && !scanning && (
@@ -402,6 +445,27 @@ const createStyles = (theme) =>
       color: '#f3f4f6',
       fontSize: 13,
       textAlign: 'center',
+    },
+    toolRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 12,
+    },
+    toolButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+    },
+    toolText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 13,
     },
     stateContainer: {
       flex: 1,

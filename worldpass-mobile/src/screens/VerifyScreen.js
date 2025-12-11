@@ -1,24 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, Camera } from 'expo-camera';
-import { ToastAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { verifyVC } from '../lib/crypto';
-
-// NFC simulation (real NFC requires native module)
-const receiveNfc = async (onResult) => {
-  if (Platform.OS === 'android') {
-    setTimeout(() => onResult && onResult('{"nfc":"simulated"}'), 1200);
-    ToastAndroid.show('NFC receiving simulated', ToastAndroid.SHORT);
-  } else {
-    alert('NFC receiving is only supported on Android devices.');
-    onResult && onResult(null);
-  }
-};
+import { readNdefOnce } from '../lib/nfc';
 
 export default function VerifyScreen() {
   const { theme } = useTheme();
@@ -93,17 +82,17 @@ export default function VerifyScreen() {
     setLoadingVerify(false);
   };
 
-  const handleNfcReceive = () => {
+  const handleNfcReceive = async () => {
     setVerifyResult(null);
     setVcText('');
-    receiveNfc(data => {
-      if (data) {
-        setVcText(data);
-        setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
-      } else {
-        setVerifyResult({ error: 'NFC ile veri alınamadı.' });
-      }
-    });
+    const result = await readNdefOnce();
+    if (result.ok && result.data) {
+      setVcText(result.data);
+      setVerifyResult({ info: 'NFC ile veri alındı. JSON kutusuna yapıştırıldı.' });
+    } else {
+      Alert.alert('NFC', result.reason === 'unavailable' ? 'Bu cihazda NFC desteklenmiyor.' : 'NFC okuma başarısız');
+      setVerifyResult({ error: 'NFC ile veri alınamadı.' });
+    }
   };
 
   return (

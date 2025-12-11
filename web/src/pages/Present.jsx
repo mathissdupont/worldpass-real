@@ -1,12 +1,4 @@
 // web/src/pages/Present.jsx
-// Helper: base64url decode string to utf-8
-function decodeB64Url(str) {
-  try {
-    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    while (b64.length % 4) b64 += "=";
-    return decodeURIComponent(escape(window.atob(b64)));
-  } catch { return null; }
-}
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { qrToDataURL } from "../lib/qr";
 import jsQR from "jsqr";
@@ -203,7 +195,9 @@ export default function Present() {
         reqStreamRef.current = null;
       }
       if (reqVideoRef.current) reqVideoRef.current.srcObject = null;
-    } catch {}
+    } catch {
+      // Silently handle cleanup errors
+    }
     reqDetectorRef.current = null;
     reqDetectingRef.current = false;
     setReqQrScanning(false);
@@ -266,6 +260,7 @@ export default function Present() {
 
           if (payload) handleRequestScanned(payload);
         } catch {
+          // Silently handle QR detection errors
         } finally {
           reqDetectingRef.current = false;
         }
@@ -303,7 +298,7 @@ export default function Present() {
     }
     try {
       stopRequestNfcScan();
-      const reader = new NDEFReader();
+      const reader = new window.NDEFReader();
       const controller = new AbortController();
       reqNdefRef.current = reader;
       reqNfcAbortRef.current = controller;
@@ -333,7 +328,9 @@ export default function Present() {
       if (reqNfcAbortRef.current) {
         reqNfcAbortRef.current.abort();
       }
-    } catch {}
+    } catch {
+      // Silently handle NFC cleanup errors
+    }
     reqNfcAbortRef.current = null;
     reqNdefRef.current = null;
   };
@@ -435,7 +432,7 @@ export default function Present() {
       }
       try {
         setMsg({ type: "info", text: t("nfc_writing") });
-        const writer = new NDEFWriter();
+        const writer = new window.NDEFWriter();
         const records = [];
 
         if (writeType === "url" || writeType === "both") {

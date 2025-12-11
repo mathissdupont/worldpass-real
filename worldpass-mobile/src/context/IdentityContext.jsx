@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { decryptKeystore } from '../lib/crypto';
 import { getIdentity as loadIdentity, saveIdentity as persistIdentity, clearIdentity as wipeIdentity } from '../lib/storage';
 import { linkDid } from '../lib/api';
+import { useOffline } from './OfflineContext';
 
 const initialTelemetry = {
   lastAttemptAt: null,
@@ -24,6 +25,7 @@ const IdentityContext = createContext({
 
 export function IdentityProvider({ children }) {
   const { user } = useAuth();
+  const { isOffline } = useOffline();
   const [identity, setIdentity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -77,7 +79,7 @@ export function IdentityProvider({ children }) {
   }, [setIdentityPersistent]);
 
   useEffect(() => {
-    if (!identity?.did || !user?.id) {
+    if (!identity?.did || !user?.id || isOffline) {
       return;
     }
     if (identity.did === lastLinkedDid.current) {

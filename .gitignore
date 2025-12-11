@@ -36,3 +36,4 @@ __pycache__/
 !worldpass-mobile/package-lock.json
 !worldpass-mobile/app.json
 !worldpass-mobile/tsconfig.json
+!worldpass-mobile/eas.json

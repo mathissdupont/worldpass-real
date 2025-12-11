@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CREDENTIALS_KEY = 'worldpass_credentials';
 const IDENTITY_KEY = 'worldpass_identity_v1';
+const ISSUER_TEMPLATES_CACHE_KEY = 'worldpass_issuer_templates_cache';
 
 // Secure storage (for sensitive data)
 export async function saveSecureItem(key, value) {
@@ -136,4 +137,26 @@ export async function importCredentials(jsonString) {
 export async function clearAllData() {
   await clearCredentials();
   await clearIdentity();
+}
+
+// Issuer templates cache (offline support)
+export async function saveIssuerTemplatesCache(templates = []) {
+  try {
+    await AsyncStorage.setItem(
+      ISSUER_TEMPLATES_CACHE_KEY,
+      JSON.stringify(Array.isArray(templates) ? templates : [])
+    );
+  } catch (err) {
+    console.warn('Failed to cache issuer templates', err?.message || err);
+  }
+}
+
+export async function getIssuerTemplatesCache() {
+  try {
+    const raw = await AsyncStorage.getItem(ISSUER_TEMPLATES_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.warn('Failed to read cached issuer templates', err?.message || err);
+    return [];
+  }
 }

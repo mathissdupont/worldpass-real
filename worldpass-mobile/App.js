@@ -9,9 +9,12 @@ import { AuthProvider } from './src/context/AuthContext';
 import { IdentityProvider } from './src/context/IdentityContext';
 import { WalletProvider } from './src/context/WalletContext';
 import { SecurityProvider } from './src/context/SecurityContext';
+import { OfflineProvider } from './src/context/OfflineContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { ToastProvider } from './src/context/ToastContext';
 
 import SecurityGate from './src/components/SecurityGate';
+import OfflineBanner from './src/components/OfflineBanner';
 
 function ThemedAppShell() {
   const { theme } = useTheme();
@@ -22,10 +25,13 @@ function ThemedAppShell() {
         <IdentityProvider>
           <WalletProvider>
             <SecurityProvider>
-              <ToastProvider>
-                <AppNavigator />
-                <SecurityGate />
-              </ToastProvider>
+              <NotificationProvider>
+                <ToastProvider>
+                  <AppNavigator />
+                  <SecurityGate />
+                  <OfflineBanner />
+                </ToastProvider>
+              </NotificationProvider>
             </SecurityProvider>
           </WalletProvider>
         </IdentityProvider>
@@ -43,7 +49,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ThemedAppShell />
+        <OfflineProvider>
+          <ThemedAppShell />
+        </OfflineProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

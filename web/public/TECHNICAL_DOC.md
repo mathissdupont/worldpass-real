@@ -117,41 +117,41 @@ Kodu kopyala
 ### 5.1 Auth
 
 | Method | Path | Body | Açıklama |
-|-------|------|------|---------|
-POST | `/api/auth/register` | `{ email, password }` | Hesap oluşturur
-POST | `/api/auth/login` | `{ email, password }` | JWT döner
-POST | `/api/auth/change-password` | `{ oldPassword, newPassword }` | Parola günceller
+|--------|------|------|----------|
+| POST | `/api/auth/register` | `{ email, password }` | Hesap oluşturur |
+| POST | `/api/auth/login` | `{ email, password }` | JWT döner |
+| POST | `/api/auth/change-password` | `{ oldPassword, newPassword }` | Parola günceller |
 
 ---
 
 ### 5.2 Issuer
 
 | Method | Path | Açıklama |
-|-------|------|---------|
-POST | `/api/issuer/register` | Issuer kaydı
-POST | `/api/issuer/login` | Issuer oturumu
-GET  | `/api/issuer/templates` | Şablon listesi
-POST | `/api/issuer/templates` | Yeni VC şablonu
-POST | `/api/issuer/issue` | VC oluştur ve imzala
-GET  | `/api/issuer/credentials` | Verilen VC listesi
+|--------|------|----------|
+| POST | `/api/issuer/register` | Issuer kaydı |
+| POST | `/api/issuer/login` | Issuer oturumu |
+| GET  | `/api/issuer/templates` | Şablon listesi |
+| POST | `/api/issuer/templates` | Yeni VC şablonu |
+| POST | `/api/issuer/issue` | VC oluştur ve imzala |
+| GET  | `/api/issuer/credentials` | Verilen VC listesi |
 
 ---
 
 ### 5.3 Wallet
 
 | Method | Path | Açıklama |
-|-------|------|---------|
-GET  | `/api/wallet/credentials` | Wallet içerikleri
-POST | `/api/wallet/import` | VC import
+|--------|------|----------|
+| GET  | `/api/wallet/credentials` | Wallet içerikleri |
+| POST | `/api/wallet/import` | VC import |
 
 ---
 
 ### 5.4 Verify
 
 | Method | Path | Açıklama |
-|-------|------|---------|
-POST | `/api/verify` | VC doğrulama
-POST | `/api/present` | Selective disclosure akışı
+|--------|------|----------|
+| POST | `/api/verify` | VC doğrulama |
+| POST | `/api/present` | Selective disclosure akışı |
 
 ---
 
@@ -192,12 +192,14 @@ Revocation tam değil
 DoS ve rate limiting ilkel
 
 8. Bilinen Sınırlamalar
-Alan	Durum
-Veri saklama	Yerel, sınırlı
-Offline doğrulama	Yok
-Wallet kurtarma	Deneysel
-Güvenlik denetimi	Yapılmadı
-On-chain entegrasyon	Stage-2’de
+
+| Alan | Durum |
+|------|-------|
+| Veri saklama | Yerel, sınırlı |
+| Offline doğrulama | Yok |
+| Wallet kurtarma | Deneysel |
+| Güvenlik denetimi | Yapılmadı |
+| On-chain entegrasyon | Stage-2'de |
 
 9. Stage-2 EAS Planı (Opsiyonel Modül)
 Polygon Amoy test ağı
@@ -212,11 +214,13 @@ VC → hash → EAS attestation → txHash DB kaydı
 EAS, MVP’nin yerini almaz — güçlendirir.
 
 10. Yol Haritası
-Aşama	İçerik
-MVP	Issuer → Wallet → Verify akışı
-Stage-2	On-chain attestation (EAS)
-Stage-3	Multi-issuer trust registry
-Stage-4	Mobil wallet production
+
+| Aşama | İçerik |
+|-------|--------|
+| MVP | Issuer → Wallet → Verify akışı |
+| Stage-2 | On-chain attestation (EAS) |
+| Stage-3 | Multi-issuer trust registry |
+| Stage-4 | Mobil wallet production |
 
 11. Ek Belgeler
 PRIVACY_POLICY.md

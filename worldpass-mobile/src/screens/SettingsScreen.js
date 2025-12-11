@@ -18,6 +18,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useTheme } from '../context/ThemeContext';
 import { useWallet } from '../context/WalletContext';
 import { useSecurity } from '../context/SecurityContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: 'sunny-outline' },
@@ -37,12 +38,14 @@ export default function SettingsScreen({ navigation }) {
     setPinCode,
     clearPinCode,
   } = useSecurity();
+  const { permissionStatus, requestPermissions, sendLocalNotification } = useNotifications();
   const [biometricUpdating, setBiometricUpdating] = useState(false);
   const [pinSheetVisible, setPinSheetVisible] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinConfirmInput, setPinConfirmInput] = useState('');
   const [pinError, setPinError] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
   const walletDid = identity?.did || '';
   const hasIdentity = Boolean(walletDid);
   const identitySubtitle = walletDid
@@ -116,6 +119,21 @@ export default function SettingsScreen({ navigation }) {
       setBiometricUpdating(false);
     }
   }, [updateBiometricPreference]);
+
+  const handleNotificationSetup = useCallback(async () => {
+    setNotifLoading(true);
+    try {
+      await requestPermissions();
+      await sendLocalNotification({
+        title: 'WorldPass bildirimleri aktif',
+        body: 'Test bildirimi gönderildi.',
+      });
+    } catch (err) {
+      Alert.alert('Notifications', err?.message || 'Bildirime izin verilemedi');
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [requestPermissions, sendLocalNotification]);
 
   const openPinSheet = useCallback(() => {
     setPinSheetVisible(true);
@@ -388,6 +406,13 @@ export default function SettingsScreen({ navigation }) {
                 ios_backgroundColor={theme.colors.border}
               />
             }
+          />
+          <SettingItem
+            icon="notifications-outline"
+            title="Notifications"
+            subtitle={permissionStatus ? `Status: ${permissionStatus}` : 'Enable alerts for wallet activity'}
+            onPress={handleNotificationSetup}
+            rightElement={notifLoading ? <ActivityIndicator color={theme.colors.primary} /> : null}
             isLast
           />
         </View>

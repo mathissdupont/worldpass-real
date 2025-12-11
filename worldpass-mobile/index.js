@@ -1,18 +1,14 @@
 import 'react-native-get-random-values';
 import { registerRootComponent } from 'expo';
+import { setCustomSourceTransformer } from 'expo-asset';
 
-// Polyfill for setCustomSourceTransformer issue in React Native 0.81.5
-if (typeof global !== 'undefined' && typeof require !== 'undefined') {
-  try {
-    // @ts-ignore - This is a polyfill for React Native compatibility
-    const resolveAssetSource = require('react-native/Libraries/Image/resolveAssetSource').default;
-    if (resolveAssetSource && typeof resolveAssetSource.setCustomSourceTransformer !== 'function') {
-      resolveAssetSource.setCustomSourceTransformer = () => {};
-    }
-  } catch (e) {
-    // Silently fail if module not available
-    console.log('Polyfill not needed:', e.message);
+// Ensure setCustomSourceTransformer exists without using deprecated deep imports
+try {
+  if (typeof setCustomSourceTransformer === 'function') {
+    setCustomSourceTransformer(() => {});
   }
+} catch (e) {
+  console.log('Asset transformer polyfill skipped:', e?.message || e);
 }
 
 import App from './App';

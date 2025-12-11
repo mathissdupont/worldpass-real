@@ -25,17 +25,9 @@ import { useIdentity } from '../context/IdentityContext';
 import { useTheme } from '../context/ThemeContext';
 import { useWallet } from '../context/WalletContext';
 import { formatRelativeTime } from '../lib/time';
-
-// NFC paylaşım fonksiyonu (Android için simülasyon)
-const sendNfc = async (payload, onResult) => {
-  if (Platform.OS === 'android') {
-    setTimeout(() => onResult && onResult(true), 1200);
-    ToastAndroid.show('NFC ile paylaşım simüle edildi', ToastAndroid.SHORT);
-  } else {
-    Alert.alert('NFC', 'NFC paylaşımı sadece Android cihazlarda desteklenir.');
-    onResult && onResult(false);
-  }
-};
+import { useOffline } from '../context/OfflineContext';
+import { shareCredentialNfc } from '../lib/nfc';
+import { shareOverBle } from '../lib/bluetooth';
 
 // VC önemli alanlarını daha okunabilir göster
 const renderCredentialDetails = (cred) => {
@@ -142,6 +134,7 @@ export default function WalletScreen() {
   const { identity, linking, error: identityError, linkTelemetry } = useIdentity();
   const navigation = useNavigation();
   const walletDid = identity?.did || '';
+  const { isOffline } = useOffline();
 
   const { theme } = useTheme();
   const {
@@ -652,6 +645,35 @@ export default function WalletScreen() {
     }
   };
 
+  const handleNfcShare = async () => {
+    if (!selectedCredential) return;
+    const result = await shareCredentialNfc(selectedCredential);
+    if (result.ok) {
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('NFC ile gönderildi', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('NFC', 'Credential gönderildi.');
+      }
+    } else {
+      Alert.alert('NFC', result.reason === 'unsupported' ? 'Bu cihazda NFC desteklenmiyor.' : (result.reason || 'Gönderilemedi'));
+    }
+  };
+
+  const handleBleShare = async () => {
+    if (!selectedCredential) return;
+    const payload = JSON.stringify(selectedCredential, null, 2);
+    const result = await shareOverBle(payload);
+    if (result.ok) {
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Bluetooth ile paylaşıldı', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Bluetooth', 'Paylaşıldı');
+      }
+    } else if (result.reason !== 'unavailable') {
+      Alert.alert('Bluetooth', result.reason || 'Paylaşım başarısız');
+    }
+  };
+
   const handleExportAll = async () => {
     try {
       const jsonString = await exportCreds();
@@ -714,6 +736,15 @@ export default function WalletScreen() {
             {typeof error === 'string'
               ? error
               : 'Bir hata oluştu, lütfen tekrar deneyin.'}
+          </Text>
+        </View>
+      )}
+
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline" size={18} color={theme.colors.warning} />
+          <Text style={styles.offlineText}>
+            Çevrimdışı: QR/NFC/Bluetooth yerel çalışır, sunucu işlemleri bekletilir.
           </Text>
         </View>
       )}
@@ -795,20 +826,19 @@ export default function WalletScreen() {
                   styles.modalButton,
                   { flex: 1, backgroundColor: '#ffb300' },
                 ]}
-                onPress={() => {
-                  sendNfc(selectedCredential, (ok) => {
-                    if (ok && Platform.OS === 'android') {
-                      ToastAndroid.show(
-                        'NFC ile gönderildi (simülasyon)',
-                        ToastAndroid.SHORT
-                      );
-                    } else if (!ok) {
-                      Alert.alert('NFC', 'NFC ile gönderilemedi.');
-                    }
-                  });
-                }}
+                onPress={handleNfcShare}
               >
                 <Text style={styles.modalButtonText}>NFC ile Paylaş</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  { flex: 1, backgroundColor: '#4f46e5' },
+                ]}
+                onPress={handleBleShare}
+              >
+                <Text style={styles.modalButtonText}>Bluetooth ile Paylaş</Text>
               </TouchableOpacity>
             </View>
 
@@ -863,6 +893,23 @@ const createStyles = (theme) =>
     errorText: {
       flex: 1,
       color: theme.colors.danger,
+      fontSize: theme.typography.sizes.sm,
+    },
+    offlineBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+      marginHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.sm,
+      padding: theme.spacing.sm + 2,
+      borderRadius: theme.radii.md,
+      borderWidth: 1,
+      borderColor: theme.colors.warningBorder,
+      backgroundColor: theme.colors.warningSurface,
+    },
+    offlineText: {
+      flex: 1,
+      color: theme.colors.warning,
       fontSize: theme.typography.sizes.sm,
     },
     identityHeaderRow: {
