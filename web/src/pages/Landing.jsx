@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { track } from '@/lib/evt';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { t, getLocale, setLocale } from '@/lib/i18n';
+import IdentityCardMockup from '@/components/IdentityCardMockup';
 import { 
   ShieldCheck, 
   Zap, 
@@ -14,7 +16,8 @@ import {
   ArrowRight,
   Fingerprint,
   Shield,
-  Smartphone
+  Smartphone,
+  Globe
 } from 'lucide-react';
 
 // --- UTILITY COMPONENTS ---
@@ -36,6 +39,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [locale, setLocaleState] = useState(getLocale());
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -43,11 +47,17 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const toggleLocale = () => {
+    const newLocale = locale === 'en' ? 'tr' : 'en';
+    setLocale(newLocale);
+    setLocaleState(newLocale);
+  };
+
   const navLinks = [
-    { name: 'Özellikler', href: '#features' },
-    { name: 'Nasıl Çalışır', href: '#how-it-works' },
-    { name: 'Güvenlik', href: '#security' },
-    { name: 'SSS', href: '#faq' }
+    { name: t('landing.footer.features'), href: '#features' },
+    { name: t('landing.footer.how_it_works'), href: '#how-it-works' },
+    { name: t('landing.footer.security'), href: '#security' },
+    { name: 'FAQ', href: '#faq' }
   ];
 
   return (
@@ -70,13 +80,20 @@ const Navbar = () => {
             </a>
           ))}
           <button
+            onClick={toggleLocale}
+            className="p-2 text-zinc-400 hover:text-white transition-colors"
+            title={locale === 'en' ? 'Türkçe' : 'English'}
+          >
+            <Globe size={18} />
+          </button>
+          <button
             onClick={() => {
               track('cta_nav', { location: 'navbar' });
               navigate('/dashboard');
             }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
           >
-            Başla
+            {t('landing.hero.cta_start')}
           </button>
         </div>
 
@@ -113,6 +130,13 @@ const Navbar = () => {
                 </a>
               ))}
               <button
+                onClick={toggleLocale}
+                className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Globe size={18} />
+                {locale === 'en' ? 'Türkçe' : 'English'}
+              </button>
+              <button
                 onClick={() => {
                   track('cta_nav_mobile', { location: 'mobile_menu' });
                   navigate('/dashboard');
@@ -120,7 +144,7 @@ const Navbar = () => {
                 }}
                 className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
               >
-                Başla
+                {t('landing.hero.cta_start')}
               </button>
             </div>
           </Motion.div>
@@ -149,40 +173,52 @@ const Hero = React.memo(() => {
         </svg>
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-32 pb-20">
-        <FadeIn>
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-            Kimliğini <span className="text-indigo-400">Dijitalleştir</span>
-          </h1>
-        </FadeIn>
-        <FadeIn delay={0.1}>
-          <p className="text-xl md:text-2xl text-zinc-400 mb-12 max-w-3xl mx-auto">
-            Tüm kimlik kartlarını tek bir dijital cüzdanda topla. QR kod ile güvenle paylaş.
-          </p>
-        </FadeIn>
-        <FadeIn delay={0.2}>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => {
-                track('cta_hero', { action: 'start' });
-                navigate('/dashboard');
-              }}
-              className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg font-semibold transition-all flex items-center justify-center gap-2 group"
-            >
-              Hemen Başla
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              onClick={() => {
-                track('cta_hero', { action: 'demo' });
-                document.querySelector('#features').scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 rounded-xl text-lg font-semibold transition-all"
-            >
-              Nasıl Çalışır?
-            </button>
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-32 pb-20">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Text Content */}
+          <div className="text-center lg:text-left">
+            <FadeIn>
+              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+                {t('landing.hero.title')} <span className="text-indigo-400">{t('landing.hero.title_highlight')}</span>
+              </h1>
+            </FadeIn>
+            <FadeIn delay={0.1}>
+              <p className="text-xl md:text-2xl text-zinc-400 mb-12">
+                {t('landing.hero.subtitle')}
+              </p>
+            </FadeIn>
+            <FadeIn delay={0.2}>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <button
+                  onClick={() => {
+                    track('cta_hero', { action: 'start' });
+                    navigate('/dashboard');
+                  }}
+                  className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg font-semibold transition-all flex items-center justify-center gap-2 group"
+                >
+                  {t('landing.hero.cta_start')}
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={() => {
+                    track('cta_hero', { action: 'demo' });
+                    document.querySelector('#features').scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="px-8 py-4 bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 rounded-xl text-lg font-semibold transition-all"
+                >
+                  {t('landing.hero.cta_demo')}
+                </button>
+              </div>
+            </FadeIn>
           </div>
-        </FadeIn>
+
+          {/* Right: Identity Card Mockup */}
+          <FadeIn delay={0.3}>
+            <div className="flex justify-center lg:justify-end">
+              <IdentityCardMockup />
+            </div>
+          </FadeIn>
+        </div>
       </div>
 
       {/* Scroll indicator */}
@@ -203,12 +239,12 @@ const Hero = React.memo(() => {
 
 const Features = React.memo(() => {
   const features = [
-    { title: "Hızlı Paylaşım", desc: "QR kod ile kimlik bilgilerini saniyeler içinde paylaş.", icon: <Zap /> },
-    { title: "Geleceğe Hazır", desc: "Blokzincir altyapısı için tasarlandı.", icon: <ShieldCheck /> },
-    { title: "Çoklu Kimlik", desc: "Ehliyet, öğrenci kartı, üyelikler tek cüzdanda.", icon: <Wallet /> },
-    { title: "Tam Kontrol", desc: "Hangi bilgiyi paylaştığını sen belirle.", icon: <Fingerprint /> },
-    { title: "Şifreli Saklama", desc: "AES-256 ile veriler güvende.", icon: <Lock /> },
-    { title: "Mobil Öncelikli", desc: "Her zaman yanında, offline çalışır.", icon: <Smartphone /> }
+    { title: t('landing.features.fast_share.title'), desc: t('landing.features.fast_share.desc'), icon: <Zap /> },
+    { title: t('landing.features.future_ready.title'), desc: t('landing.features.future_ready.desc'), icon: <ShieldCheck /> },
+    { title: t('landing.features.multi_id.title'), desc: t('landing.features.multi_id.desc'), icon: <Wallet /> },
+    { title: t('landing.features.full_control.title'), desc: t('landing.features.full_control.desc'), icon: <Fingerprint /> },
+    { title: t('landing.features.encrypted.title'), desc: t('landing.features.encrypted.desc'), icon: <Lock /> },
+    { title: t('landing.features.mobile_first.title'), desc: t('landing.features.mobile_first.desc'), icon: <Smartphone /> }
   ];
 
   return (
@@ -216,8 +252,8 @@ const Features = React.memo(() => {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
           <FadeIn>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Özellikler</h2>
-            <p className="text-zinc-400 text-lg">Kimliğini güvenle yönet</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">{t('landing.features.title')}</h2>
+            <p className="text-zinc-400 text-lg">{t('landing.features.subtitle')}</p>
           </FadeIn>
         </div>
 
@@ -247,9 +283,9 @@ const Features = React.memo(() => {
 
 const HowItWorks = React.memo(() => {
   const steps = [
-    { id: "01", title: "Kayıt Ol", desc: "E-posta ile hesap oluştur.", icon: <Shield /> },
-    { id: "02", title: "Kimlik Ekle", desc: "Kartlarını dijital cüzdana aktar.", icon: <Wallet /> },
-    { id: "03", title: "QR ile Paylaş", desc: "QR kod ile güvenle paylaş.", icon: <QrCode /> }
+    { id: "01", title: t('landing.how_it_works.step1.title'), desc: t('landing.how_it_works.step1.desc'), icon: <Shield /> },
+    { id: "02", title: t('landing.how_it_works.step2.title'), desc: t('landing.how_it_works.step2.desc'), icon: <Wallet /> },
+    { id: "03", title: t('landing.how_it_works.step3.title'), desc: t('landing.how_it_works.step3.desc'), icon: <QrCode /> }
   ];
 
   return (
@@ -257,8 +293,8 @@ const HowItWorks = React.memo(() => {
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-16">
           <FadeIn>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Nasıl Çalışır?</h2>
-            <p className="text-zinc-400 text-lg">3 basit adım</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">{t('landing.how_it_works.title')}</h2>
+            <p className="text-zinc-400 text-lg">{t('landing.how_it_works.subtitle')}</p>
           </FadeIn>
         </div>
 
@@ -292,17 +328,17 @@ const SecuritySection = React.memo(() => {
             <Lock size={32} />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Güvenlik Odaklı <span className="text-indigo-400">Tasarım</span>
+            {t('landing.security.title')} <span className="text-indigo-400">{t('landing.security.title_highlight')}</span>
           </h2>
           <p className="text-zinc-400 mb-8 max-w-3xl mx-auto text-lg">
-            Verilerin şifreli tutulduğu, kullanıcı kontrollü bir model üzerine inşa ediyoruz.
+            {t('landing.security.subtitle')}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             {[
-              "AES-256 Şifreleme",
-              "Açık Kaynak",
-              "On-chain Doğrulama",
-              "Şeffaflık"
+              t('landing.security.badge1'),
+              t('landing.security.badge2'),
+              t('landing.security.badge3'),
+              t('landing.security.badge4')
             ].map((item, i) => (
               <span key={i} className="px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-zinc-300 text-sm">
                 {item}
@@ -320,20 +356,20 @@ const SecuritySection = React.memo(() => {
 const FAQ = () => {
   const questions = [
     { 
-      q: "WorldPass'i kullanmak ücretli mi?", 
-      a: "Şu anki erken aşama sürümde temel kullanım ücretsiz." 
+      q: t('landing.faq.q1'), 
+      a: t('landing.faq.a1')
     },
     { 
-      q: "Kimlik bilgilerim nerede saklanıyor?", 
-      a: "Veriler cihaz tarafında şifreli olarak tutulur." 
+      q: t('landing.faq.q2'), 
+      a: t('landing.faq.a2')
     },
     { 
-      q: "Telefonumu kaybedersem ne olur?", 
-      a: "Kurtarma anahtarı sistemi üzerinde çalışıyoruz." 
+      q: t('landing.faq.q3'), 
+      a: t('landing.faq.a3')
     },
     { 
-      q: "Hangi kimlik türlerini ekleyebilirim?", 
-      a: "Öğrenci kartı, ehliyet, üyelik kartları ve daha fazlası." 
+      q: t('landing.faq.q4'), 
+      a: t('landing.faq.a4')
     }
   ];
 
@@ -344,8 +380,8 @@ const FAQ = () => {
       <div className="max-w-3xl mx-auto px-6">
         <div className="text-center mb-16">
           <FadeIn>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Sıkça Sorulan Sorular</h2>
-            <p className="text-zinc-400 text-lg">Merak ettikleriniz</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">{t('landing.faq.title')}</h2>
+            <p className="text-zinc-400 text-lg">{t('landing.faq.subtitle')}</p>
           </FadeIn>
         </div>
 
@@ -392,10 +428,10 @@ const CTASection = React.memo(() => {
       <div className="max-w-4xl mx-auto px-6 text-center">
         <FadeIn>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Dijital Kimliğini <span className="text-indigo-400">Bugün Oluştur</span>
+            {t('landing.cta.title')} <span className="text-indigo-400">{t('landing.cta.title_highlight')}</span>
           </h2>
           <p className="text-zinc-400 text-lg mb-8">
-            Ücretsiz hesap oluştur, kimliklerini ekle ve kullanmaya başla.
+            {t('landing.cta.subtitle')}
           </p>
           <button
             onClick={() => {
@@ -404,7 +440,7 @@ const CTASection = React.memo(() => {
             }}
             className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg font-semibold transition-all inline-flex items-center gap-2 group"
           >
-            Hemen Başla
+            {t('landing.cta.button')}
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </FadeIn>
@@ -423,31 +459,31 @@ const Footer = React.memo(() => {
           <div>
             <div className="text-xl font-bold text-white mb-4">WorldPass</div>
             <p className="text-zinc-500 text-sm">
-              Dijital kimlik deneyimini sadeleştiren bir proje.
+              {t('landing.footer.tagline')}
             </p>
           </div>
           
           {[
             {
-              title: "Ürün",
+              title: t('landing.footer.product'),
               links: [
-                { name: "Özellikler", href: "#features" },
-                { name: "Güvenlik", href: "#security" },
-                { name: "Nasıl Çalışır?", href: "#how-it-works" }
+                { name: t('landing.footer.features'), href: "#features" },
+                { name: t('landing.footer.security'), href: "#security" },
+                { name: t('landing.footer.how_it_works'), href: "#how-it-works" }
               ]
             },
             {
-              title: "Topluluk",
+              title: t('landing.footer.community'),
               links: [
-                { name: "Hakkımızda", href: "https://heptapusgroup.com/about" },
-                { name: "İletişim", href: "https://heptapusgroup.com/contact" }
+                { name: t('landing.footer.about'), href: "https://heptapusgroup.com/about" },
+                { name: t('landing.footer.contact'), href: "https://heptapusgroup.com/contact" }
               ]
             },
             {
-              title: "Yasal",
+              title: t('landing.footer.legal'),
               links: [
-                { name: "Gizlilik", href: "/privacy" },
-                { name: "Kullanım Koşulları", href: "/terms" }
+                { name: t('landing.footer.privacy'), href: "/privacy" },
+                { name: t('landing.footer.terms'), href: "/terms" }
               ]
             }
           ].map((col, i) => (
@@ -470,7 +506,7 @@ const Footer = React.memo(() => {
         </div>
         
         <div className="border-t border-zinc-900 pt-8 text-center text-sm text-zinc-600">
-          © 2025 WorldPass. Tüm hakları saklıdır.
+          {t('landing.footer.copyright')}
         </div>
       </div>
     </footer>
