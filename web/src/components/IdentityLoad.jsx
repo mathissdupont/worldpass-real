@@ -14,7 +14,6 @@ export default function IdentityLoad({ onLoaded }) {
   const [msg, setMsg] = useState(null); // {type:'ok'|'err'|'info', text:string}
   const [drag, setDrag] = useState(false);
   const [capsOn, setCapsOn] = useState(false);
-  const [rawJson, setRawJson] = useState("");
 
   const fileInputRef = useRef(null);
   const passInputRef = useRef(null);
@@ -28,12 +27,13 @@ export default function IdentityLoad({ onLoaded }) {
   }, []);
 
   const onCaps = useCallback((e) => {
-    try { setCapsOn(!!e.getModifierState && e.getModifierState("CapsLock")); } catch {}
+    try { setCapsOn(!!e.getModifierState && e.getModifierState("CapsLock")); } catch {
+      setCapsOn(false);
+    }
   }, []);
 
   const resetAll = () => {
     setFile(null);
-    setRawJson("");
     setPass("");
     setMsg(null);
     setBusy(false);
@@ -125,12 +125,9 @@ export default function IdentityLoad({ onLoaded }) {
     >
       <header className="mb-4">
         <h3 className="text-base font-semibold">{t("identity.load.title")}</h3>
-        <p className="text-[12px] text-[color:var(--muted)] mt-1">{t("identity.load.paragraph")}</p>
+        <p className="text-[12px] text-[color:var(--muted)] mt-1">t("identity.load.paragraph")</p>
       </header>
 
-      {/* File-only input (paste removed) */}
-
-      {/* Drag & Drop zone OR Paste area */}
       (
         <div
           onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
