@@ -18,6 +18,9 @@ import AdminIssuers from "./pages/admin/Issuers";
 import IssuerApproval from "./pages/admin/IssuerApproval";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLogin from "./pages/admin/Login";
+import AdminAnalytics from "./pages/admin/Analytics";
+import AdminSettings from "./pages/admin/Settings";
+import AdminLogs from "./pages/admin/Logs";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 // New Issuer Console (consolidated)
@@ -188,12 +191,68 @@ export default function App() {
                   <Route path="/verifier" element={<Verifier />} />
                   <Route path="/admin/login" element={<AdminLogin />} />
 
+                  {/* Admin Routes - Protected */}
                   <Route
                     path="/admin"
                     element={
                       <RoleRoute user={user} roles="admin">
                         <ProtectedRoute>
                           <AdminDashboard />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/admin/dashboard"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/admin/issuers"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <IssuerApproval />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/admin/analytics"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminAnalytics />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/admin/settings"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminSettings />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/admin/logs"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminLogs />
                         </ProtectedRoute>
                       </RoleRoute>
                     }
