@@ -188,7 +188,7 @@ class BlockchainLedger:
             "merkle_root": merkle_root,
             "status": "pending",  # Would be 'confirmed' after mining
             "native_token": self.chain_config["native_token"],
-            "gas_price_level": self.chain_config["gas_price"]
+            "gas_price_level": self.chain_config["avg_gas_price"]
         }
     
     async def verify_hash(self, vc_id: str, expected_hash: str, tx_hash: str = None) -> Dict[str, Any]:
@@ -406,5 +406,5 @@ async def migrate_to_distributed_storage(db, chain_key: str = None, batch_size: 
     print(f"\nMigration complete!")
     print(f"  Migrated: {migrated} credentials")
     print(f"  Blockchain: {manager.ledger.chain_config['name']}")
-    print(f"  Gas Level: {manager.ledger.chain_config['gas_price']}")
-    print(f"  Finality: {manager.ledger.chain_config['finality']} seconds")
+    print(f"  Gas Level: {manager.ledger.chain_config['avg_gas_price']}")
+    print(f"  Finality: {manager.ledger.chain_config['finality']}")
