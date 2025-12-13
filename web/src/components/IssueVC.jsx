@@ -5,6 +5,7 @@ import { addVC as addVCToStore } from "../lib/storage";
 import { t } from "../lib/i18n";
 import MiniQR from "./MiniQR";
 import TemplateManager from "./TemplateManager";
+import BlockchainSelector from "./BlockchainSelector";
 
 const enc = new TextEncoder();
 const b64uJson = (obj) => b64u(enc.encode(JSON.stringify(obj)));
@@ -85,6 +86,7 @@ export default function IssueVC({ identity }) {
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [blockchainChain, setBlockchainChain] = useState('polygon');
 
   // QR scan state
   const [qrScanning, setQrScanning] = useState(false);
@@ -284,7 +286,36 @@ export default function IssueVC({ identity }) {
       // 2) Add to issuer's wallet
       addVCToStore(vcSigned);
       
-      // 3) Send to recipient's wallet via backend
+      // 3) Send to issuer backend for storage
+      try {
+        const token = localStorage.getItem("issuerToken");
+        if (!token) {
+          console.warn("No issuer token found, skipping backend storage");
+        } else {
+          const backendResponse = await fetch("/api/issuer/issue", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Token": token
+            },
+            body: JSON.stringify({
+              vc: vcSigned,
+              blockchain_chain: blockchainChain  // Send selected blockchain
+            })
+          });
+          
+          if (backendResponse.ok) {
+            const backendData = await backendResponse.json();
+            console.log("✅ VC stored in issuer backend:", backendData);
+          } else {
+            console.warn("Failed to store in issuer backend:", await backendResponse.text());
+          }
+        }
+      } catch (backendErr) {
+        console.error("Error sending to issuer backend:", backendErr);
+      }
+
+      // 4) Send to recipient's wallet via backend
       try {
         const response = await fetch("/api/user/vcs/add", {
           method: "POST",
@@ -622,6 +653,32 @@ export default function IssueVC({ identity }) {
           >
              {canIssue ? (
                 <div className="space-y-4">
+                   {/* Blockchain Selector */}
+                   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-3">
+                         <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                           <rect x="4" y="4" width="6" height="6" rx="1"/>
+                           <rect x="14" y="4" width="6" height="6" rx="1"/>
+                           <rect x="4" y="14" width="6" height="6" rx="1"/>
+                           <rect x="14" y="14" width="6" height="6" rx="1"/>
+                         </svg>
+                         <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Blockchain Seçimi</h4>
+                      </div>
+                      <BlockchainSelector 
+                        onSelect={(chain) => setBlockchainChain(chain)} 
+                        defaultChain={blockchainChain}
+                        showTestnets={false}
+                      />
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="10"/>
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                          <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        Bu kimlik kartının hash'i seçilen blockchain'e kaydedilecek
+                      </p>
+                   </div>
+                
                    <div className="bg-[color:var(--panel-2)] rounded-xl p-4 border border-[color:var(--border)]">
                       <div className="flex justify-between items-center mb-3 border-b border-[color:var(--border)] pb-2">
                          <span className="text-xs font-bold uppercase text-[color:var(--muted)]">Önizleme</span>

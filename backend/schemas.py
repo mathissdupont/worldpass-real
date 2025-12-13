@@ -100,6 +100,7 @@ class IssuerIssueReq(BaseModel):
     api_key: Optional[str] = None
     vc: Dict[str, Any]  # imzalanmış VC (issuer kendi anahtarıyla imzalar) veya imzasız (ileride HSM modülü ile imzalatılabilir)
     template_id: Optional[int] = None  # optional reference to issuer_templates for validation
+    blockchain_chain: Optional[str] = 'polygon'  # selected blockchain for anchoring
 
 class IssuerIssueResp(BaseModel):
     ok: bool

@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS issued_vcs (
   payload_hash TEXT,            -- SHA256(payload canonical JSON)
   credential_type TEXT,         -- extracted from payload for filtering
   template_id INTEGER,          -- reference to issuer_templates (optional)
+  blockchain_chain TEXT DEFAULT 'polygon',  -- selected blockchain for anchoring
   created_at INTEGER NOT NULL,
   updated_at INTEGER,
   FOREIGN KEY(issuer_id) REFERENCES issuers(id),

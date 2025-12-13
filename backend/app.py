@@ -1850,8 +1850,8 @@ async def issuer_issue(
         credential_type = str(vc_types) if vc_types else "Unknown"
 
     await db.execute(
-        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, payload_hash, credential_type, template_id, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO issued_vcs(vc_id, issuer_id, subject_did, recipient_id, payload, payload_hash, credential_type, template_id, blockchain_chain, created_at, updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (
             jti,
             issuer["id"],
@@ -1861,6 +1861,7 @@ async def issuer_issue(
             payload_hash,
             credential_type,
             template_id,
+            body.blockchain_chain or 'polygon',
             now,
             now,
         ),

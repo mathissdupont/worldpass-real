@@ -125,10 +125,8 @@ export default function IdentityLoad({ onLoaded }) {
     >
       <header className="mb-4">
         <h3 className="text-base font-semibold">{t("identity.load.title")}</h3>
-        <p className="text-[12px] text-[color:var(--muted)] mt-1">t("identity.load.paragraph")</p>
+        <p className="text-[12px] text-[color:var(--muted)] mt-1">{t("identity.load.paragraph")}</p>
       </header>
-
-      (
         <div
           onDragOver={(e)=>{e.preventDefault(); setDrag(true);}}
           onDragLeave={()=>setDrag(false)}
@@ -166,7 +164,7 @@ export default function IdentityLoad({ onLoaded }) {
             </div>
           </div>
         </div>
-      )
+  
 
       {/* Password */}
       <label htmlFor="pwdLoad" className="block text-sm text-[color:var(--muted)] mt-4 mb-1.5">{t("identity.load.password_label")}</label>
