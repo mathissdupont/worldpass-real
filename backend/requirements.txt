@@ -17,7 +17,7 @@ pytest-asyncio
 dnspython
 pyotp 
 web3==6.10.0
-ipfshttpclient==0.9.0
+ipfshttpclient==0.8.0a2
 eth-account==0.9.0
 eth-keys==0.4.5
 eth-abi==4.1.1
