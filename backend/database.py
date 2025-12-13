@@ -400,10 +400,14 @@ async def _run_migrations(conn: aiosqlite.Connection):
     issued_vcs_column_names = [col[1] for col in columns]
     
     issued_vcs_migrations = [
-        ("credential_type", "ALTER TABLE issued_vcs ADD COLUMN credential_type TEXT"),
-        ("updated_at", "ALTER TABLE issued_vcs ADD COLUMN updated_at INTEGER"),
-        ("payload_hash", "ALTER TABLE issued_vcs ADD COLUMN payload_hash TEXT"),
-        ("template_id", "ALTER TABLE issued_vcs ADD COLUMN template_id INTEGER REFERENCES issuer_templates(id) ON DELETE SET NULL"),
+      ("credential_type", "ALTER TABLE issued_vcs ADD COLUMN credential_type TEXT"),
+      ("updated_at", "ALTER TABLE issued_vcs ADD COLUMN updated_at INTEGER"),
+      ("payload_hash", "ALTER TABLE issued_vcs ADD COLUMN payload_hash TEXT"),
+      ("template_id", "ALTER TABLE issued_vcs ADD COLUMN template_id INTEGER REFERENCES issuer_templates(id) ON DELETE SET NULL"),
+      # Distributed storage columns
+      ("ipfs_cid", "ALTER TABLE issued_vcs ADD COLUMN ipfs_cid TEXT"),
+      ("blockchain_tx", "ALTER TABLE issued_vcs ADD COLUMN blockchain_tx TEXT"),
+      ("storage_type", "ALTER TABLE issued_vcs ADD COLUMN storage_type TEXT DEFAULT 'centralized'"),
     ]
     
     for column_name, alter_sql in issued_vcs_migrations:
@@ -413,6 +417,12 @@ async def _run_migrations(conn: aiosqlite.Connection):
                 print(f"Migration: Added column {column_name} to issued_vcs table")
             except Exception as e:
                 print(f"Migration warning: Could not add column {column_name} to issued_vcs: {e}")
+
+          # Create index for IPFS lookups on issued_vcs
+          try:
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_issued_vcs_ipfs_cid ON issued_vcs(ipfs_cid)")
+          except Exception as e:
+            print(f"Migration warning: Could not create index idx_issued_vcs_ipfs_cid: {e}")
 
     # Check and migrate user_vcs table
     cursor = await conn.execute("PRAGMA table_info(user_vcs)")
@@ -425,6 +435,21 @@ async def _run_migrations(conn: aiosqlite.Connection):
         print("Migration: Added column vc_hash to user_vcs table")
       except Exception as e:
         print(f"Migration warning: Could not add column vc_hash to user_vcs: {e}")
+
+    # Distributed storage columns for user_vcs
+    if "ipfs_cid" not in user_vcs_column_names:
+      try:
+        await conn.execute("ALTER TABLE user_vcs ADD COLUMN ipfs_cid TEXT")
+        print("Migration: Added column ipfs_cid to user_vcs table")
+      except Exception as e:
+        print(f"Migration warning: Could not add column ipfs_cid to user_vcs: {e}")
+
+    if "storage_type" not in user_vcs_column_names:
+      try:
+        await conn.execute("ALTER TABLE user_vcs ADD COLUMN storage_type TEXT DEFAULT 'centralized'")
+        print("Migration: Added column storage_type to user_vcs table")
+      except Exception as e:
+        print(f"Migration warning: Could not add column storage_type to user_vcs: {e}")
 
     if "subject_did" not in user_vcs_column_names:
         try:

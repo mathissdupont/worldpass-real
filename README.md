@@ -227,3 +227,55 @@ This is a private repository. For questions or issues, contact the repository ow
 ## License
 
 Proprietary - All rights reserved.
+
+## IPFS Kurulumu ve Entegrasyon
+
+WorldPass, şifrelenmiş kimlik bilgilerini (VC) merkezi DB yerine IPFS üzerinde saklayabilir ve zincire yalnızca hash/kanıt yazar. IPFS’yi Docker Compose ile yerel bir Kubo (go-ipfs) düğümü olarak çalıştırıyoruz.
+
+### Gereksinimler
+- Docker ve Docker Compose
+- Backend için `.env` veya compose ortamında IPFS değişkenleri
+
+### Docker Compose ile IPFS Çalıştırma
+`docker-compose.yml` içinde `ipfs` servisi tanımlıdır ve backend şu değişkenlerle IPFS’ye bağlanır:
+- `IPFS_API_URL=http://ipfs:5001`
+- `IPFS_GATEWAY=http://ipfs:8080/ipfs`
+
+Başlatmak için:
+```powershell
+cd C:\Users\samet\OneDrive\Masaüstü\worldpass
+docker compose pull
+docker compose up -d ipfs
+# Ardından backend ve frontend
+docker compose up -d backend; docker compose up -d frontend; docker compose up -d caddy
+```
+
+IPFS veri klasörleri:
+- `data/ipfs` (kalıcı veri)
+- `data/ipfs-staging` (yükleme öncesi geçici alan)
+
+### Backend Ortam Değişkenleri
+Backend, IPFS ile konuşmak için şu değişkenleri kullanır (settings.py):
+- `IPFS_API_URL` (varsayılan: `http://localhost:5001`)
+- `IPFS_GATEWAY` (varsayılan: `https://ipfs.io/ipfs`)
+
+Compose ile birlikte çalışırken üretim `.env` için örnek:
+```
+IPFS_API_URL=http://ipfs:5001
+IPFS_GATEWAY=http://ipfs:8080/ipfs
+```
+
+### Dağıtık Saklama Akışı
+Backend’te `distributed_ledger.py` şunları yapar:
+- IPFS’ye şifreli VC payload’ını yükler (`/api/v0/add`)
+- Dönüşte gelen `CID`’i DB’ye yazar (`issued_vcs.ipfs_cid`)
+- Zincire hash/metadata (simüle veya gerçek) ançorlar (`blockchain_tx`)
+
+DB migrasyonları, `issued_vcs` ve `user_vcs` tablolarına `ipfs_cid`, `storage_type`, `blockchain_tx` alanlarını ekler ve `idx_issued_vcs_ipfs_cid` indeksini oluşturur.
+
+### Test Etme
+- IPFS ekleme: `POST /api/distributed/store` (şifreli payload ile)
+- IPFS’den alma: `GET /api/distributed/retrieve/{cid}`
+- Doğrulama: `POST /api/distributed/verify`
+
+Örnek PowerShell çağrıları ve payloadlar için `backend/blockchain_endpoints.py` ve `backend/distributed_ledger.py` dosyalarına bakabilirsiniz.
