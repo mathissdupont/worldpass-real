@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiCheckCircle, FiXCircle, FiClock, FiMail, FiGlobe, FiKey } from "react-icons/fi";
 
@@ -11,23 +11,19 @@ export default function IssuerApproval() {
   const [apiKey, setApiKey] = useState(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  useEffect(() => {
-    loadIssuers();
-  }, []);
-
-  const loadIssuers = async () => {
+  const loadIssuers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("wp_admin_token");
       if (!token) {
-        navigate("/login");
+        navigate("/admin/login");
         return;
       }
 
       const response = await fetch("/api/admin/issuers", {
-        headers: { "X-Token": token }
+        headers: { "x-token": token }
       });
 
       if (!response.ok) {
@@ -48,7 +44,11 @@ export default function IssuerApproval() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadIssuers();
+  }, [loadIssuers]);
 
   const handleApprove = async (issuerId) => {
     if (!confirm("Are you sure you want to approve this issuer? This will generate API keys and activate their account.")) {
@@ -59,12 +59,12 @@ export default function IssuerApproval() {
       setApproving(issuerId);
       setError(null);
 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("wp_admin_token");
       const response = await fetch("/api/admin/issuers/approve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Token": token
+          "x-token": token
         },
         body: JSON.stringify({ issuer_id: issuerId })
       });

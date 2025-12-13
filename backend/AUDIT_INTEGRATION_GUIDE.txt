@@ -1,0 +1,100 @@
+# Add these lines to backend/app.py after admin_approve_issuer endpoint
+
+# Import audit functions at top
+# from audit import log_admin_action, log_issuer_action, get_audit_logs
+
+# Add this endpoint after admin_backfill_payload_hash
+"""
+@app.get(
+    f"{API}/admin/logs",
+    dependencies=[Depends(_require_admin)],
+)
+async def admin_get_logs(
+    limit: int = 100,
+    offset: int = 0,
+    action: str = None,
+    result: str = None
+):
+    from audit import get_audit_logs
+    logs = await get_audit_logs(
+        limit=limit,
+        offset=offset,
+        action_filter=action,
+        result_filter=result
+    )
+    return logs
+"""
+
+# Update admin_login to log the action
+"""
+@app.post(f"{API}/admin/login", response_model=AdminLoginResp)
+async def admin_login(request: Request, body: AdminLoginReq):
+    from audit import log_admin_action
+    
+    if not settings.ADMIN_PASS_HASH:
+        raise HTTPException(status_code=400, detail="Admin password not configured.")
+    
+    if body.username != settings.ADMIN_USER:
+        await log_admin_action("login", body.username, result="fail", ip_address=request.client.host)
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    if not bcrypt.checkpw(body.password.encode(), settings.ADMIN_PASS_HASH.encode()):
+        await log_admin_action("login", body.username, result="fail", ip_address=request.client.host)
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    
+    # Log successful login
+    await log_admin_action("login", body.username, details={"ip": request.client.host}, result="ok")
+    
+    # Generate JWT token
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    to_encode = {"sub": body.username, "exp": expire}
+    token = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    
+    return AdminLoginResp(token=token)
+"""
+
+# Update admin_approve_issuer to log the action
+"""
+@app.post(
+    f"{API}/admin/issuers/approve",
+    response_model=ApproveIssuerResp,
+    dependencies=[Depends(_require_admin)],
+)
+async def admin_approve_issuer(body: ApproveIssuerReq, x_token: str = Header(...), db=Depends(get_db)):
+    from audit import log_admin_action
+    
+    # Get admin username from token
+    payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    admin_username = payload.get("sub")
+    
+    api_key = _gen_api_key()
+    now = int(time.time())
+    row = await db.execute_fetchone("SELECT * FROM issuers WHERE id=?", (body.issuer_id,))
+    if not row:
+        await log_admin_action("approve_issuer", admin_username, {"issuer_id": body.issuer_id}, result="fail")
+        raise HTTPException(status_code=404, detail="issuer_not_found")
+
+    # Generate signing keys
+    from core.crypto_ed25519 import b64u
+    sk_bytes, pk_bytes = signer.generate_keypair()
+    sk_b64u = b64u(sk_bytes)
+    pk_b64u = b64u(pk_bytes)
+    
+    issuer_did = row["did"] if row["did"] else f"did:key:z{pk_b64u}"
+
+    await db.execute(
+        "UPDATE issuers SET status='approved', api_key_hash=?, sk_b64u=?, pk_b64u=?, did=?, updated_at=? WHERE id=?",
+        (_sha256(api_key), sk_b64u, pk_b64u, issuer_did, now, body.issuer_id),
+    )
+    await db.commit()
+    
+    # Log approval
+    await log_admin_action(
+        "approve_issuer",
+        admin_username,
+        {"issuer_id": body.issuer_id, "issuer_name": row["name"]},
+        result="ok"
+    )
+    
+    return ApproveIssuerResp(api_key=api_key)
+"""

@@ -1,0 +1,41 @@
+# Add these migrations to backend/database.py in init_db() function
+# After issued_vcs_migrations list, add:
+
+"""
+    # Distributed storage migrations for issued_vcs
+    distributed_storage_migrations = [
+        ("ipfs_cid", "ALTER TABLE issued_vcs ADD COLUMN ipfs_cid TEXT"),
+        ("blockchain_tx", "ALTER TABLE issued_vcs ADD COLUMN blockchain_tx TEXT"),
+        ("storage_type", "ALTER TABLE issued_vcs ADD COLUMN storage_type TEXT DEFAULT 'centralized'"),
+        ("encryption_key_ref", "ALTER TABLE issued_vcs ADD COLUMN encryption_key_ref TEXT"),
+    ]
+    
+    for column_name, alter_sql in distributed_storage_migrations:
+        if column_name not in issued_vcs_column_names:
+            try:
+                await conn.execute(alter_sql)
+                print(f"Migration: Added distributed storage column {column_name} to issued_vcs table")
+            except Exception as e:
+                print(f"Migration warning: Could not add column {column_name}: {e}")
+    
+    # Add index for IPFS lookups
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_issued_vcs_ipfs_cid ON issued_vcs(ipfs_cid)")
+    
+    # Distributed storage migrations for user_vcs
+    cursor = await conn.execute("PRAGMA table_info(user_vcs)")
+    columns = await cursor.fetchall()
+    user_vcs_column_names = [col[1] for col in columns]
+    
+    user_distributed_migrations = [
+        ("ipfs_cid", "ALTER TABLE user_vcs ADD COLUMN ipfs_cid TEXT"),
+        ("storage_type", "ALTER TABLE user_vcs ADD COLUMN storage_type TEXT DEFAULT 'centralized'"),
+    ]
+    
+    for column_name, alter_sql in user_distributed_migrations:
+        if column_name not in user_vcs_column_names:
+            try:
+                await conn.execute(alter_sql)
+                print(f"Migration: Added distributed storage column {column_name} to user_vcs table")
+            except Exception as e:
+                print(f"Migration warning: Could not add column {column_name}: {e}")
+"""

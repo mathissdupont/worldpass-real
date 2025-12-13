@@ -55,6 +55,7 @@ from issuer_endpoints import router as issuer_router
 from payment_endpoints import router as payment_router
 from mock_provider_routes import router as mock_provider_router
 from blockchain.routes import router as blockchain_router
+from blockchain_endpoints import router as blockchain_api_router
 
 import time, secrets, base64
 import hashlib, os, json
@@ -2347,6 +2348,9 @@ app.include_router(mock_provider_router)
 
 # Mount Blockchain router
 app.include_router(blockchain_router)
+
+# Mount Blockchain API router (distributed storage & multi-chain)
+app.include_router(blockchain_api_router)
 
 # ---------- simple VC verify (no presentation) ----------
 @app.post(f"{API}/vc/verify", response_model=VerifyResp)

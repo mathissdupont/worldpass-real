@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { t } from "../../lib/i18n";
 
 export default function AdminIssuers(){
@@ -22,10 +22,10 @@ export default function AdminIssuers(){
     }
   };
 
-  const fetchList = async (tk)=>{
+  const fetchList = useCallback(async (tk)=>{
     const r = await fetch('/api/admin/issuers', {headers:{'x-token': tk || token}});
     if(r.ok){ setList(await r.json()); }
-  };
+  }, [token]);
 
   const approve = async (id)=>{
     const r = await fetch('/api/admin/issuers/approve', {method:'POST', headers:{
@@ -38,7 +38,7 @@ export default function AdminIssuers(){
     }
   };
 
-  useEffect(()=>{ if(token) fetchList(token); },[]);
+  useEffect(()=>{ if(token) fetchList(token); },[token, fetchList]);
 
   if(!token){
     return (

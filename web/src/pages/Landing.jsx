@@ -89,7 +89,7 @@ const Navbar = () => {
           <button
             onClick={() => {
               track('cta_nav', { location: 'navbar' });
-              navigate('/dashboard');
+              navigate('/login');
             }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
           >
@@ -139,7 +139,7 @@ const Navbar = () => {
               <button
                 onClick={() => {
                   track('cta_nav_mobile', { location: 'mobile_menu' });
-                  navigate('/dashboard');
+                  navigate('/login');
                   setMobileMenuOpen(false);
                 }}
                 className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
@@ -192,7 +192,7 @@ const Hero = React.memo(() => {
                 <button
                   onClick={() => {
                     track('cta_hero', { action: 'start' });
-                    navigate('/dashboard');
+                    navigate('/login');
                   }}
                   className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg font-semibold transition-all flex items-center justify-center gap-2 group"
                 >
@@ -436,7 +436,7 @@ const CTASection = React.memo(() => {
           <button
             onClick={() => {
               track('cta_final', { location: 'bottom' });
-              navigate('/dashboard');
+              navigate('/login');
             }}
             className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-lg font-semibold transition-all inline-flex items-center gap-2 group"
           >

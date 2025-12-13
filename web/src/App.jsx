@@ -16,6 +16,7 @@ import Settings from "./pages/Settings";
 import ReceiveInfo from "./pages/ReceiveInfo";
 import AdminIssuers from "./pages/admin/Issuers";
 import IssuerApproval from "./pages/admin/IssuerApproval";
+import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLogin from "./pages/admin/Login";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
@@ -186,6 +187,18 @@ export default function App() {
                   <Route path="/verify" element={<Verify />} />
                   <Route path="/verifier" element={<Verifier />} />
                   <Route path="/admin/login" element={<AdminLogin />} />
+
+                  <Route
+                    path="/admin"
+                    element={
+                      <RoleRoute user={user} roles="admin">
+                        <ProtectedRoute>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      </RoleRoute>
+                    }
+                  />
+
                   {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
                   <Route path="/issuer/register" element={<IssuerRegister />} />
                   <Route path="/issuer/login" element={<IssuerLogin />} />

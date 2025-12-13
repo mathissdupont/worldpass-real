@@ -1,0 +1,15 @@
+# Add to backend/schemas.py at the end:
+
+class AuditLogItem(BaseModel):
+    id: int
+    timestamp: int
+    action: str
+    admin: Optional[str] = None
+    subject_did: Optional[str] = None
+    result: str
+    details: Dict[str, Any] = {}
+    ip: Optional[str] = None
+
+class AuditLogsResp(BaseModel):
+    logs: List[AuditLogItem]
+    total: int

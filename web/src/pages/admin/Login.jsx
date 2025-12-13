@@ -28,8 +28,8 @@ export default function AdminLogin() {
 
       const data = await response.json();
       
-      // Store admin token
-      localStorage.setItem("token", data.token);
+      // Store admin token with admin prefix to differentiate from issuer token
+      localStorage.setItem("wp_admin_token", data.token);
       
       // Redirect to admin panel
       navigate("/admin/issuer-approval");
