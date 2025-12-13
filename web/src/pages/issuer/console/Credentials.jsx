@@ -78,7 +78,7 @@ export default function IssuerCredentials() {
         }
       });
 
-      const response = await listIssuerCredentials(token, params);
+      const response = await listIssuerCredentials(params);
       setCredentials(response.credentials || []);
       setPagination(prev => ({
         ...prev,
