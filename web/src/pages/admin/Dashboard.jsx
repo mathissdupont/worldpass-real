@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiLogOut, FiUsers, FiCheckCircle, FiClock, FiBarChart3 } from "react-icons/fi";
+import { FiLogOut, FiUsers, FiCheckCircle, FiClock, FiBarChart2 } from "react-icons/fi";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
           >
             <div className="flex items-center gap-3">
               <div className="p-3 bg-purple-50 rounded-lg">
-                <FiBarChart3 className="h-6 w-6 text-purple-600" />
+                <FiBarChart2 className="h-6 w-6 text-purple-600" />
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Manage Issuers</h3>
