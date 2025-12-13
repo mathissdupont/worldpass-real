@@ -91,7 +91,7 @@ async def get_recommended_blockchain(
         "success": True,
         "recommended": chain_key,
         "config": chain_config,
-        "reason": f"Low gas fees ({chain_config['gas_price']}), fast finality ({chain_config['finality']}s)"
+        "reason": f"Low gas fees ({chain_config['avg_gas_price']}), fast finality ({chain_config['finality']})"
     }
 
 
