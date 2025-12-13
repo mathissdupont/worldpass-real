@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_BASE_URL: str = os.getenv("PAYMENT_PROVIDER_BASE_URL", "https://worldpass-beta.heptapusgroup.com/api/mock-provider")
     PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "mock_webhook_secret_change_in_production")
     
+    # IPFS Configuration (for distributed storage)
+    IPFS_API_URL: str = os.getenv("IPFS_API_URL", "http://localhost:5001")
+    IPFS_GATEWAY: str = os.getenv("IPFS_GATEWAY", "https://ipfs.io/ipfs")
+    
     def validate_production_security(self):
         """Validate security settings for production deployment"""
         if self.ENVIRONMENT != "production":
