@@ -28,7 +28,12 @@ export default function IssuerTemplates() {
       
       if (response.ok) {
         const data = await response.json();
-        setTemplates(data.templates || []);
+        // Parse fields JSON string to array
+        const parsedTemplates = (data.templates || []).map(t => ({
+          ...t,
+          fields: typeof t.fields === 'string' ? JSON.parse(t.fields || '[]') : (t.fields || [])
+        }));
+        setTemplates(parsedTemplates);
       }
     } catch (e) {
       console.error("Template loading error:", e);
@@ -49,11 +54,16 @@ export default function IssuerTemplates() {
 
   const handleEdit = (template) => {
     setEditing(template.id);
+    // Ensure fields is an array
+    const fields = Array.isArray(template.fields) 
+      ? template.fields 
+      : (typeof template.fields === 'string' ? JSON.parse(template.fields || '[]') : []);
+    
     setFormData({
       name: template.name,
       description: template.description,
       vc_type: template.vc_type,
-      fields: template.fields || []
+      fields: fields
     });
   };
 
