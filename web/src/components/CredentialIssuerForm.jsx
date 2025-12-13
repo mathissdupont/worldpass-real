@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BlockchainSelector from './BlockchainSelector';
 
 const CredentialIssuerForm = () => {
   const [form, setForm] = useState({
@@ -16,9 +17,9 @@ const CredentialIssuerForm = () => {
   
   // Template system
   const [templates, setTemplates] = useState([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customFields, setCustomFields] = useState({});
+  const [blockchainChain, setBlockchainChain] = useState('polygon');
 
   // Get issuer token from localStorage
   const getIssuerToken = () => {
@@ -55,7 +56,6 @@ const CredentialIssuerForm = () => {
     };
 
     const loadTemplates = async () => {
-      setLoadingTemplates(true);
       try {
         const token = getIssuerToken();
         if (!token) return;
@@ -70,8 +70,6 @@ const CredentialIssuerForm = () => {
         }
       } catch (e) {
         console.error("Template loading error:", e);
-      } finally {
-        setLoadingTemplates(false);
       }
     };
 
@@ -142,7 +140,7 @@ const CredentialIssuerForm = () => {
           'Content-Type': 'application/json',
           'X-Token': token
         },
-        body: JSON.stringify({ vc: vcPayload }),
+        body: JSON.stringify({ vc: vcPayload, blockchain_chain: blockchainChain }),
       });
 
       if (!response.ok) {
@@ -327,6 +325,21 @@ const CredentialIssuerForm = () => {
                 </div>
               </div>
             )}
+
+            {/* Blockchain Selection */}
+            <div className="border-t border-blue-200 pt-4 mt-4">
+              <h3 className="text-sm font-semibold mb-3 text-blue-700">Blockchain Seçimi</h3>
+              <div className="p-3 border rounded bg-blue-50">
+                <BlockchainSelector
+                  onSelect={(chain) => setBlockchainChain(chain)}
+                  defaultChain={blockchainChain}
+                  showTestnets={false}
+                />
+                <p className="text-xs text-blue-700 mt-2">
+                  Seçilen ağ sadece hash anchoring içindir; VC verisi şifreli saklanır.
+                </p>
+              </div>
+            </div>
 
             <button
               type="submit"
