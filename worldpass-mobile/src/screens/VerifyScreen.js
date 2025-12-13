@@ -8,6 +8,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useWallet } from '../context/WalletContext';
 import { verifyVC } from '../lib/crypto';
 import { readNdefOnce } from '../lib/nfc';
+import { verifyCredential as verifyCredentialAPI } from '../lib/api';
 
 export default function VerifyScreen() {
   const { theme } = useTheme();
@@ -52,7 +53,28 @@ export default function VerifyScreen() {
       // Parse the VC JSON
       const vcObj = JSON.parse(vcText);
 
-      // Use local crypto verification
+      // Try backend verification first (checks revocation status)
+      try {
+        const backendResult = await verifyCredentialAPI(vcObj);
+        setVerifyResult({
+          valid: backendResult.valid,
+          issuer: backendResult.issuer,
+          subject: backendResult.subject,
+          reason: backendResult.reason,
+          revoked: backendResult.revoked,
+          proof: vcObj.proof,
+          issuanceDate: vcObj.issuanceDate,
+          expirationDate: vcObj.expirationDate,
+          type: vcObj.type,
+          verifiedBy: 'backend',
+        });
+        setLoadingVerify(false);
+        return;
+      } catch (err) {
+        console.warn('Backend verification failed, using local verification:', err?.message);
+      }
+
+      // Fallback to local crypto verification (offline mode)
       const localResult = await verifyVC(vcObj);
 
       if (localResult.valid) {
@@ -65,6 +87,7 @@ export default function VerifyScreen() {
           issuanceDate: vcObj.issuanceDate,
           expirationDate: vcObj.expirationDate,
           type: vcObj.type,
+          verifiedBy: 'offline',
         });
       } else {
         setVerifyResult({

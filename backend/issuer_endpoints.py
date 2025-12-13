@@ -204,6 +204,8 @@ async def update_issuer_profile(
     db=Depends(get_db)
 ):
     """Update issuer profile/settings"""
+    logger.info(f"Updating issuer profile for issuer_id={issuer['id']}, data={body.dict(exclude_none=True)}")
+    
     now = int(time.time())
     updates = []
     params = []
@@ -238,8 +240,12 @@ async def update_issuer_profile(
         params.append(issuer["id"])
         
         sql = f"UPDATE issuers SET {', '.join(updates)} WHERE id=?"
+        logger.info(f"Executing SQL: {sql} with params: {params}")
         await db.execute(sql, tuple(params))
         await db.commit()
+        logger.info(f"Profile updated successfully for issuer_id={issuer['id']}")
+    else:
+        logger.warning(f"No fields to update for issuer_id={issuer['id']}")
     
     # Fetch updated issuer
     updated = await db.execute_fetchone(

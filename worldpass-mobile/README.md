@@ -57,10 +57,9 @@ npm install
 
 ## Configuration
 
-`src/lib/api.js` automatically picks the right backend URL for development
-(`10.0.2.2` for Android emulators, `localhost` for iOS/web). Update the
-constants there if you want to target a different environment (e.g.,
-`https://staging.worldpass.tech`).
+`src/lib/api.js` uses the production backend URL (`https://worldpass-beta.heptapusgroup.com`)
+by default. You can override this via the `EXPO_PUBLIC_API_BASE` environment variable
+if needed for testing against a different environment.
 
 ## Running the App
 
@@ -153,8 +152,8 @@ The app requires:
 
 ### "API requests failing"
 - Verify backend URL in `src/lib/api.js`
-- For Android emulator, use `10.0.2.2` instead of `localhost`
-- For iOS simulator, use `localhost`
+- Always uses production backend: `https://worldpass-beta.heptapusgroup.com`
+- Override via `EXPO_PUBLIC_API_BASE` environment variable if needed
 - For physical devices, use your computer's local network IP
 
 ## Backend Integration

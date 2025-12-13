@@ -111,7 +111,7 @@ const exportCredentialToFile = async (credential) => {
     const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
     await FileSystem.writeAsStringAsync(fileUri, json, {
-      encoding: FileSystem.EncodingType.UTF8,
+      encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
     });
 
     if (await Sharing.isAvailableAsync()) {
@@ -681,7 +681,7 @@ export default function WalletScreen() {
       const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
 
       await FileSystem.writeAsStringAsync(fileUri, jsonString, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
       });
 
       if (await Sharing.isAvailableAsync()) {

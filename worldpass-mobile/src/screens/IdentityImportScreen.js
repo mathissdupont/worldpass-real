@@ -94,7 +94,7 @@ export default function IdentityImportScreen() {
       throw new Error('Select a keystore file first.');
     }
     const contents = await FileSystem.readAsStringAsync(file.uri, {
-      encoding: FileSystem.EncodingType.UTF8,
+      encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
     });
     try {
       return JSON.parse(contents);
@@ -171,7 +171,7 @@ export default function IdentityImportScreen() {
       const fileUri = `${dir}${filename}`;
 
       await FileSystem.writeAsStringAsync(fileUri, keystoreJson, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
       });
 
       if (await Sharing.isAvailableAsync()) {

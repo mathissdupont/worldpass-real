@@ -8,6 +8,7 @@ import {
   importCredentials as importStoredCredentials
 } from '../lib/storage';
 import { useAuth } from './AuthContext';
+import { listUserVCs, addVCToWallet, deleteUserVC } from '../lib/api';
 
 const WalletContext = createContext({
   credentials: [],
@@ -30,6 +31,21 @@ export function WalletProvider({ children }) {
   const loadCredentials = useCallback(async () => {
     try {
       setError(null);
+      
+      // Try to load from backend first if user is authenticated
+      if (user) {
+        try {
+          const backendVCs = await listUserVCs();
+          if (backendVCs && Array.isArray(backendVCs.vcs)) {
+            setCredentials(backendVCs.vcs);
+            return;
+          }
+        } catch (err) {
+          console.warn('Failed to load credentials from backend, using local storage:', err?.message || err);
+        }
+      }
+      
+      // Fallback to local storage
       const stored = await loadStoredCredentials();
       if (Array.isArray(stored)) {
         setCredentials(stored);
@@ -40,7 +56,7 @@ export function WalletProvider({ children }) {
       setError(err?.message || 'wallet_load_failed');
       setCredentials([]);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,15 +89,37 @@ export function WalletProvider({ children }) {
 
   const addCredential = useCallback(async (credential) => {
     if (!credential) return;
+    
+    // Add to backend if user is authenticated
+    if (user) {
+      try {
+        await addVCToWallet(credential);
+      } catch (err) {
+        console.warn('Failed to add credential to backend, storing locally:', err?.message || err);
+      }
+    }
+    
+    // Also store locally
     const updated = await storeCredential(credential);
     setCredentials(updated);
-  }, []);
+  }, [user]);
 
   const deleteCredential = useCallback(async (credentialId) => {
     if (!credentialId) return;
+    
+    // Delete from backend if user is authenticated
+    if (user) {
+      try {
+        await deleteUserVC(credentialId);
+      } catch (err) {
+        console.warn('Failed to delete credential from backend:', err?.message || err);
+      }
+    }
+    
+    // Also delete locally
     const updated = await removeStoredCredential(credentialId);
     setCredentials(updated);
-  }, []);
+  }, [user]);
 
   const clearWallet = useCallback(async () => {
     await wipeStoredCredentials();

@@ -127,7 +127,7 @@ eas build --platform android --profile development
 - **Expo Docs**: https://docs.expo.dev/
 - **EAS Build**: https://docs.expo.dev/build/introduction/
 - **Play Console**: https://play.google.com/console
-- **Backend**: http://localhost:8000 (development)
+- **Backend**: https://worldpass-beta.heptapusgroup.com (production)
 
 ## 📞 İletişim
 

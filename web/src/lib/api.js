@@ -192,8 +192,19 @@ export async function getIssuerProfile() {
   return r.json();
 }
 
-export async function updateIssuerProfile(data) {
-  const token = getIssuerToken();
+export async function updateIssuerProfile(tokenOrData, maybeData) {
+  // Support both: updateIssuerProfile(data) and updateIssuerProfile(token, data)
+  let token, data;
+  if (maybeData !== undefined) {
+    // Called with (token, data)
+    token = tokenOrData;
+    data = maybeData;
+  } else {
+    // Called with (data) only
+    token = getIssuerToken();
+    data = tokenOrData;
+  }
+  
   if (!token) throw new Error('Not authenticated');
   const r = await fetch('/api/issuer/me', {
     method: 'PATCH',
@@ -203,7 +214,11 @@ export async function updateIssuerProfile(data) {
     },
     body: JSON.stringify(data)
   });
-  if (!r.ok) throw new Error('update_profile_failed');
+  if (!r.ok) {
+    const errText = await r.text();
+    console.error('Update profile failed:', r.status, errText);
+    throw new Error('update_profile_failed');
+  }
   return r.json();
 }
 

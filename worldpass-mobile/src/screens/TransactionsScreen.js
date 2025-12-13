@@ -23,7 +23,7 @@ export default function TransactionsScreen({ navigation }) {
       setError(null);
       const filterStatus = filter === 'all' ? null : filter;
       const params = filterStatus ? `?status=${filterStatus}` : '';
-      const result = await apiRequest(`/api/payments/transactions${params}`);
+      const result = await apiRequest(`/api/payment/transactions${params}`);
       setTransactions(result.transactions || []);
     } catch (err) {
       console.error('Failed to fetch transactions:', err);

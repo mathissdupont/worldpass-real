@@ -39,7 +39,7 @@ class Settings(BaseSettings):
                 )
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 24
-    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "https://worldpass-beta.heptapusgroup.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "https://worldpass-beta.heptapusgroup.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://localhost:8081,http://127.0.0.1:8081")
     # VC Encryption - Used to encrypt VCs at rest in the database
     # Generate with: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     VC_ENCRYPTION_KEY: str = os.getenv("VC_ENCRYPTION_KEY", "lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE=")

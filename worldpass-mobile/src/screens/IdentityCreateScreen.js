@@ -138,7 +138,7 @@ export default function IdentityCreateScreen({ navigation }) {
       const fileUri = `${dir}${filename}`;
 
       await FileSystem.writeAsStringAsync(fileUri, keystoreJson, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
       });
 
       const canShare = await Sharing.isAvailableAsync();

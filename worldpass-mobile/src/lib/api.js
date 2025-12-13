@@ -3,14 +3,9 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDID } from './storage';
 
-const LOCAL_API_BASE = Platform.select({
-  ios: 'https://worldpass-beta.heptapusgroup.com',
-  android: 'http://10.0.2.2:8000',
-  default: 'https://worldpass-beta.heptapusgroup.com',
-});
-
+// Use local backend for web testing, production for native
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE || '').replace(/\/$/, '')
-  || (__DEV__ ? LOCAL_API_BASE : 'https://worldpass-beta.heptapusgroup.com');
+  || (Platform.OS === 'web' ? 'http://localhost:8000' : 'https://worldpass-beta.heptapusgroup.com');
 
 const ACCOUNT_PROFILE_ENDPOINT = '/api/user/profile';
 const PROFILE_DATA_ENDPOINT = '/api/user/profile-data';
@@ -39,6 +34,7 @@ export async function apiRequest(endpoint, options = {}) {
   }
   const headers = {
     'Content-Type': 'application/json',
+    'expo-platform': Platform.OS,
     ...options.headers,
   };
   
@@ -311,4 +307,105 @@ export async function deleteTemplate(templateId) {
 
 export async function lookupRecipient(recipientId) {
   return apiRequest(`/api/recipient/${recipientId}`);
+}
+
+// Challenge APIs (for offline VC verification)
+export async function newChallenge(audience = 'worldpass-mobile', exp_secs = 120) {
+  return apiRequest('/api/challenge/new', {
+    method: 'POST',
+    body: JSON.stringify({ audience, exp_secs }),
+  });
+}
+
+// Presentation verification
+export async function verifyPresentation(presentation) {
+  return apiRequest('/api/present/verify', {
+    method: 'POST',
+    body: JSON.stringify(presentation),
+  });
+}
+
+// Payment APIs
+export async function createPaymentIntent(data) {
+  return apiRequest('/api/payment/intent', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function listTransactions(status) {
+  const endpoint = status
+    ? `/api/payment/transactions?status=${status}`
+    : '/api/payment/transactions';
+  return apiRequest(endpoint);
+}
+
+// 2FA APIs
+export async function setup2FA() {
+  return apiRequest('/api/user/2fa/setup', { method: 'POST' });
+}
+
+export async function enable2FA(otp_code) {
+  return apiRequest('/api/user/2fa/enable', {
+    method: 'POST',
+    body: JSON.stringify({ otp_code }),
+  });
+}
+
+export async function disable2FA(otp_code) {
+  return apiRequest('/api/user/2fa/disable', {
+    method: 'POST',
+    body: JSON.stringify({ otp_code }),
+  });
+}
+
+// VC Management APIs
+export async function exportUserCredentials() {
+  const token = await getToken();
+  const walletDid = await getDID();
+  const headers = {
+    'X-Token': token,
+    'X-Wallet-Did': walletDid,
+  };
+
+  const response = await fetch(`${API_BASE}/api/vc/export`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Export failed');
+  }
+
+  return response.json();
+}
+
+export async function addVCToWallet(vc) {
+  return apiRequest('/api/user/vc/add', {
+    method: 'POST',
+    body: JSON.stringify({ vc }),
+  });
+}
+
+export async function listUserVCs() {
+  return apiRequest('/api/user/vcs');
+}
+
+export async function deleteUserVC(vc_id) {
+  return apiRequest(`/api/user/vcs/${vc_id}`, {
+    method: 'DELETE',
+  });
+}
+
+// Share token for QR/NFC sharing
+export async function createShareToken(vc_id, expires_in_secs = 300) {
+  return apiRequest('/api/share/token', {
+    method: 'POST',
+    body: JSON.stringify({ vc_id, expires_in_secs }),
+  });
+}
+
+export async function getSharedVC(token) {
+  return apiRequest(`/api/share/${token}`);
 }

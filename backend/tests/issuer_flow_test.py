@@ -4,7 +4,7 @@ Run with:
     python backend/tests/issuer_flow_test.py
 
 Prerequisites:
- - Backend server running on http://127.0.0.1:8000
+ - Backend server running on https://worldpass-beta.heptapusgroup.com
  - httpx installed in virtual environment
 
 This script will:
@@ -28,7 +28,7 @@ import os
 import random
 import string
 
-BASE = "http://127.0.0.1:8000/api"
+BASE = "https://worldpass-beta.heptapusgroup.com/api"
 # Ensure parent (backend) directory is on sys.path for module imports
 import sys, pathlib
 parent_dir = pathlib.Path(__file__).resolve().parent.parent
