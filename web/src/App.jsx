@@ -8,7 +8,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Account from "./pages/Account";
 import Profile from "./pages/Profile";
-import Issue from "./pages/Issue";
+// Legacy Issue page removed; using CredentialIssuerForm under issuer console
 import CredentialIssuerForm from "./components/CredentialIssuerForm";
 import Verify from "./pages/Verify";
 import Credentials from "./pages/Credentials";
