@@ -4,8 +4,9 @@ from .crypto_ed25519 import b64u, b64u_d
 from .crypto_base import Signer
 
 def jws_message(header: dict, payload: dict) -> bytes:
-    return (b64u(json.dumps(header, separators=(",",":")).encode()) + "." +
-            b64u(json.dumps(payload, separators=(",",":")).encode())).encode()
+    # Use sort_keys=True for canonical JSON form (required for signature verification)
+    return (b64u(json.dumps(header, separators=(",",":"), sort_keys=True).encode()) + "." +
+            b64u(json.dumps(payload, separators=(",",":"), sort_keys=True).encode())).encode()
 
 def sign_vc(vc_body: Dict, signer: Signer, sk: bytes, issuer_pk_b64u: str, verification_method: str) -> Dict:
     header = {"alg":"EdDSA","typ":"JWT"}
