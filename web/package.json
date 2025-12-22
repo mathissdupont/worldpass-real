@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "argon2-browser": "^1.18.0",
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.17",
@@ -24,6 +26,7 @@
     "react-router-dom": "^6.30.2",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "three": "^0.180.0",
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
