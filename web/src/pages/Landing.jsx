@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { track } from '@/lib/evt';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { t, getLocale, setLocale } from '@/lib/i18n';
 // 3D Imports
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sphere, MeshDistortMaterial, Float, Stars } from '@react-three/drei';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { OrbitControls, Stars, Html } from '@react-three/drei';
 import * as THREE from 'three';
 
 import { 
@@ -21,7 +21,7 @@ import {
   Fingerprint,
   Shield,
   Smartphone,
-  Globe
+  Globe as GlobeIcon
 } from 'lucide-react';
 
 // --- UTILITY COMPONENTS ---
@@ -37,66 +37,119 @@ const FadeIn = ({ children, delay = 0 }) => (
   </Motion.div>
 );
 
-// --- 3D COMPONENTS (NEW) ---
+// --- 3D COMPONENTS (YENİ VE GELİŞMİŞ) ---
 
-const AnimatedGlobe = () => {
+const RealisticGlobe = ({ isMobile }) => {
   const meshRef = useRef(null);
+  const atmosphereRef = useRef(null);
+
+  // Texture'ları yükle (GitHub raw kaynaklarından)
+  const [colorMap, normalMap, specularMap] = useLoader(THREE.TextureLoader, [
+    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg',
+    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg',
+    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'
+  ]);
 
   useFrame((state) => {
+    const time = state.clock.getElapsedTime();
     if (meshRef.current) {
-      // Yavaşça kendi ekseninde dönme ve hafif salınım
-      meshRef.current.rotation.y += 0.002;
-      meshRef.current.rotation.x = Math.sin(state.clock.getElapsedTime() * 0.5) * 0.1;
+      meshRef.current.rotation.y += 0.0015; // Kendi etrafında dönüş
+      // Mobilde biraz daha az salınım
+      meshRef.current.rotation.x = Math.sin(time * 0.3) * (isMobile ? 0.05 : 0.1);
+    }
+    if (atmosphereRef.current) {
+        atmosphereRef.current.rotation.y += 0.002;
     }
   });
 
+  const scale = isMobile ? 1.8 : 2.5; // Mobilde daha küçük, masaüstünde büyük
+
   return (
-    <Float speed={2} rotationIntensity={1.5} floatIntensity={2}>
-      {/* İç Çekirdek - Sıvımsı Efekt */}
-      <Sphere args={[1, 64, 64]} scale={1.6}>
-        <MeshDistortMaterial
-          color="#4f46e5" // Indigo-600
-          attach="material"
-          distort={0.4}
-          speed={2}
-          roughness={0.2}
-          metalness={0.8}
+    <group rotation={[0, 0, isMobile ? 0 : 0.2]}> {/* Hafif eksen eğikliği */}
+      {/* ANA DÜNYA KÜRESİ */}
+      <mesh ref={meshRef} scale={scale}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshPhongMaterial
+          map={colorMap}
+          normalMap={normalMap}
+          specularMap={specularMap}
+          shininess={15} // Okyanus parlaması
+          color="#ffffff"
         />
-      </Sphere>
-      
-      {/* Dış Tel Kafes (Wireframe) - Siber Güvenlik Hissi */}
-      <Sphere args={[1, 64, 64]} scale={2.1} ref={meshRef}>
-        <meshStandardMaterial
-          color="#22d3ee" // Cyan-400
+      </mesh>
+
+      {/* ATMOSFER (GLOW EFFECT) */}
+      <mesh ref={atmosphereRef} scale={scale * 1.03}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshPhongMaterial
+          color="#4f46e5" // Indigo rengi atmosfer
+          transparent
+          opacity={0.2}
+          side={THREE.BackSide} // İçten dışa render
+          blending={THREE.AdditiveBlending} // Parlama efekti
+        />
+      </mesh>
+
+       {/* SİBER AĞ KATMANI (WIREFRAME) */}
+       <mesh scale={scale * 1.01} rotation={[0, Math.PI, 0]}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshBasicMaterial
+          color="#22d3ee" // Cyan
           wireframe
           transparent
-          opacity={0.15}
+          opacity={0.05}
         />
-      </Sphere>
-      
-      {/* Sahne Işıkları */}
-      <pointLight position={[10, 10, 10]} intensity={2} color="#818cf8" />
-      <pointLight position={[-10, -10, -10]} intensity={1} color="#22d3ee" />
-      <ambientLight intensity={0.5} />
-    </Float>
+      </mesh>
+    </group>
   );
 };
 
+const SceneLoader = () => {
+    return (
+        <Html center>
+            <div className="text-indigo-500 text-sm font-mono animate-pulse">Loading World...</div>
+        </Html>
+    )
+}
+
 const Scene3D = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize(); // İlk yüklemede kontrol et
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <div className="w-full h-[450px] lg:h-[650px] relative cursor-move">
-      <Canvas camera={{ position: [0, 0, 7], fov: 45 }}>
-        {/* Arka plan parçacıkları */}
-        <Stars radius={80} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
+    // Mobilde height: 350px, Desktopta height: 650px
+    <div className={`w-full relative transition-all duration-300 ${isMobile ? 'h-[350px] mt-8' : 'h-[650px]'}`}>
+      <Canvas camera={{ position: [0, 0, isMobile ? 6 : 7], fov: 45 }}>
+        {/* Işıklandırma */}
+        <ambientLight intensity={0.2} color="#ffffff" />
+        <directionalLight position={[5, 3, 5]} intensity={3.5} color="#ffffff" />
+        <pointLight position={[-5, -2, -5]} intensity={1} color="#4f46e5" /> {/* Arkadan vuran mor ışık */}
+
+        {/* Arka plan yıldızları */}
+        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
         
-        <AnimatedGlobe />
+        <Suspense fallback={<SceneLoader />}>
+            <RealisticGlobe isMobile={isMobile} />
+        </Suspense>
         
-        {/* Kullanıcı hafifçe çevirebilsin ama zoom yapamasın */}
-        <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.8} enablePan={false} />
+        <OrbitControls 
+            enableZoom={false} 
+            enablePan={false} 
+            autoRotate={true}
+            autoRotateSpeed={0.5}
+            minPolarAngle={Math.PI / 2.5}
+            maxPolarAngle={Math.PI / 1.5}
+        />
       </Canvas>
       
-      {/* Alt kısım için yumuşak geçiş maskesi */}
-      <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-black via-black/50 to-transparent pointer-events-none" />
+      {/* Geçiş Maskesi */}
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none" />
     </div>
   );
 };
@@ -132,8 +185,8 @@ const Navbar = () => {
     <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-black/80 backdrop-blur-md border-b border-zinc-800' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="text-xl font-bold text-white cursor-pointer flex items-center gap-2" onClick={() => navigate('/')}>
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Globe className="text-white w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
+            <GlobeIcon className="text-white w-5 h-5" />
           </div>
           WorldPass
         </div>
@@ -155,7 +208,7 @@ const Navbar = () => {
             className="p-2 text-zinc-400 hover:text-white transition-colors"
             title={locale === 'en' ? 'Türkçe' : 'English'}
           >
-            <Globe size={18} />
+            <GlobeIcon size={18} />
           </button>
           <button
             onClick={() => {
@@ -204,7 +257,7 @@ const Navbar = () => {
                 onClick={toggleLocale}
                 className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                <Globe size={18} />
+                <GlobeIcon size={18} />
                 {locale === 'en' ? 'Türkçe' : 'English'}
               </button>
               <button
@@ -232,16 +285,16 @@ const Hero = React.memo(() => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
-      {/* Yeni Gradient Arka Plan */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/30 via-zinc-950 to-black pointer-events-none" />
+      {/* Yeni Gradient Arka Plan - Daha Derin */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-zinc-950 to-black pointer-events-none" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 pt-32 pb-20 w-full">
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           
           {/* Sol: Metin İçeriği */}
-          <div className="text-center lg:text-left order-2 lg:order-1">
+          <div className="text-center lg:text-left order-2 lg:order-1 relative z-20">
             <FadeIn>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-6 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-6 backdrop-blur-sm shadow-[0_0_10px_rgba(79,70,229,0.2)]">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
@@ -264,7 +317,7 @@ const Hero = React.memo(() => {
                     track('cta_hero', { action: 'start' });
                     navigate('/login');
                   }}
-                  className="px-8 py-4 bg-white text-black hover:bg-zinc-200 rounded-xl text-lg font-bold transition-all flex items-center justify-center gap-2 group shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+                  className="px-8 py-4 bg-white text-black hover:bg-zinc-200 rounded-xl text-lg font-bold transition-all flex items-center justify-center gap-2 group shadow-[0_0_25px_rgba(255,255,255,0.25)] hover:shadow-[0_0_35px_rgba(255,255,255,0.4)]"
                 >
                   {t('landing.hero.cta_start')}
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -289,7 +342,7 @@ const Hero = React.memo(() => {
                         <span>E2E Encrypted</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-indigo-500" />
+                        <GlobeIcon className="w-5 h-5 text-indigo-500" />
                         <span>Global Standarts</span>
                     </div>
                 </div>
@@ -298,16 +351,19 @@ const Hero = React.memo(() => {
 
           {/* Sağ: 3D Scene */}
           <FadeIn delay={0.3}>
-            <div className="order-1 lg:order-2 flex justify-center items-center relative">
-               {/* 3D Model */}
+            {/* Mobilde düzeni korumak için order-1 verdik (önce metin sonra görsel), ancak görsel olarak metnin üstünde veya altında kalmasını CSS ile yönettik */}
+            <div className="order-1 lg:order-2 flex justify-center items-center relative w-full">
                <Scene3D />
+               
+               {/* 3D Yüklenirken gösterilecek overlay (opsiyonel) */}
+               <div className="absolute inset-0 z-0 bg-radial-gradient from-transparent to-black opacity-0"></div>
             </div>
           </FadeIn>
         </div>
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:block">
         <Motion.div
           animate={{ y: [0, 10, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -442,7 +498,7 @@ const SecuritySection = React.memo(() => {
 
 // --- FAQ ---
 
-const FAQ = () => {
+const FAQ = React.memo(() => {
   const questions = [
     { q: t('landing.faq.q1'), a: t('landing.faq.a1') },
     { q: t('landing.faq.q2'), a: t('landing.faq.a2') },
@@ -495,7 +551,7 @@ const FAQ = () => {
       </div>
     </section>
   );
-};
+});
 
 // --- CTA ---
 
