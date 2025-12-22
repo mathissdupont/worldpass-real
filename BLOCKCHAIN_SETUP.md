@@ -1,6 +1,6 @@
 # Blockchain Entegrasyonu - Sıfırdan Kurulum Rehberi
 
-WorldPass için Polygon Mumbai testnet üzerinde VC anchor kontratı deployment ve backend entegrasyonu.
+WorldPass için Polygon testnet üzerinde VC anchor kontratı deployment ve backend entegrasyonu.
 
 ## Önkoşullar - Kurulması Gerekenler
 
@@ -87,7 +87,25 @@ Mumbai testnet'te işlem yapmak için ücretsiz test MATIC lazım:
 
 ## Proje Kurulumu
 
-### 1. Hardhat Projesi Oluşturma
+### 1. Hardhat Projesi
+
+Bu repoda deploy için hazır minimal bir Hardhat projesi var: `worldpass/blockchain/`.
+
+İstersen sıfırdan kurmak yerine direkt onu kullan:
+
+```powershell
+cd C:\Users\samet\OneDrive\Masaüstü\worldpass\blockchain
+npm install
+copy .env.example .env
+```
+
+`.env` içine `PRIVATE_KEY` girmen yeterli.
+
+> Not: Kontrat dosyası repo root'ta: `worldpass/contracts/VCAnchor.sol`
+
+---
+
+### 1 (Alternatif). Hardhat Projesi Oluşturma (Sıfırdan)
 
 Workspace içinde blockchain klasörü oluştur:
 
@@ -142,7 +160,10 @@ New-Item .env -ItemType File
 # MetaMask private key (GÜVENLİ TUT! - Git'e ekleme)
 PRIVATE_KEY=buraya_metamask_private_key_yapistir
 
-# Mumbai RPC URL (Alchemy veya Infura)
+# Amoy RPC URL (Önerilen)
+AMOY_RPC_URL=https://rpc-amoy.polygon.technology
+
+# Mumbai RPC URL (Legacy)
 MUMBAI_RPC_URL=https://rpc-mumbai.maticvigil.com
 
 # PolygonScan API Key (contract verify için - opsiyonel)
@@ -400,12 +421,19 @@ main()
   });
 ```
 
-### 2. Mumbai'ye Deploy Etme
+### 2. Amoy'a Deploy Etme (Önerilen)
+
+```powershell
+cd C:\Users\samet\OneDrive\Masaüstü\worldpass\blockchain
+npm run deploy:amoy
+```
+
+### 2 (Alternatif). Mumbai'ye Deploy Etme (Legacy)
 
 **Deploy komutu:**
 ```powershell
 cd C:\Users\samet\OneDrive\Masaüstü\worldpass\blockchain
-npx hardhat run scripts/deploy.js --network mumbai
+npm run deploy:mumbai
 ```
 
 **Beklenen çıktı:**
@@ -441,8 +469,12 @@ Kontrat deploy olduktan sonra backend'de kullanmak için:
 ```env
 # Blockchain Anchor Settings
 ANCHOR_MODE=real
-POLYGON_MUMBAI_RPC_URL=https://rpc-mumbai.maticvigil.com
 DEPLOYER_PRIVATE_KEY=0xYourPrivateKey
+
+# Eğer Amoy'a deploy ettiysen:
+CONTRACT_POLYGON_AMOY=0xYourContractAddress
+
+# Eğer Mumbai'ye deploy ettiysen (legacy):
 CONTRACT_POLYGON_MUMBAI=0xYourContractAddress
 ```
 

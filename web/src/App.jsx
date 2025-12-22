@@ -18,9 +18,6 @@ import AdminIssuers from "./pages/admin/Issuers";
 import IssuerApproval from "./pages/admin/IssuerApproval";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminLogin from "./pages/admin/Login";
-import AdminAnalytics from "./pages/admin/Analytics";
-import AdminSettings from "./pages/admin/Settings";
-import AdminLogs from "./pages/admin/Logs";
 import IssuerRegister from "./pages/issuer/Register";
 import IssuerLogin from "./pages/issuer/Login";
 // New Issuer Console (consolidated)
@@ -40,6 +37,10 @@ import AdminRoute from "./components/AdminRoute";
 import WorldPassPayDemo from "./pages/pay/WorldPassPayDemo";
 import PaymentResult from "./pages/pay/PaymentResult";
 import TransactionsPage from "./pages/pay/TransactionsPage";
+// Append this to App.jsx imports section (after AdminLogin import):
+import AdminAnalytics from "./pages/admin/Analytics";
+import AdminSettings from "./pages/admin/Settings";
+import AdminLogs from "./pages/admin/Logs";
 
 import { getSession } from "./lib/auth";
 import { listOrgs } from "./lib/issuerStore.js";
@@ -107,6 +108,61 @@ export default function App() {
       <Routes>
         {/* Landing Page */}
         <Route path="/" element={<Landing />} />
+
+        {/* Admin Routes (token-based, separate from user DID auth) */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/issuers"
+          element={
+            <AdminRoute>
+              <IssuerApproval />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/issuer-approval"
+          element={<Navigate to="/admin/issuers" replace />}
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <AdminRoute>
+              <AdminAnalytics />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <AdminRoute>
+              <AdminSettings />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/logs"
+          element={
+            <AdminRoute>
+              <AdminLogs />
+            </AdminRoute>
+          }
+        />
         
         {/* Issuer Console - consolidated routes */}
         <Route
@@ -190,62 +246,6 @@ export default function App() {
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/verify" element={<Verify />} />
                   <Route path="/verifier" element={<Verifier />} />
-                  <Route path="/admin/login" element={<AdminLogin />} />
-
-                  {/* Admin Routes - Protected */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  
-                  <Route
-                    path="/admin/dashboard"
-                    element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  
-                  <Route
-                    path="/admin/issuers"
-                    element={
-                      <AdminRoute>
-                        <IssuerApproval />
-                      </AdminRoute>
-                    }
-                  />
-                  
-                  <Route
-                    path="/admin/analytics"
-                    element={
-                      <AdminRoute>
-                        <AdminAnalytics />
-                      </AdminRoute>
-                    }
-                  />
-                  
-                  <Route
-                    path="/admin/settings"
-                    element={
-                      <AdminRoute>
-                        <AdminSettings />
-                      </AdminRoute>
-                    }
-                  />
-                  
-                  <Route
-                    path="/admin/logs"
-                    element={
-                      <AdminRoute>
-                        <AdminLogs />
-                      </AdminRoute>
-                    }
-                  />
 
                   {/* Kuruluş kaydı public: sayfanın kendisi DID yoksa zaten uyarıyor */}
                   <Route path="/issuer/register" element={<IssuerRegister />} />
@@ -359,28 +359,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-                  <Route
-                    path="/admin/issuers"
-                    element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminIssuers />
-                        </ProtectedRoute>
-                      </RoleRoute>
-                    }
-                  />
-
-                  <Route
-                    path="/admin/issuer-approval"
-                    element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <IssuerApproval />
-                        </ProtectedRoute>
-                      </RoleRoute>
-                    }
-                  />
 
                   <Route
                     path="*"
