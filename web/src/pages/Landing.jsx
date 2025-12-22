@@ -59,7 +59,9 @@ const RealisticGlobe = ({ isMobile }) => {
           map={colorMap}
           normalMap={normalMap}
           specularMap={specularMap}
-          shininess={5} 
+          shininess={20}
+          emissive={new THREE.Color('#111827')}
+          emissiveIntensity={0.35}
           color="#eef2ff" // Hafif mavi tint
         />
       </mesh>
@@ -70,7 +72,7 @@ const RealisticGlobe = ({ isMobile }) => {
         <meshPhongMaterial
           color="#6366f1" // Indigo-500
           transparent
-          opacity={0.15}
+          opacity={0.2}
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
@@ -116,10 +118,10 @@ const Scene3D = () => {
         {/* Sis efekti: Uzaktaki yıldızları siyaha gömer */}
         <fog attach="fog" args={['#000000', 10, 25]} />
 
-        <ambientLight intensity={0.1} color="#ffffff" />
-        <directionalLight position={[10, 10, 5]} intensity={2} color="#ffffff" />
+        <ambientLight intensity={0.18} color="#ffffff" />
+        <directionalLight position={[10, 10, 5]} intensity={2.6} color="#ffffff" />
         {/* Dramatik yan ışık (Rim Light) */}
-        <spotLight position={[-10, 0, 10]} angle={0.5} penumbra={1} intensity={3} color="#4f46e5" />
+        <spotLight position={[-10, 0, 10]} angle={0.5} penumbra={1} intensity={3.4} color="#4f46e5" />
 
         {/* Yıldızlar artık daha geniş alanda */}
         <Stars radius={100} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
