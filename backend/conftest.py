@@ -19,7 +19,10 @@ os.environ['VC_ENCRYPTION_KEY'] = 'test-key-for-integration-test-12345'
 os.environ['PROFILE_ENCRYPTION_KEY'] = 'lIwAjiHC7Rep5_Vb5vH-nXBHDWiMQnwclFUCga2CNLE='
 os.environ['SQLITE_PATH'] = TEST_DB_PATH
 os.environ['JWT_SECRET'] = 'test-jwt-secret-key-12345'
-os.environ['ADMIN_PASS_HASH'] = '$2b$12$rV305vOf0QA17Bq1o4WrPOzsfWpI7y9cSviK5zl3JHcEXqLRjDq4u'
+# Tests expect username=admin
+os.environ['ADMIN_USER'] = 'admin'
+# bcrypt hash for password: admin123
+os.environ['ADMIN_PASS_HASH'] = '$2b$12$troQwLxrcRAClS/V.LxwSugXG1FAK3KUTr9.Z8Qj9e8rbc4aHJd0S'
 
 # Clean up any existing test database before importing anything
 if os.path.exists(TEST_DB_PATH):
@@ -42,7 +45,20 @@ def setup_test_db():
     
     # Clean up after all tests
     if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+        # Windows can keep SQLite files locked briefly; retry a few times.
+        import time
+        last_err = None
+        for _ in range(30):
+            try:
+                os.remove(TEST_DB_PATH)
+                last_err = None
+                break
+            except PermissionError as e:
+                last_err = e
+                time.sleep(0.2)
+        # If still locked, don't fail the whole test run on Windows.
+        if last_err is not None:
+            print(f"[TEST WARN] Could not delete test DB (locked): {last_err}")
 
 
 @pytest.fixture(scope="module")

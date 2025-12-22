@@ -36,6 +36,7 @@ import Present from "./pages/Present";
 import WPTEditorPro from "@/pages/tools/WPTEditorPRO.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/RoleRoute";
+import AdminRoute from "./components/AdminRoute";
 import WorldPassPayDemo from "./pages/pay/WorldPassPayDemo";
 import PaymentResult from "./pages/pay/PaymentResult";
 import TransactionsPage from "./pages/pay/TransactionsPage";
@@ -195,66 +196,54 @@ export default function App() {
                   <Route
                     path="/admin"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminDashboard />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <AdminDashboard />
+                      </AdminRoute>
                     }
                   />
                   
                   <Route
                     path="/admin/dashboard"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminDashboard />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <AdminDashboard />
+                      </AdminRoute>
                     }
                   />
                   
                   <Route
                     path="/admin/issuers"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <IssuerApproval />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <IssuerApproval />
+                      </AdminRoute>
                     }
                   />
                   
                   <Route
                     path="/admin/analytics"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminAnalytics />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <AdminAnalytics />
+                      </AdminRoute>
                     }
                   />
                   
                   <Route
                     path="/admin/settings"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminSettings />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <AdminSettings />
+                      </AdminRoute>
                     }
                   />
                   
                   <Route
                     path="/admin/logs"
                     element={
-                      <RoleRoute user={user} roles="admin">
-                        <ProtectedRoute>
-                          <AdminLogs />
-                        </ProtectedRoute>
-                      </RoleRoute>
+                      <AdminRoute>
+                        <AdminLogs />
+                      </AdminRoute>
                     }
                   />
 

@@ -32,7 +32,7 @@ export default function AdminLogin() {
       localStorage.setItem("wp_admin_token", data.token);
       
       // Redirect to admin panel
-      navigate("/admin/issuer-approval");
+      navigate("/admin/dashboard");
     } catch (err) {
       console.error(err);
       setError(err.message || "Invalid credentials");

@@ -120,7 +120,7 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <button
-            onClick={() => navigate("/admin/issuer-approval")}
+            onClick={() => navigate("/admin/issuers")}
             className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow text-left"
           >
             <div className="flex items-center gap-3">

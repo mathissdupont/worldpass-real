@@ -128,6 +128,19 @@ SUPPORTED_CHAINS = {
         "explorer": "https://mumbai.polygonscan.com",
         "native_token": "MATIC",
         "testnet": True,
+        "poa": True,
+        "recommended": True,
+    },
+
+    # Polygon Amoy (current Polygon PoS testnet)
+    "polygon-amoy": {
+        "name": "Polygon Amoy Testnet",
+        "chain_id": 80002,
+        "rpc": "https://rpc-amoy.polygon.technology",
+        "explorer": "https://amoy.polygonscan.com",
+        "native_token": "MATIC",
+        "testnet": True,
+        "poa": True,
         "recommended": True,
     },
     
@@ -155,7 +168,9 @@ def get_recommended_chain(region=None, use_testnet=False):
         Chain key
     """
     if use_testnet:
-        return "polygon-mumbai"
+        # Prefer current Polygon PoS testnet; override via env if needed.
+        import os
+        return (os.getenv("DEFAULT_TESTNET_CHAIN") or "polygon-amoy").strip() or "polygon-amoy"
     
     # Regional optimization (optional)
     if region == "asia":

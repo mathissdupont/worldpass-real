@@ -39,7 +39,7 @@ export default function IssuerApproval() {
       console.error(err);
       setError(err.message);
       if (err.message.includes("Unauthorized")) {
-        setTimeout(() => navigate("/login"), 2000);
+        setTimeout(() => navigate("/admin/login"), 2000);
       }
     } finally {
       setLoading(false);

@@ -25,6 +25,7 @@ import time
 from typing import Optional, Dict, Any
 import aiohttp
 import os
+import asyncio
 from chain_config import get_chain_config, get_recommended_chain
 
 # IPFS Configuration
@@ -58,7 +59,13 @@ class DistributedStorage:
                     f"{self.ipfs_api}/api/v0/add",
                     data=data
                 ) as resp:
-                    result = await resp.json()
+                    # IPFS often replies with JSON but content-type can be text/plain.
+                    text = await resp.text()
+                    try:
+                        result = json.loads(text)
+                    except Exception:
+                        # Some IPFS gateways may stream newline-delimited JSON
+                        result = json.loads(text.strip().splitlines()[-1])
                     return result["Hash"]
         except Exception as e:
             # Fallback: Return hash-based ID if IPFS not available
@@ -107,16 +114,128 @@ class BlockchainLedger:
         self.explorer = self.chain_config["explorer"]
         
         # Contract address per chain (would be deployed separately on each)
-        self.contract = os.getenv(f"CONTRACT_{chain_key.upper()}", None)
+        env_chain_key = chain_key.upper().replace("-", "_")
+        self.contract = os.getenv(f"CONTRACT_{env_chain_key}", None)
+
+        # Anchor mode:
+        # - simulated: never sends tx, always returns a deterministic fake tx hash
+        # - real: uses web3 to send tx when CONTRACT_* and DEPLOYER_PRIVATE_KEY are set
+        self.anchor_mode = os.getenv("ANCHOR_MODE", "simulated").lower().strip() or "simulated"
+        self.deployer_private_key = os.getenv("DEPLOYER_PRIVATE_KEY", "").strip()
         
         print(f"[BlockchainLedger] Initialized with {self.chain_config['name']} (chain_id: {self.chain_id})")
+
+    @staticmethod
+    def _bytes32_from_hex(hexstr: str) -> bytes:
+        s = (hexstr or "").strip().lower()
+        if s.startswith("0x"):
+            s = s[2:]
+        if len(s) != 64:
+            raise ValueError("Expected 32-byte hex (64 chars)")
+        return bytes.fromhex(s)
+
+    async def _send_anchor_tx(self, vc_hash_hex: str, ipfs_cid: str) -> str:
+        """Send anchor transaction via web3 in a background thread."""
+        from web3 import Web3
+        from web3.middleware import geth_poa_middleware
+
+        if not self.contract:
+            raise ValueError("contract_not_configured")
+        if not self.deployer_private_key:
+            raise ValueError("DEPLOYER_PRIVATE_KEY_not_set")
+
+        abi = [
+            {
+                "inputs": [
+                    {"internalType": "bytes32", "name": "vcHash", "type": "bytes32"},
+                    {"internalType": "string", "name": "ipfsCid", "type": "string"},
+                ],
+                "name": "anchorVC",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+            {
+                "inputs": [{"internalType": "bytes32", "name": "vcHash", "type": "bytes32"}],
+                "name": "revokeVC",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function",
+            },
+            {
+                "inputs": [{"internalType": "bytes32", "name": "vcHash", "type": "bytes32"}],
+                "name": "getAnchor",
+                "outputs": [
+                    {"internalType": "bool", "name": "exists", "type": "bool"},
+                    {"internalType": "bool", "name": "revoked", "type": "bool"},
+                    {"internalType": "string", "name": "ipfsCid", "type": "string"},
+                    {"internalType": "address", "name": "issuer", "type": "address"},
+                    {"internalType": "uint256", "name": "timestamp", "type": "uint256"},
+                ],
+                "stateMutability": "view",
+                "type": "function",
+            },
+        ]
+
+        def _do_send() -> str:
+            w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": 30}))
+            if not w3.is_connected():
+                raise RuntimeError(f"rpc_not_reachable: {self.rpc_url}")
+
+            if self.chain_config.get("poa"):
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+
+            account = w3.eth.account.from_key(self.deployer_private_key)
+            contract = w3.eth.contract(address=Web3.to_checksum_address(self.contract), abi=abi)
+
+            vc_hash_bytes = self._bytes32_from_hex(vc_hash_hex)
+            nonce = w3.eth.get_transaction_count(account.address)
+
+            base_tx = {
+                "chainId": self.chain_id,
+                "from": account.address,
+                "nonce": nonce,
+            }
+
+            # Prefer EIP-1559 when available
+            try:
+                latest = w3.eth.get_block("latest")
+                base_fee = latest.get("baseFeePerGas")
+            except Exception:
+                base_fee = None
+
+            if base_fee is not None:
+                max_priority = w3.to_wei(1, "gwei")
+                max_fee = int(base_fee) * 2 + int(max_priority)
+                base_tx.update({
+                    "maxFeePerGas": max_fee,
+                    "maxPriorityFeePerGas": max_priority,
+                })
+            else:
+                base_tx["gasPrice"] = w3.eth.gas_price
+
+            tx = contract.functions.anchorVC(vc_hash_bytes, ipfs_cid).build_transaction(base_tx)
+
+            # Gas estimation (and safety buffer)
+            try:
+                estimated = w3.eth.estimate_gas(tx)
+                tx["gas"] = int(estimated * 1.2)
+            except Exception:
+                tx.setdefault("gas", 250000)
+
+            signed = w3.eth.account.sign_transaction(tx, private_key=self.deployer_private_key)
+            raw_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+            return raw_hash.hex()
+
+        return await asyncio.to_thread(_do_send)
     
     async def anchor_hash(
         self,
         vc_id: str,
         ipfs_cid: str,
         issuer_did: str,
-        subject_did: str
+        subject_did: str,
+        vc_hash_hex: str
     ) -> Dict[str, Any]:
         """
         Anchor credential hash on blockchain
@@ -130,65 +249,42 @@ class BlockchainLedger:
         Returns:
             Dict with transaction hash, chain info, and explorer URL
         """
-        # Create merkle root of credential metadata
-        metadata = {
-            "vc_id": vc_id,
-            "ipfs_cid": ipfs_cid,
-            "issuer": issuer_did,
-            "subject": subject_did,
-            "timestamp": int(time.time()),
-            "chain": self.chain_key,
-            "chain_id": self.chain_id
-        }
+        # We anchor the SHA-256 hash of the encrypted payload (or canonical VC hash).
+        # This keeps verification consistent: retrieve from IPFS => sha256(payload) => compare.
+        vc_hash_hex = (vc_hash_hex or "").lower().strip()
+        if vc_hash_hex.startswith("0x"):
+            vc_hash_hex = vc_hash_hex[2:]
+        if len(vc_hash_hex) != 64:
+            raise ValueError("vc_hash_hex_must_be_32_bytes")
         
-        # Hash the metadata
-        canonical = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
-        merkle_root = hashlib.sha256(canonical.encode()).hexdigest()
-        
-        # If blockchain contract not configured, store in local ledger
-        if not self.contract:
-            print(f"[{self.chain_config['name']}] Contract not configured, storing locally: {merkle_root}")
+        # If blockchain is not enabled, store in local ledger
+        if self.anchor_mode != "real" or not self.contract or not self.deployer_private_key:
+            simulated_tx_hash = f"0x{vc_hash_hex}"
             return {
-                "tx_hash": f"local:{merkle_root}",
+                "tx_hash": simulated_tx_hash,
                 "chain": self.chain_key,
                 "chain_id": self.chain_id,
                 "chain_name": self.chain_config["name"],
-                "explorer_url": None,
-                "merkle_root": merkle_root,
-                "status": "simulated"
+                "explorer_url": f"{self.explorer}/tx/{simulated_tx_hash}",
+                "vc_hash": vc_hash_hex,
+                "status": "simulated",
+                "native_token": self.chain_config["native_token"],
+                "gas_price_level": self.chain_config.get("avg_gas_price"),
             }
-        
-        # TODO: Implement Web3 transaction
-        # from web3 import Web3
-        # web3 = Web3(Web3.HTTPProvider(self.rpc_url))
-        # contract = web3.eth.contract(address=self.contract, abi=CONTRACT_ABI)
-        # tx = contract.functions.anchorCredential(
-        #     merkle_root,
-        #     ipfs_cid,
-        #     issuer_did,
-        #     subject_did
-        # ).build_transaction({
-        #     'chainId': self.chain_id,
-        #     'gas': 100000,
-        #     'gasPrice': web3.eth.gas_price,
-        #     'nonce': web3.eth.get_transaction_count(account)
-        # })
-        # signed_tx = web3.eth.account.sign_transaction(tx, private_key)
-        # tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-        
-        # For now, return simulated response
-        simulated_tx_hash = f"0x{merkle_root[:64]}"
-        
+
+        # Real chain tx
+        tx_hash = await self._send_anchor_tx(vc_hash_hex=vc_hash_hex, ipfs_cid=ipfs_cid)
+
         return {
-            "tx_hash": simulated_tx_hash,
+            "tx_hash": tx_hash,
             "chain": self.chain_key,
             "chain_id": self.chain_id,
             "chain_name": self.chain_config["name"],
-            "explorer_url": f"{self.explorer}/tx/{simulated_tx_hash}",
-            "merkle_root": merkle_root,
-            "status": "pending",  # Would be 'confirmed' after mining
+            "explorer_url": f"{self.explorer}/tx/{tx_hash}",
+            "vc_hash": vc_hash_hex,
+            "status": "pending",
             "native_token": self.chain_config["native_token"],
-            "gas_price_level": self.chain_config["avg_gas_price"]
+            "gas_price_level": self.chain_config.get("avg_gas_price"),
         }
     
     async def verify_hash(self, vc_id: str, expected_hash: str, tx_hash: str = None) -> Dict[str, Any]:
@@ -203,18 +299,73 @@ class BlockchainLedger:
         Returns:
             Dict with verification status and chain info
         """
-        # TODO: Query blockchain for hash
-        # If tx_hash provided, verify transaction exists and contains hash
-        
+        expected = (expected_hash or "").lower().strip()
+        if expected.startswith("0x"):
+            expected = expected[2:]
+
+        # If real mode is not configured, return simulated verification
+        if self.anchor_mode != "real" or not self.contract:
+            return {
+                "verified": True,
+                "chain": self.chain_key,
+                "chain_name": self.chain_config["name"],
+                "tx_hash": tx_hash,
+                "on_chain_hash": expected,
+                "matches": True,
+                "confirmations": 0,
+                "explorer_url": f"{self.explorer}/tx/{tx_hash}" if tx_hash else None,
+                "status": "simulated",
+            }
+
+        from web3 import Web3
+        from web3.middleware import geth_poa_middleware
+
+        def _do_call() -> Dict[str, Any]:
+            w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": 30}))
+            if self.chain_config.get("poa"):
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+
+            abi = [
+                {
+                    "inputs": [{"internalType": "bytes32", "name": "vcHash", "type": "bytes32"}],
+                    "name": "getAnchor",
+                    "outputs": [
+                        {"internalType": "bool", "name": "exists", "type": "bool"},
+                        {"internalType": "bool", "name": "revoked", "type": "bool"},
+                        {"internalType": "string", "name": "ipfsCid", "type": "string"},
+                        {"internalType": "address", "name": "issuer", "type": "address"},
+                        {"internalType": "uint256", "name": "timestamp", "type": "uint256"},
+                    ],
+                    "stateMutability": "view",
+                    "type": "function",
+                }
+            ]
+
+            contract = w3.eth.contract(address=Web3.to_checksum_address(self.contract), abi=abi)
+            vc_hash_bytes = self._bytes32_from_hex(expected)
+            exists, revoked, ipfs_cid, issuer, ts = contract.functions.getAnchor(vc_hash_bytes).call()
+
+            is_verified = bool(exists) and (not bool(revoked))
+            return {
+                "verified": is_verified,
+                "exists": bool(exists),
+                "revoked": bool(revoked),
+                "issuer_address": issuer,
+                "timestamp": int(ts) if ts is not None else None,
+                "ipfs_cid": ipfs_cid,
+            }
+
+        info = await asyncio.to_thread(_do_call)
         return {
-            "verified": True,  # Simulated
+            "verified": info["verified"],
             "chain": self.chain_key,
             "chain_name": self.chain_config["name"],
             "tx_hash": tx_hash,
-            "on_chain_hash": expected_hash,
-            "matches": True,
-            "confirmations": 12,  # Simulated
-            "explorer_url": f"{self.explorer}/tx/{tx_hash}" if tx_hash else None
+            "on_chain_hash": expected,
+            "matches": info["exists"],
+            "confirmations": None,
+            "explorer_url": f"{self.explorer}/tx/{tx_hash}" if tx_hash else None,
+            **info,
         }
 
 
@@ -257,6 +408,9 @@ class DistributedCredentialManager:
         Returns:
             Dict with IPFS CID, blockchain tx hash, and chain info
         """
+        # Hash payload (encrypted bytes) so verification can re-compute from IPFS
+        vc_hash_hex = hashlib.sha256(encrypted_payload).hexdigest()
+
         # Store on IPFS
         ipfs_cid = await self.storage.store_credential(encrypted_payload)
         
@@ -265,12 +419,14 @@ class DistributedCredentialManager:
             vc_id=vc_id,
             ipfs_cid=ipfs_cid,
             issuer_did=issuer_did,
-            subject_did=subject_did
+            subject_did=subject_did,
+            vc_hash_hex=vc_hash_hex
         )
         
         return {
             "ipfs_cid": ipfs_cid,
             "storage": "distributed",
+            "payload_hash": vc_hash_hex,
             **blockchain_result
         }
     

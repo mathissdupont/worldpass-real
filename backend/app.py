@@ -138,6 +138,44 @@ async def new_challenge(body: ChallengeReq, db=Depends(get_db)):
     )
     await db.commit()
 
+    # Optional: store encrypted VC on IPFS and anchor hash on-chain.
+    # This is non-blocking for issuance success: failures are logged and ignored.
+    try:
+        if os.getenv("STORAGE_MODE", "centralized").lower().strip() in ("distributed", "ipfs"):
+            from distributed_ledger import create_distributed_manager
+
+            # Encrypt VC (Fernet output is base64 string) and store as bytes
+            encrypted_payload_for_ipfs = vc_encryptor.encrypt_vc(vc).encode("utf-8")
+            chain_key = (body.blockchain_chain or "").strip() or None
+            manager = create_distributed_manager(chain_key)
+            dist_res = await manager.store_credential(
+                vc_id=jti,
+                encrypted_payload=encrypted_payload_for_ipfs,
+                issuer_did=vc.get("issuer", issuer["did"] or ""),
+                subject_did=subject_did,
+            )
+
+            await db.execute(
+                "UPDATE issued_vcs SET ipfs_cid=?, blockchain_tx=?, storage_type=? WHERE vc_id=?",
+                (dist_res.get("ipfs_cid"), dist_res.get("tx_hash"), "distributed", jti),
+            )
+
+            # If user wallet row exists, mirror refs (best-effort)
+            if subject_did:
+                user_row2 = await db.execute_fetchone("SELECT id FROM users WHERE did=?", (subject_did,))
+                if user_row2:
+                    await db.execute(
+                        "UPDATE user_vcs SET ipfs_cid=?, storage_type=? WHERE user_id=? AND vc_id=?",
+                        (dist_res.get("ipfs_cid"), "distributed", user_row2["id"], jti),
+                    )
+
+            await db.commit()
+            logger.info(
+                f"Distributed storage enabled: vc_id={jti} ipfs={dist_res.get('ipfs_cid')} tx={dist_res.get('tx_hash')} chain={dist_res.get('chain')}"
+            )
+    except Exception as e:
+        logger.error(f"Distributed storage failed for vc_id={jti}: {e}")
+
     return ChallengeResp(challenge=nonce, nonce=nonce, expires_at=exp)
 
 
@@ -704,19 +742,39 @@ async def _get_current_user(
     try:
         payload = jwt.decode(x_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         
-        # Support both token formats:
-        # - New format (DID-based): {"sub": user_id, "did": "did:key:z...", "exp": ...}
-        # - Legacy format: {"user_id": 123, "exp": ...}
-        user_id = payload.get("sub") or payload.get("user_id")
+        # Support multiple token formats:
+        # - DID-based format: {"sub": <user_id>, "did": "did:key:z...", "exp": ...}
+        # - Legacy format from /api/user/login: {"sub": <email>, "user_id": <id>, "exp": ...}
         token_did = payload.get("did")  # Only present in new DID-based tokens
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="invalid_token")
-        
-        user = await db.execute_fetchone(
-            "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE id=?",
-            (user_id,)
-        )
+        user_id = payload.get("user_id")
+        sub = payload.get("sub")
+
+        user = None
+        if user_id is not None:
+            user = await db.execute_fetchone(
+                "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE id=?",
+                (user_id,)
+            )
+        else:
+            # If "sub" is an integer-ish value, treat it as user_id.
+            if isinstance(sub, int) or (isinstance(sub, str) and sub.strip().isdigit()):
+                user_id = int(sub)
+                user = await db.execute_fetchone(
+                    "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE id=?",
+                    (user_id,)
+                )
+            # If "sub" looks like an email, treat it as legacy subject.
+            elif isinstance(sub, str) and "@" in sub:
+                email = sub.lower().strip()
+                user = await db.execute_fetchone(
+                    "SELECT id, email, first_name, last_name, did, display_name, theme, avatar, phone, lang, otp_enabled, email_verified FROM users WHERE email=?",
+                    (email,)
+                )
+                if user:
+                    user_id = user["id"]
+
+        if not user:
+            raise HTTPException(status_code=401, detail="user_not_found")
         if not user:
             raise HTTPException(status_code=401, detail="user_not_found")
         

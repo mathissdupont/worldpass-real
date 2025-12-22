@@ -186,13 +186,17 @@ Container'dan çık:
 exit
 ```
 
-## 14. IPFS Portlarını Dışarıya Açma (Opsiyonel)
+## 14. IPFS Gateway Dış Erişim (Opsiyonel - Sadece Okuma İçin)
 
-Eğer IPFS gateway'i dış erişime açmak istersen (şu an sadece internal):
+**ÖNEMLİ GÜVENLİK NOTU:**
+- **IPFS API (port 5001) asla dışarıya açılmamalı** - yazma erişimi sağlar, güvenlik riski
+- **Gateway (port 8080)** sadece okuma için açılabilir (public CID'leri paylaşmak için)
+
+Eğer IPFS gateway'i public erişime açmak istersen (örn: kullanıcılar CID linklerini paylaşacaksa):
 
 **Caddyfile'a ekle:**
 ```
-# IPFS Gateway
+# IPFS Gateway (Sadece Okuma - Public CID erişimi)
 ipfs.worldpass-beta.heptapusgroup.com {
     reverse_proxy ipfs:8080
 }
@@ -202,6 +206,8 @@ Sonra Caddy'yi yeniden yükle:
 ```bash
 docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
+
+**Not:** Varsayılan kurulumda gateway internal kalır, bu da yeterlidir.
 
 ## 15. Log Takibi (Sorun Giderme)
 
@@ -263,6 +269,13 @@ docker compose restart ipfs
 ## Notlar
 
 - IPFS verileri `./data/ipfs` klasöründe kalıcı olarak saklanır
-- IPFS API sadece internal network'te erişilebilir (güvenlik)
-- Gateway varsayılan olarak internal; gerekirse Caddy ile dış erişim
+- **IPFS API (port 5001) sadece internal network'te erişilebilir - ASLA dışarı açılmamalı (güvenlik)**
+- Gateway (port 8080) varsayılan olarak internal; gerekirse Caddy ile public read-only erişim verilebilir
 - Production'da gerçek blockchain çağrıları için `ANCHOR_MODE=real` ve kontrat adresleri gerekli
+
+## Güvenlik Kontrol Listesi
+
+✅ IPFS API (5001) sadece internal network  
+✅ Backend IPFS'ye internal hostname ile bağlanıyor (http://ipfs:5001)  
+✅ Gateway opsiyonel ve sadece okuma erişimi sağlıyor  
+✅ Kimlik bilgileri ve şifreli VC'ler IPFS'ye client-side encryption ile yükleniyor
