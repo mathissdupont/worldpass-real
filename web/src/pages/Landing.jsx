@@ -295,7 +295,7 @@ const Hero = React.memo(() => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                 </span>
-                WorldPass ID v2.0
+                Own Your Identity
               </div>
               <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight tracking-tight">
                 {t('landing.hero.title')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">{t('landing.hero.title_highlight')}</span>
