@@ -177,7 +177,6 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="text-xl font-bold text-white cursor-pointer flex items-center gap-2" onClick={() => navigate('/')}>
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
-             <GlobeIcon className="text-white w-5 h-5" />
           </div>
           WorldPass
         </div>
@@ -199,7 +198,6 @@ const Navbar = () => {
             className="p-2 text-zinc-400 hover:text-white transition-colors"
             title={locale === 'en' ? 'Türkçe' : 'English'}
           >
-             <GlobeIcon size={18} />
           </button>
           <button
             onClick={() => {
@@ -248,7 +246,7 @@ const Navbar = () => {
                 onClick={toggleLocale}
                 className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                <GlobeIcon size={18} />
+
                 {locale === 'en' ? 'Türkçe' : 'English'}
               </button>
               <button
