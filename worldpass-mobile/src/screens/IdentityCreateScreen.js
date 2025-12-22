@@ -144,7 +144,9 @@ export default function IdentityCreateScreen({ navigation }) {
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
+          // Avoid some share targets renaming the file to .json
+          mimeType: 'application/octet-stream',
+          UTI: 'public.data',
           dialogTitle: 'WorldPass Keystore Backup',
         });
       } else {

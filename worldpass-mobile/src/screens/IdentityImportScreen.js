@@ -66,10 +66,11 @@ export default function IdentityImportScreen() {
       if (!asset) return;
 
       const name = asset.name || 'keystore.wpkeystore';
-      if (!/\.wpkeystore$/i.test(name)) {
+      // Some platforms rename the exported file to .json; accept it as long as contents parse.
+      if (!/\.(wpkeystore|json)$/i.test(name)) {
         setStatus({
           type: 'error',
-          message: 'Unsupported file type. Please choose a .wpkeystore file.',
+          message: 'Unsupported file type. Please choose a .wpkeystore (or .json) keystore file.',
         });
         return;
       }
@@ -176,7 +177,9 @@ export default function IdentityImportScreen() {
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
+          // Avoid some share targets renaming the file to .json
+          mimeType: 'application/octet-stream',
+          UTI: 'public.data',
           dialogTitle: 'WorldPass Keystore Backup',
         });
       } else {

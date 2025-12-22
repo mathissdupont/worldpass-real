@@ -6,17 +6,49 @@ const CREDENTIALS_KEY = 'worldpass_credentials';
 const IDENTITY_KEY = 'worldpass_identity_v1';
 const ISSUER_TEMPLATES_CACHE_KEY = 'worldpass_issuer_templates_cache';
 
+let secureStoreAvailablePromise = null;
+async function isSecureStoreAvailable() {
+  if (!secureStoreAvailablePromise) {
+    secureStoreAvailablePromise = (async () => {
+      try {
+        if (typeof SecureStore?.isAvailableAsync === 'function') {
+          return await SecureStore.isAvailableAsync();
+        }
+      } catch (err) {
+        // ignore
+      }
+      return false;
+    })();
+  }
+  return secureStoreAvailablePromise;
+}
+
+function insecureFallbackKey(key) {
+  return `secure_fallback:${key}`;
+}
+
 // Secure storage (for sensitive data)
 export async function saveSecureItem(key, value) {
-  await SecureStore.setItemAsync(key, value);
+  if (await isSecureStoreAvailable()) {
+    await SecureStore.setItemAsync(key, value);
+    return;
+  }
+  await AsyncStorage.setItem(insecureFallbackKey(key), value);
 }
 
 export async function getSecureItem(key) {
-  return await SecureStore.getItemAsync(key);
+  if (await isSecureStoreAvailable()) {
+    return await SecureStore.getItemAsync(key);
+  }
+  return await AsyncStorage.getItem(insecureFallbackKey(key));
 }
 
 export async function deleteSecureItem(key) {
-  await SecureStore.deleteItemAsync(key);
+  if (await isSecureStoreAvailable()) {
+    await SecureStore.deleteItemAsync(key);
+    return;
+  }
+  await AsyncStorage.removeItem(insecureFallbackKey(key));
 }
 
 // Identity management

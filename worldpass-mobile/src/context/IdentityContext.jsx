@@ -32,17 +32,24 @@ export function IdentityProvider({ children }) {
   const [linking, setLinking] = useState(false);
   const [linkTelemetry, setLinkTelemetry] = useState(() => ({ ...initialTelemetry }));
   const lastLinkedDid = useRef(null);
+  const bootstrapSeq = useRef(0);
 
   const bootstrap = useCallback(async () => {
+    const seq = ++bootstrapSeq.current;
     try {
       setLoading(true);
       const stored = await loadIdentity();
-      setIdentity(stored);
+      // Avoid clobbering a freshly created/imported identity (race with bootstrap)
+      if (seq === bootstrapSeq.current) {
+        setIdentity((prev) => prev ?? stored);
+      }
     } catch (err) {
       console.warn('Failed to load identity', err);
       setError(err?.message || 'identity_load_failed');
     } finally {
-      setLoading(false);
+      if (seq === bootstrapSeq.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
