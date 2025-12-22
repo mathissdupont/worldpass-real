@@ -186,7 +186,6 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="text-xl font-bold text-white cursor-pointer flex items-center gap-2" onClick={() => navigate('/')}>
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
-            <GlobeIcon className="text-white w-5 h-5" />
           </div>
           WorldPass
         </div>
