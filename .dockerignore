@@ -1,0 +1,41 @@
+cat > .dockerignore <<'EOF'
+# VCS
+.git
+.gitignore
+
+# Node
+web/node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+
+# Python
+backend/venv
+**/venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Logs
+*.log
+logs
+**/logs
+
+# Runtime data / volumes (ASLA build context'e girmesin)
+data
+**/data
+
+# OS
+.DS_Store
+EOF
