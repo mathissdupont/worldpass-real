@@ -59,10 +59,12 @@ from blockchain_endpoints import router as blockchain_api_router
 
 import time, secrets, base64
 import hashlib, os, json
-from typing import Optional
+from typing import Optional, Dict, Any
 import dns.resolver
 import httpx
 import pyotp
+
+from pydantic import BaseModel, Field
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -119,6 +121,47 @@ async def _startup():
 @app.get(f"{API}/health", response_model=HealthResp)
 async def health():
     return HealthResp()
+
+
+# ---------- events/analytics (optional) ----------
+class AnalyticsEventIn(BaseModel):
+    event: str = Field(..., min_length=1, max_length=128)
+    props: Dict[str, Any] = Field(default_factory=dict)
+    ts: Optional[int] = None
+    path: Optional[str] = None
+    title: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+@app.post(f"{API}/evt")
+@limiter.limit("60/minute")
+async def ingest_event(request: Request, body: AnalyticsEventIn, db=Depends(get_db)):
+    now = int(time.time())
+    remote_ip = getattr(getattr(request, "client", None), "host", None)
+    ua = request.headers.get("user-agent")
+
+    meta = {
+        "event": body.event,
+        "props": body.props,
+        "path": body.path,
+        "title": body.title,
+        "user_id": body.user_id,
+        "ts": body.ts,
+        "ip": remote_ip,
+        "ua": ua,
+    }
+
+    # Keep audit_logs.meta bounded to avoid huge payloads
+    meta_json = json.dumps(meta, ensure_ascii=False)
+    if len(meta_json) > 8192:
+        meta_json = meta_json[:8192]
+
+    await db.execute(
+        "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
+        (now, "evt", "ok", meta_json),
+    )
+    await db.commit()
+    return {"ok": True}
 
 
 # ---------- challenge ----------

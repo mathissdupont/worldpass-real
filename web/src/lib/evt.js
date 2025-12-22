@@ -6,10 +6,33 @@
 
 const isBrowser = typeof window !== 'undefined';
 const ENABLED = isBrowser && import.meta.env.PROD && (import.meta.env.VITE_ANALYTICS_ENABLED === 'true');
+const ENDPOINT = isBrowser ? (import.meta.env.VITE_ANALYTICS_ENDPOINT || '/api/evt') : null;
 
 function ensureDataLayer() {
 	if (!isBrowser) return;
 	window.dataLayer = window.dataLayer || [];
+}
+
+function postToBackend(payload) {
+	if (!ENABLED || !isBrowser || !ENDPOINT) return;
+	try {
+		const body = JSON.stringify(payload);
+		// Prefer sendBeacon when available (non-blocking during navigation)
+		if (navigator?.sendBeacon) {
+			const blob = new Blob([body], { type: 'application/json' });
+			navigator.sendBeacon(ENDPOINT, blob);
+			return;
+		}
+		// Fallback: keepalive fetch for unload-safe-ish delivery
+		fetch(ENDPOINT, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body,
+			keepalive: true,
+		}).catch(() => {});
+	} catch (_) {
+		// swallow
+	}
 }
 
 export function initAnalytics(options = {}) {
@@ -43,6 +66,14 @@ export function initAnalytics(options = {}) {
 export function track(event, props = {}) {
 	if (!ENABLED || !isBrowser || !event) return;
 	try {
+		postToBackend({
+			event,
+			props,
+			ts: Date.now(),
+			path: window.location?.pathname + window.location?.search,
+			title: document?.title,
+		});
+
 		if (typeof window.gtag === 'function') {
 			window.gtag('event', event, props);
 			return;
@@ -58,6 +89,14 @@ export function pageview(path, title) {
 	if (!ENABLED || !isBrowser) return;
 	try {
 		const location = path || (window.location?.pathname + window.location?.search) || '/';
+		postToBackend({
+			event: 'page_view',
+			props: {},
+			ts: Date.now(),
+			path: location,
+			title: title || document?.title,
+		});
+
 		if (typeof window.gtag === 'function') {
 			const id = import.meta.env.VITE_GTAG_ID;
 			if (id) {
