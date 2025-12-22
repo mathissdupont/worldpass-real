@@ -282,13 +282,6 @@ const Hero = React.memo(() => {
           {/* Sol: Metin İçeriği */}
           <div className="text-center lg:text-left order-2 lg:order-1 relative z-20">
             <FadeIn>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-6 backdrop-blur-sm shadow-[0_0_10px_rgba(79,70,229,0.2)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                </span>
-                Own Your Identity
-              </div>
               <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight tracking-tight">
                 {t('landing.hero.title')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">{t('landing.hero.title_highlight')}</span>
               </h1>
