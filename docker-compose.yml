@@ -30,13 +30,16 @@ services:
       - ipfs
     ports:
       - "80:80"
-      # DNS + HTTPS gelince açılacak:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./data/caddy:/data   
+      - ./data/caddy:/data
       - ./data/config:/config
+    networks:
+      - default
+      - mailcow
     restart: unless-stopped
+
 
   ipfs:
     image: ipfs/kubo:latest
@@ -52,3 +55,7 @@ services:
       - IPFS_PROFILE=server
     restart: unless-stopped
 
+networks:
+  mailcow:
+    external: true
+    name: mailcowdockerized_mailcow-network
