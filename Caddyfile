@@ -10,3 +10,15 @@ worldpass-beta.heptapusgroup.com {
         reverse_proxy frontend:4173
     }
 }
+
+ipfs.worldpass-beta.heptapusgroup.com {
+    reverse_proxy ipfs:8080
+}
+
+heptapusgroup.com www.heptapusgroup.com {
+    encode gzip
+    reverse_proxy heptapus_web:3000
+}
+
+
+mail.heptapusgroup.com { encode gzip basicauth * { admin $2a$14$EHDBtQRyBaJEGvUToCI63eg/rKhzBcRMCdMsrP.IWoFXTKUxR963e } reverse_proxy https://mailcowdockerized-nginx-mailcow-1:8445 { transport http { tls_insecure_skip_verify } header_up Host {host} header_up X-Forwarded-Proto {scheme} header_up X-Forwarded-Host {host} } }
