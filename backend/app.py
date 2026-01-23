@@ -102,14 +102,17 @@ else:
 vc_encryptor = VCEncryptor(vc_encryption_key)
 
 # Enhanced CORS with environment variables
-origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
+origins = [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,  # prod domainler
+    allow_origin_regex=r"^http://localhost(:\d+)?$|^http://127\.0\.0\.1(:\d+)?$",  # dev için
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.on_event("startup")
