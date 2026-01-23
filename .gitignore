@@ -37,3 +37,21 @@ __pycache__/
 !worldpass-mobile/app.json
 !worldpass-mobile/tsconfig.json
 !worldpass-mobile/eas.json
+
+# --- local/server artifacts ---
+_local_junk_backup/
+backend/venv/
+**/venv/
+.env
+.env.*
+Caddyfile.bak
+Caddyfile.save
+Caddyfile.broken.*
+exporting/
+vite/
+web@0.0.0
+CANCELED
+ERROR
+=
+[backend
+[frontend
