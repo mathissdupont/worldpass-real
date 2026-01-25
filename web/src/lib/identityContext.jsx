@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { ensurePrivateKeyFields } from "./identityPatch";
 import { linkUserDid } from "./api";
 import { TOKEN_CHANGED_EVENT } from "./auth";
 
@@ -36,7 +37,7 @@ export function IdentityProvider({children}){
             }
           } catch {}
         }
-        setIdentity(parsed);
+        setIdentity(ensurePrivateKeyFields(parsed));
       } catch (e) {
         console.error("Failed to parse stored identity:", e);
       }
@@ -81,9 +82,10 @@ export function IdentityProvider({children}){
 
   // identity değişince localStorage'a kaydet
   const setIdentityPersistent = (newIdentity) => {
-    setIdentity(newIdentity);
-    if (newIdentity) {
-      localStorage.setItem("worldpass_identity", JSON.stringify(newIdentity));
+    const patched = ensurePrivateKeyFields(newIdentity);
+    setIdentity(patched);
+    if (patched) {
+      localStorage.setItem("worldpass_identity", JSON.stringify(patched));
     } else {
       localStorage.removeItem("worldpass_identity");
       lastSyncedDid.current = null;

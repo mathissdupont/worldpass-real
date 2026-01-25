@@ -1,6 +1,6 @@
 // Ed25519 seed'den private ve public key türetir (tweetnacl)
 import nacl from 'tweetnacl';
-import { b64u } from './crypto';
+import { b64u, b64uToBytes } from './crypto';
 
 export function ed25519FromSeed(seed) {
   // seed Uint8Array (32 byte)
