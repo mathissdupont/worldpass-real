@@ -20,12 +20,22 @@ export function IdentityProvider({children}){
   });
   const lastSyncedDid = useRef(null);
 
-  // localStorage'dan yükle
+  // localStorage'dan yükle ve seed_b64u migrasyonu yap
   useEffect(() => {
     const storedIdentity = localStorage.getItem("worldpass_identity");
     if (storedIdentity) {
       try {
-        const parsed = JSON.parse(storedIdentity);
+        let parsed = JSON.parse(storedIdentity);
+        // Eğer seed_b64u yoksa ve sk_b64u varsa, migrate et
+        if (!parsed.seed_b64u && parsed.sk_b64u && typeof parsed.sk_b64u === "string") {
+          // base64url decode et ve 32 byte ise seed olarak ata
+          try {
+            const raw = atob(parsed.sk_b64u.replace(/-/g, "+").replace(/_/g, "/") + "==");
+            if (raw.length === 32) {
+              parsed.seed_b64u = parsed.sk_b64u;
+            }
+          } catch {}
+        }
         setIdentity(parsed);
       } catch (e) {
         console.error("Failed to parse stored identity:", e);
