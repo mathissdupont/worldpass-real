@@ -80,6 +80,9 @@ export default function IdentityLoad({ onLoaded }) {
       const ident = await decryptKeystore(pass, blob); // {did, sk_b64u, pk_b64u, ...}
       if (!ident?.did) throw new Error(t("identity.load.err_no_did"));
 
+      // seed_b64u varsa kimlik objesine ekle
+      if (blob.seed_b64u && !ident.seed_b64u) ident.seed_b64u = blob.seed_b64u;
+
       setIdentity(ident);
       onLoaded?.(ident);
       setMsg({ type: "ok", text: t("identity.load.ok_loaded") });
