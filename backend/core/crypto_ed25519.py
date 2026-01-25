@@ -7,7 +7,9 @@ from .crypto_base import Signer
 def b64u(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
 def b64u_d(s: str) -> bytes:
-    return base64.urlsafe_b64decode(s + "==")
+    # Eksik padding'i otomatik tamamla
+    s += '=' * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s)
 
 class Ed25519Signer(Signer):
     def generate_keypair(self) -> Tuple[bytes, bytes]:
