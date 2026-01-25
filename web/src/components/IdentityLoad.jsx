@@ -1,6 +1,6 @@
 // src/pages/identity/IdentityLoad.jsx
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { decryptKeystore } from "../lib/crypto";
+import { decryptKeystore, b64u } from "../lib/crypto";
 import { ed25519FromSeedB64u } from "../lib/ed25519";
 import { useIdentity } from "../lib/identityContext";
 import { t } from "../lib/i18n";
@@ -88,9 +88,7 @@ export default function IdentityLoad({ onLoaded }) {
       if (!ident.sk_b64u && ident.seed_b64u) {
         try {
           const { sk } = ed25519FromSeedB64u(ident.seed_b64u);
-          // sk 64 byte, ilk 32 byte seed, son 32 byte public key (tweetnacl)
-          // Bizim formatımızda sk_b64u = 64 byte (private+public)
-          ident.sk_b64u = require("../lib/crypto").b64u(sk);
+          ident.sk_b64u = b64u(sk);
         } catch (e) {
           // seed hatalıysa sessizce geç
         }
