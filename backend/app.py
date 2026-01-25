@@ -271,21 +271,21 @@ async def did_auth_verify(body: DIDAuthVerifyReq, db=Depends(get_db)):
 
     # 2. Extract public key from DID and verify signature
     try:
-        # did:key:z... format
+        import base58
+        # W3C did:key:z... format (multicodec+base58btc)
         if not body.did.startswith("did:key:z"):
             raise HTTPException(status_code=400, detail="unsupported_did_format")
-        
-        pk_b64u = body.did.split("did:key:z")[1]
-        pk_bytes = b64u_d(pk_b64u)
-        
+        did_b58 = body.did[len("did:key:z"):]
+        multicodec = base58.b58decode(did_b58)
+        if not (len(multicodec) == 34 and multicodec[:2] == b"\xed\x01"):
+            raise HTTPException(status_code=400, detail="invalid_multicodec")
+        pk_bytes = multicodec[2:]
         # Reconstruct challenge message
         challenge_msg = f"WorldPass Auth\nDID: {body.did}\nNonce: {body.challenge}\nAudience: worldpass-web"
-        
         # Verify signature
         sig_bytes = b64u_d(body.signature)
         if not signer.verify(pk_bytes, challenge_msg.encode(), sig_bytes):
             raise HTTPException(status_code=401, detail="invalid_signature")
-            
     except HTTPException:
         raise
     except Exception as e:
