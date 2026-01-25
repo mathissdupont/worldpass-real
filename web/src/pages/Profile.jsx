@@ -1,6 +1,6 @@
 // src/pages/Profile.jsx
 import { useState, useEffect } from "react";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { Button, Input, Card } from "../components/ui";
 import { getUserProfileData, saveUserProfileData } from "../lib/api";
 import { getSession, getToken } from "../lib/auth";

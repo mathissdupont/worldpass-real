@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { authenticateWithDID, setSession, isAuthed } from "../lib/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { t } from "../lib/i18n";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import IdentityLoad from "../components/IdentityLoad";
 import IdentityCreate from "../components/IdentityCreate";
 import { Shield, Key, ArrowRight } from "lucide-react";

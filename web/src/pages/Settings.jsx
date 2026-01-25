@@ -1,6 +1,6 @@
 // src/pages/Settings.jsx
 import { useEffect, useState } from "react";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { t, setLocale } from "../lib/i18n";
 import { encryptKeystore } from "../lib/crypto";
 import { loadProfile, saveProfile, clearVCs as clearVCsStore } from "../lib/storage";

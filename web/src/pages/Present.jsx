@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { qrToDataURL } from "../lib/qr";
 import jsQR from "jsqr";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { b64u, b64uToBytes } from "../lib/crypto";
 import { getVCs, migrateVCsIfNeeded } from "../lib/storage";
 import nacl from "tweetnacl";

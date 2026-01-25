@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { isAuthed } from "../lib/auth";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 
 export default function ProtectedRoute({ children, requireDid = true }) {
   const loc = useLocation();

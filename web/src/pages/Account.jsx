@@ -1,7 +1,7 @@
 // src/pages/Account.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { loadProfile, saveProfile } from "../lib/storage";
 import { getUserProfileData, saveUserProfileData } from "../lib/api";
 import VisualIDCardVertical from "../components/VisualIDCardVertical";

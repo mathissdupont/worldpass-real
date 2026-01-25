@@ -89,7 +89,7 @@ export default function IdentityLoad({ onLoaded }) {
         try {
           const { sk } = ed25519FromSeedB64u(ident.seed_b64u);
           ident.sk_b64u = b64u(sk);
-        } catch (e) {
+        } catch {
           // seed hatalıysa sessizce geç
         }
       }

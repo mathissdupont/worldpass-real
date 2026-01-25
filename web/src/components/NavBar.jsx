@@ -1,7 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { isAuthed, clearSession } from "../lib/auth";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { t } from "../lib/i18n";
 
 function cx(...xs){ return xs.filter(Boolean).join(" "); }

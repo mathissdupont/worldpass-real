@@ -1,6 +1,6 @@
 // src/pages/issuer/Register.jsx
 import { useMemo, useState } from "react";
-import { useIdentity } from "../../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { t } from "../../lib/i18n";
 import { registerIssuer, verifyIssuerDomain } from "../../lib/api";
 import IdentityLoad from "../../components/IdentityLoad";

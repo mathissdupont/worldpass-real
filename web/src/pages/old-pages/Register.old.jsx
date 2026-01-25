@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { t } from "../lib/i18n";
 import { registerUser, setSession } from "../lib/auth";
 import { loadProfile, saveProfile } from "../lib/storage";
-import { useIdentity } from "../lib/identityContext";
+import { useIdentity } from "../lib/useIdentity";
 import { useNavigate } from "react-router-dom";
 import IdentityCreate from "../components/IdentityCreate";
 import IdentityLoad   from "../components/IdentityLoad";
