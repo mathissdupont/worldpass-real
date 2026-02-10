@@ -350,14 +350,13 @@ async def did_auth_verify(body: DIDAuthVerifyReq, db=Depends(get_db)):
                   now,
                   display_name,
                   "light",
-                  "",
-                  "",
-                  "",
-                  "en",
-                  0,
-                  now,
-                  now,
-                  "active",
+                                    "",
+                                    "",
+                                    "en",
+                                    0,
+                                    now,
+                                    now,
+                                    "active",
                 )
             )
             user_id = (await db.execute_fetchone("SELECT last_insert_rowid() as id"))["id"]

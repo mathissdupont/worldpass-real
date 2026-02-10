@@ -94,6 +94,7 @@ export async function authenticateWithDID({ did, signChallenge, displayName }) {
         // send back the full challenge string so backend can verify the exact message
         challenge,
         signature,
+        audience: "worldpass-web",
         displayName: displayName || did.slice(0, 20) + "..."
       })
     });
