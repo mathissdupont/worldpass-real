@@ -140,7 +140,12 @@ export default function IdentityCreate({ onCreated }) {
     try {
       const { sk, pk } = ed25519Generate();
       const _did = didFromPk(pk);
-      const ksPayload = { did: _did, sk_b64u: b64u(sk), pk_b64u: b64u(pk) };
+      const seed = sk.slice(0, 32); // tweetnacl secretKey: first 32 bytes are the seed
+      const sk_b64u = b64u(sk);
+      const pk_b64u = b64u(pk);
+      const seed_b64u = b64u(seed);
+
+      const ksPayload = { did: _did, sk_b64u, pk_b64u, seed_b64u };
       const blob = await encryptKeystore(p1, ksPayload);
 
       const fname = _did.replace(/:/g, "_") + ".wpkeystore";
@@ -156,7 +161,8 @@ export default function IdentityCreate({ onCreated }) {
       
       // Call onCreated callback with the identity data
       if (onCreated) {
-        onCreated({ did: _did, sk: b64u(sk), pk: b64u(pk) });
+        // Hand back all key fields so the UI can immediately sign challenges without reloading
+        onCreated({ did: _did, sk_b64u, pk_b64u, seed_b64u });
       }
     } catch (e) {
       setMsg({type:"err", text: "Error: " + (e?.message || String(e))});

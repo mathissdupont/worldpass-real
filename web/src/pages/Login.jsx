@@ -12,7 +12,7 @@ import { ed25519Sign, b64uToBytes } from "../lib/crypto";
 export default function LoginDID() {
   const nav = useNavigate();
   const loc = useLocation();
-  const { identity, setIdentity } = useIdentity();
+  const { identity, setIdentity, setDisplayName: setDisplayNamePersist } = useIdentity();
 
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -82,6 +82,15 @@ export default function LoginDID() {
   const onLoadedIdent = (ident) => {
     setIdentity(ident);
     setDisplayName(ident.displayName || "");
+  };
+
+  const handleChangeIdentity = () => {
+    // Clear current identity and cached display name so user can load another DID
+    setIdentity(null);
+    setDisplayName("");
+    setDisplayNamePersist?.("");
+    setDidMode("load");
+    setError("");
   };
 
   /* ------------------ DID not loaded → Identity panel ------------------ */
@@ -164,6 +173,16 @@ export default function LoginDID() {
             <p className="text-sm text-[color:var(--muted)] mb-4">
               Sign in with your digital identity
             </p>
+
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleChangeIdentity}
+                className="text-xs font-medium text-[color:var(--brand)] hover:text-[color:var(--brand-hover)] underline"
+              >
+                Change identity
+              </button>
+            </div>
             
             {/* DID Display */}
             <div className="p-3 rounded-lg bg-[color:var(--panel-2)] border border-[color:var(--border)]">
