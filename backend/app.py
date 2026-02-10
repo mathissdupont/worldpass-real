@@ -387,9 +387,10 @@ async def did_auth_verify(body: DIDAuthVerifyReq, db=Depends(get_db)):
     token = jwt.encode(token_data, settings.JWT_SECRET, algorithm="HS256")
 
     # 6. Audit log
+    user_dict = dict(user)
     await db.execute(
         "INSERT INTO audit_logs(ts, action, result, meta) VALUES(?,?,?,?)",
-        (now, "did_auth_success", "ok", json.dumps({"did": body.did, "user_id": user.get("id")} if not settings.DATA_MINIMAL else {})),
+        (now, "did_auth_success", "ok", json.dumps({"did": body.did, "user_id": user_dict.get("id")} if not settings.DATA_MINIMAL else {})),
     )
     await db.commit()
 
