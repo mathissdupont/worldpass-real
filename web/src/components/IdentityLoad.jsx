@@ -1,6 +1,6 @@
 // src/pages/identity/IdentityLoad.jsx
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
-import { decryptKeystore, b64u } from "../lib/crypto";
+import { decryptKeystore, b64u, b64uToBytes, didFromPk } from "../lib/crypto";
 import { ed25519FromSeedB64u } from "../lib/ed25519";
 import { useIdentity } from "../lib/identityContext";
 import { t } from "../lib/i18n";
@@ -83,6 +83,15 @@ export default function IdentityLoad({ onLoaded }) {
 
       // seed_b64u varsa kimlik objesine ekle
       if (blob.seed_b64u && !ident.seed_b64u) ident.seed_b64u = blob.seed_b64u;
+
+      // Recompute DID from public key (old keystores had non-standard did format)
+      if (ident.pk_b64u) {
+        try {
+          const pkBytes = b64uToBytes(ident.pk_b64u);
+          const fixedDid = didFromPk(pkBytes);
+          ident.did = fixedDid;
+        } catch { /* leave as-is if decode fails */ }
+      }
 
       // Eğer sk_b64u eksikse ve seed_b64u varsa, Ed25519 private key seed'den türet
       if (!ident.sk_b64u && ident.seed_b64u) {

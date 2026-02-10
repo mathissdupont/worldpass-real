@@ -1,5 +1,5 @@
 import { ed25519FromSeedB64u } from "./ed25519";
-import { b64u, b64uToBytes } from "./crypto";
+import { b64u, b64uToBytes, didFromPk } from "./crypto";
 
 // identity objesini MUTATE etme: kopya üstünden dön
 export function ensurePrivateKeyFields(identity) {
@@ -25,6 +25,14 @@ export function ensurePrivateKeyFields(identity) {
       const { sk } = ed25519FromSeedB64u(out.seed_b64u);
       out.sk_b64u = b64u(sk);
     } catch { /* empty */ }
+  }
+
+  // 3) DID'i public key'den yeniden hesapla (eski formatları düzelt)
+  if (out.pk_b64u) {
+    try {
+      const pkBytes = b64uToBytes(out.pk_b64u);
+      out.did = didFromPk(pkBytes);
+    } catch { /* keep existing did if decode fails */ }
   }
 
   return out;

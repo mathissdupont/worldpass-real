@@ -5,6 +5,7 @@ import { hash as argon2Hash, ArgonType } from "argon2-browser";
 import argon2WasmURL from "argon2-browser/dist/argon2.wasm?url";
 
 import nacl from "tweetnacl";
+import bs58 from "bs58";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -36,7 +37,14 @@ export const b64uToBytes = (s) => {
 
 // DID (did:key:z + pk b64url)
 export function didFromPk(pkBytes) {
-  return `did:key:z${b64u(pkBytes)}`;
+  const pk = toU8(pkBytes);
+  // did:key for Ed25519 = multibase(base58btc, multicodec 0xed01 || pubkey)
+  const prefix = new Uint8Array([0xed, 0x01]);
+  const multicodec = new Uint8Array(prefix.length + pk.length);
+  multicodec.set(prefix, 0);
+  multicodec.set(pk, prefix.length);
+  const multibase = `z${bs58.encode(multicodec)}`;
+  return `did:key:${multibase}`;
 }
 
 // --- KDF ---
