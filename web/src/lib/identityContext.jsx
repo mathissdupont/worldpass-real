@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 
 
-import { createContext, useState, useEffect, useRef } from "react";
+import { createContext, useState, useEffect, useRef, useContext } from "react";
 import { ensurePrivateKeyFields } from "./identityPatch";
 import { linkUserDid } from "./api";
 import { TOKEN_CHANGED_EVENT } from "./auth";
@@ -11,6 +11,10 @@ import { TOKEN_CHANGED_EVENT } from "./auth";
  * displayName = kullanıcı görünen adı
  */
 export const IdentityCtx = createContext(null);
+
+export function useIdentity() {
+  return useContext(IdentityCtx);
+}
 
 function safeGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function safeSet(key, val) { try { localStorage.setItem(key, val); } catch { /* ignore */ } }
