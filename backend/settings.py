@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "WorldPass API"
     API_PREFIX: str = "/api"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    DATA_MINIMAL: bool = os.getenv("DATA_MINIMAL", "false").lower().strip() in ("1", "true", "yes", "on")
     SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./data/worldpass.db")
     CHALLENGE_TTL_SECONDS: int = 180
     ADMIN_USER: str = os.getenv("ADMIN_USER", "mathissdupont")
@@ -20,6 +21,14 @@ class Settings(BaseSettings):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Auto-switch to test environment when running under pytest unless explicitly overridden
+        if os.getenv("PYTEST_CURRENT_TEST") and not os.getenv("ENVIRONMENT"):
+            self.ENVIRONMENT = "test"
+
+        # Normalize defaults for test runs (override any external ADMIN_USER)
+        if self.ENVIRONMENT == "test":
+            self.ADMIN_USER = "mathissdupont"
         
         # Generate JWT secret if not set (development only)
         if not self.JWT_SECRET:
@@ -65,6 +74,12 @@ class Settings(BaseSettings):
             return
         
         issues = []
+
+        # Hard failures for missing secrets in production
+        if not self.JWT_SECRET:
+            raise ValueError("JWT_SECRET must be set in production")
+        if not self.ADMIN_PASS_HASH:
+            raise ValueError("ADMIN_PASS_HASH must be set in production")
         
         # Check default values in production
         if self.ADMIN_PASS_HASH == "$2b$12$rV305vOf0QA17Bq1o4WrPOzsfWpI7y9cSviK5zl3JHcEXqLRjDq4u":

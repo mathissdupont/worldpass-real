@@ -368,7 +368,7 @@ https://mumbai.polygonscan.com/tx/0xabc123...
 
 ### Web3 Entegrasyonu İçin:
 ```bash
-pip install web3 ipfshttpclient
+pip install web3
 
 # IPFS node başlat (ya da Infura/Pinata kullan)
 docker run -d -p 5001:5001 ipfs/go-ipfs

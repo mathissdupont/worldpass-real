@@ -75,6 +75,9 @@ async def create_share_token(
     Returns:
         {ok: true, token: str, share_url: str, expires_at: int}
     """
+    from settings import settings
+    if settings.DATA_MINIMAL:
+        raise HTTPException(status_code=403, detail="share_tokens_disabled_in_minimal_mode")
     import secrets
     import time
     
@@ -133,6 +136,9 @@ async def get_credential_by_token(
     Returns:
         {ok: true, vc: dict}
     """
+    from settings import settings
+    if settings.DATA_MINIMAL:
+        raise HTTPException(status_code=403, detail="share_tokens_disabled_in_minimal_mode")
     import time
     import json
     

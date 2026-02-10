@@ -179,9 +179,15 @@ async def test_vc_storage_encryption():
         assert parsed["jti"] == legacy_vc["jti"]
         print("✓ Legacy plain JSON VC can be parsed")
     
-    # Clean up
+    # Clean up (Windows can keep SQLite files briefly locked)
     if os.path.exists('test_vc_db.db'):
-        os.remove('test_vc_db.db')
+        import time
+        for _ in range(20):
+            try:
+                os.remove('test_vc_db.db')
+                break
+            except PermissionError:
+                time.sleep(0.1)
     
     return True
 

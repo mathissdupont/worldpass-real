@@ -47,14 +47,13 @@
 #### Install Dependencies
 ```bash
 cd backend
-pip install aiohttp web3 ipfshttpclient
+pip install aiohttp web3
 ```
 
 #### Add to requirements.txt
 ```
 aiohttp==3.9.1
 web3==6.11.3
-ipfshttpclient==0.8.0a2
 ```
 
 #### Run IPFS Node (Optional - for local testing)

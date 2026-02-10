@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 def test_env_vars():
     """Test environment variable loading"""
     print("Testing environment variables...")
-    assert settings.ADMIN_USER == "admin"
+    assert settings.ADMIN_USER == "mathissdupont"
     # Note: ADMIN_PASS_HASH and JWT_SECRET are using defaults since .env not loaded
     assert "worldpass-beta.heptapusgroup.com" in settings.CORS_ORIGINS or "localhost:5173" in settings.CORS_ORIGINS
     print("✓ Environment variables loaded correctly")

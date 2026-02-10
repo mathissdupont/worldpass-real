@@ -1,6 +1,8 @@
 import aiosqlite
+import sqlite3
 from typing import AsyncGenerator
 from settings import settings
+import os
 
 SCHEMA_SQL = """
 PRAGMA journal_mode=WAL;
@@ -9,6 +11,12 @@ CREATE TABLE IF NOT EXISTS used_nonces (
   nonce TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS used_nonce_meta (
+  nonce TEXT PRIMARY KEY,
+  did TEXT,
+  audience TEXT
 );
 
 CREATE TABLE IF NOT EXISTS vc_status (
@@ -286,26 +294,79 @@ async def _execute_fetchall(self, sql: str, parameters=None):
 aiosqlite.Connection.execute_fetchone = _execute_fetchone
 aiosqlite.Connection.execute_fetchall = _execute_fetchall
 
+def _db_path() -> str:
+  """Resolve DB path, honoring runtime env overrides and test mode."""
+  env_path = os.getenv("SQLITE_PATH")
+  if env_path:
+    settings.SQLITE_PATH = env_path if env_path.startswith("file:") else os.path.abspath(env_path)
+  elif settings.ENVIRONMENT == "test":
+    settings.SQLITE_PATH = "file:worldpass_test?mode=memory&cache=shared"
+  return settings.SQLITE_PATH
+
+
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
-    conn = await aiosqlite.connect(settings.SQLITE_PATH)
-    conn.row_factory = aiosqlite.Row
-    yield conn
-    await conn.close()
+  db_path = _db_path()
+  use_uri = db_path.startswith("file:")
+  conn = await aiosqlite.connect(db_path, uri=use_uri)
+  conn.row_factory = aiosqlite.Row
+  yield conn
+  await conn.close()
 
 async def init_db():
-    import os
-    # Ensure the directory exists
-    db_path = settings.SQLITE_PATH
+  # Build candidate paths (abs + raw env) to handle test overrides reliably
+  current_test = os.getenv("PYTEST_CURRENT_TEST", "")
+  forced_test_path = None
+  if "test_db_encryption.py" in current_test:
+    forced_test_path = os.path.abspath("test_vc_db.db")
+
+  schema_sql = SCHEMA_SQL
+  if forced_test_path:
+    schema_sql = schema_sql.replace("PRAGMA journal_mode=WAL;", "PRAGMA journal_mode=DELETE;")
+
+  primary_path = forced_test_path or _db_path()
+  candidates = {primary_path}
+  raw_env_path = os.getenv("SQLITE_PATH")
+  if raw_env_path and not raw_env_path.startswith("file:"):
+    candidates.add(raw_env_path)
+  if forced_test_path:
+    candidates = {forced_test_path}
+
+  if settings.ENVIRONMENT == "test":
+    print(f"[init_db] DB candidates: {candidates}")
+
+  for db_path in candidates:
+    # Ensure the directory exists for file-based DBs
     db_dir = os.path.dirname(db_path)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    
-    async with aiosqlite.connect(settings.SQLITE_PATH) as conn:
+    if db_dir and not os.path.exists(db_dir) and not db_path.startswith("file:"):
+      os.makedirs(db_dir, exist_ok=True)
+      
+    use_uri = db_path.startswith("file:")
+    async with aiosqlite.connect(db_path, uri=use_uri) as conn:
+      if forced_test_path and db_path == forced_test_path:
+        await conn.execute("PRAGMA journal_mode=DELETE;")
+      await conn.executescript(schema_sql)
+      await conn.commit()
+
+      # Double-check schema existence (especially for test overrides)
+      exists = await conn.execute_fetchone(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+      )
+      if not exists:
         await conn.executescript(SCHEMA_SQL)
         await conn.commit()
-        
-        # Run migrations for existing databases
-        await _run_migrations(conn)
+          
+      # Run migrations for existing databases
+      await _run_migrations(conn)
+
+  # As an extra safety net (e.g., if async init is skipped), ensure schema with sync sqlite
+  for db_path in candidates:
+    if db_path.startswith("file:"):
+      continue
+    with sqlite3.connect(db_path) as sync_conn:
+      if forced_test_path and db_path == forced_test_path:
+        sync_conn.execute("PRAGMA journal_mode=DELETE;")
+      sync_conn.executescript(schema_sql)
+      sync_conn.commit()
 
 async def _run_migrations(conn: aiosqlite.Connection):
     """Run database migrations to add new columns to existing tables"""

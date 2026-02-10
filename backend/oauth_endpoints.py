@@ -11,6 +11,12 @@ from schemas import (
 )
 from settings import settings
 
+
+async def _get_current_user_from_app(request: Request, x_token: str | None = Header(None), x_wallet_did: str | None = Header(None), db=Depends(get_db)):
+    """Re-use main auth flow to ensure OAuth consent is backed by a verified DID."""
+    from app import _get_current_user  # Local import to avoid circular dependency
+    return await _get_current_user(request=request, x_token=x_token, x_wallet_did=x_wallet_did, db=db)
+
 router = APIRouter()
 API = settings.API_PREFIX
 
@@ -21,66 +27,84 @@ async def oauth_register_client(body: OAuthClientRegisterReq, db=Depends(get_db)
 
 # ---------- OAuth Authorization (Web sayfası için) ----------
 @router.post(f"{API}/oauth/authorize", response_model=OAuthAuthorizeResp)
-async def oauth_authorize(body: OAuthAuthorizeReq, user_did: str = Header(None), db=Depends(get_db)):
+async def oauth_authorize(request: Request, body: OAuthAuthorizeReq, user=Depends(_get_current_user_from_app), db=Depends(get_db)):
+    user_did = (user.get("did") or "").strip()
     if not user_did:
-        raise HTTPException(status_code=401, detail="user_did_required")
+        raise HTTPException(status_code=400, detail="user_did_required")
     return await authorize_oauth(body, user_did, db)
 
 
 # Simple interactive authorization page for third-party integrations
 @router.get(f"{API}/oauth/authorize_page", response_class=HTMLResponse)
-async def oauth_authorize_page(request: Request, client_id: str | None = None, redirect_uri: str | None = None, scope: str | None = None, state: str | None = None):
-        # Show a tiny consent form. In a full implementation this should check session/authentication and
-        # show the logged-in user and a proper consent UI. For now we provide a form where a user can paste
-        # their DID to approve the request.
-        # XSS protection: HTML escape all user inputs
-        safe_client_id = html.escape(client_id or 'unknown')
-        safe_redirect_uri = html.escape(redirect_uri or '')
-        safe_scope = html.escape(scope or '')
-        safe_state = html.escape(state or '')
-        html_content = f"""
-        <html>
-            <head><meta charset="utf-8"><title>Worldpass Authorization</title></head>
-            <body style="font-family:system-ui,Segoe UI,Helvetica,Arial;max-width:720px;margin:40px auto;">
-                <h2>Worldpass ile giriş</h2>
-                <p>İzin verilecek istemci: <b>{safe_client_id}</b></p>
-                <p>Yönlendirme: <code>{safe_redirect_uri}</code></p>
-                <form method="post" action="{API}/oauth/authorize_page">
-                    <input type="hidden" name="client_id" value="{safe_client_id}" />
-                    <input type="hidden" name="redirect_uri" value="{safe_redirect_uri}" />
-                    <input type="hidden" name="scope" value="{safe_scope}" />
-                    <input type="hidden" name="state" value="{safe_state}" />
-                    <label for="user_did">Your DID (ör: did:key:z...):</label><br/>
-                    <input id="user_did" name="user_did" style="width:100%;padding:8px;margin-top:6px;margin-bottom:12px" placeholder="did:key:z..." />
-                    <div style="display:flex;gap:8px">
-                        <button type="submit" style="padding:10px 14px">Approve</button>
-                        <button type="button" onclick="window.history.back()" style="padding:10px 14px">Cancel</button>
-                    </div>
-                </form>
-            </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content)
+async def oauth_authorize_page(request: Request, x_token: str | None = Header(None), x_wallet_did: str | None = Header(None), client_id: str | None = None, redirect_uri: str | None = None, scope: str | None = None, state: str | None = None, db=Depends(get_db)):
+    user = await _get_current_user_from_app(request=request, x_token=x_token, x_wallet_did=x_wallet_did, db=db)
+    user_did = (user.get("did") or "").strip()
+    if not user_did:
+        raise HTTPException(status_code=400, detail="user_did_required")
+
+    # XSS protection: HTML escape all user inputs
+    safe_client_id = html.escape(client_id or 'unknown')
+    safe_redirect_uri = html.escape(redirect_uri or '')
+    safe_scope = html.escape(scope or '')
+    safe_state = html.escape(state or '')
+    html_content = f"""
+    <html>
+        <head><meta charset="utf-8"><title>Worldpass Authorization</title></head>
+        <body style="font-family:system-ui,Segoe UI,Helvetica,Arial;max-width:720px;margin:40px auto;">
+            <h2>Worldpass ile giriş</h2>
+            <p>İzin verilecek istemci: <b>{safe_client_id}</b></p>
+            <p>Yönlendirme: <code>{safe_redirect_uri}</code></p>
+            <form method="post" action="{API}/oauth/authorize_page">
+                <input type="hidden" name="client_id" value="{safe_client_id}" />
+                <input type="hidden" name="redirect_uri" value="{safe_redirect_uri}" />
+                <input type="hidden" name="scope" value="{safe_scope}" />
+                <input type="hidden" name="state" value="{safe_state}" />
+                <input type="hidden" name="user_did" value="{html.escape(user_did)}" />
+                <p>Oturum açılmış DID: <b>{html.escape(user_did)}</b></p>
+                <div style="display:flex;gap:8px">
+                    <button type="submit" style="padding:10px 14px">Approve</button>
+                    <button type="button" onclick="window.history.back()" style="padding:10px 14px">Cancel</button>
+                </div>
+            </form>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 
 @router.post(f"{API}/oauth/authorize_page")
-async def oauth_authorize_page_post(client_id: str = Form(...), redirect_uri: str = Form(...), scope: str = Form(None), state: str = Form(None), user_did: str = Form(None), db=Depends(get_db)):
-        # Basic validation
-        if not client_id or not redirect_uri:
-                raise HTTPException(status_code=400, detail="missing_parameters")
+async def oauth_authorize_page_post(
+    request: Request,
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    scope: str = Form(None),
+    state: str = Form(None),
+    x_token: str | None = Header(None),
+    x_wallet_did: str | None = Header(None),
+    db=Depends(get_db)
+):
+    # Basic validation
+    if not client_id or not redirect_uri:
+        raise HTTPException(status_code=400, detail="missing_parameters")
 
-        # Build a body object like OAuthAuthorizeReq
-        body = OAuthAuthorizeReq(client_id=client_id, redirect_uri=redirect_uri, scope=scope or "", state=state or "")
+    # Always rely on the authenticated user, ignore form-provided DID
+    user = await _get_current_user_from_app(request=request, x_token=x_token, x_wallet_did=x_wallet_did, db=db)
+    user_did = (user.get("did") or "").strip()
+    if not user_did:
+        raise HTTPException(status_code=400, detail="user_did_required")
 
-        # Create auth code using existing logic
-        resp = await authorize_oauth(body, user_did, db)
+    # Build a body object like OAuthAuthorizeReq
+    body = OAuthAuthorizeReq(client_id=client_id, redirect_uri=redirect_uri, scope=scope or "", state=state or "")
 
-        # Redirect to client's redirect_uri with code and state
-        sep = '&' if '?' in redirect_uri else '?'
-        to = f"{redirect_uri}{sep}code={resp.code}"
-        if resp.state:
-                to += f"&state={resp.state}"
-        return RedirectResponse(url=to)
+    # Create auth code using existing logic
+    resp = await authorize_oauth(body, user_did, db)
+
+    # Redirect to client's redirect_uri with code and state
+    sep = '&' if '?' in redirect_uri else '?'
+    to = f"{redirect_uri}{sep}code={resp.code}"
+    if resp.state:
+        to += f"&state={resp.state}"
+    return RedirectResponse(url=to)
 
 # ---------- OAuth Token Exchange ----------
 @router.post(f"{API}/oauth/token", response_model=OAuthTokenResp)

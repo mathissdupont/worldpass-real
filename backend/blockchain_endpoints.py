@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from chain_config import list_available_chains, get_chain_config, get_recommended_chain
 from distributed_ledger import create_distributed_manager
 import os
+from settings import settings
 
 router = APIRouter()
 
@@ -136,7 +137,10 @@ async def store_credential_distributed(
     
     NOTE: Payload must be encrypted CLIENT-SIDE before sending!
     """
-    # TODO: Verify token and permissions
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=403, detail="distributed_disabled_in_production")
+    if not x_token:
+        raise HTTPException(status_code=401, detail="auth_required")
     
     try:
         # Decode base64 payload
@@ -180,7 +184,10 @@ async def retrieve_credential_distributed(
     
     NOTE: Client must decrypt with their private key!
     """
-    # TODO: Verify token and permissions
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=403, detail="distributed_disabled_in_production")
+    if not x_token:
+        raise HTTPException(status_code=401, detail="auth_required")
     
     try:
         manager = create_distributed_manager()
@@ -225,6 +232,11 @@ async def verify_credential_integrity(
     Returns:
     - Verification result with chain info
     """
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=403, detail="distributed_disabled_in_production")
+    if not x_token:
+        raise HTTPException(status_code=401, detail="auth_required")
+
     try:
         manager = create_distributed_manager(request.chain_key)
         
@@ -257,18 +269,4 @@ async def get_distributed_storage_stats(
     - Count per blockchain
     - Storage distribution
     """
-    # TODO: Query database for stats
-    
-    return {
-        "success": True,
-        "message": "Stats endpoint - TODO: implement database queries",
-        "placeholder_data": {
-            "total_credentials": 0,
-            "ipfs_stored": 0,
-            "chains": {
-                "polygon": 0,
-                "base": 0,
-                "arbitrum": 0
-            }
-        }
-    }
+    raise HTTPException(status_code=503, detail="stats_not_implemented")

@@ -13,8 +13,9 @@ class DIDChallengeResp(BaseModel):
 
 class DIDAuthVerifyReq(BaseModel):
     did: str
-    challenge: str  # nonce
+    challenge: str  # raw nonce or formatted challenge message
     signature: str  # base64url encoded signature
+    audience: Optional[str] = "worldpass-web"
     displayName: Optional[str] = None
 
 class DIDAuthVerifyResp(BaseModel):

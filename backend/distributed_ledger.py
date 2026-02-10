@@ -27,6 +27,7 @@ import aiohttp
 import os
 import asyncio
 from chain_config import get_chain_config, get_recommended_chain
+from settings import settings
 
 # IPFS Configuration
 IPFS_API_URL = os.getenv("IPFS_API_URL", "http://localhost:5001")
@@ -68,9 +69,7 @@ class DistributedStorage:
                         result = json.loads(text.strip().splitlines()[-1])
                     return result["Hash"]
         except Exception as e:
-            # Fallback: Return hash-based ID if IPFS not available
-            print(f"IPFS storage failed: {e}, using local hash")
-            return hashlib.sha256(encrypted_vc).hexdigest()
+            raise RuntimeError(f"IPFS storage failed: {e}")
     
     async def retrieve_credential(self, cid: str) -> Optional[bytes]:
         """
@@ -104,7 +103,7 @@ class BlockchainLedger:
         """
         # Auto-select chain if not specified
         if not chain_key:
-            is_testnet = os.getenv("ENV", "development") != "production"
+            is_testnet = settings.ENVIRONMENT != "production"
             chain_key = get_recommended_chain(use_testnet=is_testnet)
         
         self.chain_key = chain_key
@@ -120,8 +119,11 @@ class BlockchainLedger:
         # Anchor mode:
         # - simulated: never sends tx, always returns a deterministic fake tx hash
         # - real: uses web3 to send tx when CONTRACT_* and DEPLOYER_PRIVATE_KEY are set
-        self.anchor_mode = os.getenv("ANCHOR_MODE", "simulated").lower().strip() or "simulated"
+        default_mode = "real" if settings.ENVIRONMENT == "production" else "simulated"
+        self.anchor_mode = os.getenv("ANCHOR_MODE", default_mode).lower().strip() or default_mode
         self.deployer_private_key = os.getenv("DEPLOYER_PRIVATE_KEY", "").strip()
+        if settings.ENVIRONMENT == "production" and self.anchor_mode != "real":
+            raise ValueError("ANCHOR_MODE must be 'real' in production")
         
         print(f"[BlockchainLedger] Initialized with {self.chain_config['name']} (chain_id: {self.chain_id})")
 
@@ -306,12 +308,12 @@ class BlockchainLedger:
         # If real mode is not configured, return simulated verification
         if self.anchor_mode != "real" or not self.contract:
             return {
-                "verified": True,
+                "verified": False,
                 "chain": self.chain_key,
                 "chain_name": self.chain_config["name"],
                 "tx_hash": tx_hash,
                 "on_chain_hash": expected,
-                "matches": True,
+                "matches": False,
                 "confirmations": 0,
                 "explorer_url": f"{self.explorer}/tx/{tx_hash}" if tx_hash else None,
                 "status": "simulated",

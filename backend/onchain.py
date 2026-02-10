@@ -6,6 +6,10 @@ import requests
 EAS_SERVICE_URL = os.getenv('EAS_SERVICE_URL', 'https://worldpass-beta.heptapusgroup.com:5055')
 
 
+class EASUnavailable(Exception):
+    """Raised when the EAS service is unreachable or misconfigured."""
+
+
 def canonicalize_vc(vc: dict) -> str:
     """Produce a stable JSON string for hashing.
     Remove volatile fields (e.g., proof) before hashing, and sort keys.
@@ -42,18 +46,27 @@ def eas_attest(vc: dict, issuer_did: str, subject_did: str):
         'subjectDid': subject_did,
         'active': True,
     }
-    r = requests.post(f'{EAS_SERVICE_URL}/attest', json=data, timeout=20)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.post(f'{EAS_SERVICE_URL}/attest', json=data, timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        raise EASUnavailable(f"EAS attest failed: {exc}") from exc
 
 
 def eas_revoke(uid: str):
-    r = requests.post(f'{EAS_SERVICE_URL}/revoke', json={'uid': uid}, timeout=20)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.post(f'{EAS_SERVICE_URL}/revoke', json={'uid': uid}, timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        raise EASUnavailable(f"EAS revoke failed: {exc}") from exc
 
 
 def eas_resolve(uid: str):
-    r = requests.get(f'{EAS_SERVICE_URL}/resolve/{uid}', timeout=20)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = requests.get(f'{EAS_SERVICE_URL}/resolve/{uid}', timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        raise EASUnavailable(f"EAS resolve failed: {exc}") from exc
