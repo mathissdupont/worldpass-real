@@ -82,6 +82,7 @@ export async function authenticateWithDID({ did, signChallenge, displayName }) {
     const { challenge, nonce } = await challengeResp.json();
 
     // 2. Sign the challenge with user's private key
+    // Sign the challenge message returned by the server
     const signature = await signChallenge(challenge);
 
     // 3. Verify and authenticate
@@ -90,7 +91,8 @@ export async function authenticateWithDID({ did, signChallenge, displayName }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         did,
-        challenge: nonce,
+        // send back the full challenge string so backend can verify the exact message
+        challenge,
         signature,
         displayName: displayName || did.slice(0, 20) + "..."
       })
