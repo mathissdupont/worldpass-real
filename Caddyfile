@@ -3,11 +3,11 @@ worldpass-beta.heptapusgroup.com {
 
     @api path /api/* /docs* /redoc*
     handle @api {
-        reverse_proxy backend:8000
+        reverse_proxy worldpass-real-backend-1:8000
     }
 
     handle {
-        reverse_proxy frontend:4173
+        reverse_proxy worldpass-real-frontend-1:4173
     }
 }
 
@@ -22,17 +22,42 @@ heptapusgroup.com www.heptapusgroup.com {
 
 mail.heptapusgroup.com {
     encode gzip
-
-    basicauth * {
-        admin $2a$14$EHDBtQRyBaJEGvUToCI63eg/rKhzBcRMCdMsrP.IWoFXTKUxR963e
-    }
-
-    reverse_proxy https://mailcowdockerized-nginx-mailcow-1:8445 {
+    reverse_proxy mailcowdockerized-nginx-mailcow-1:8445 {
         transport http {
             tls_insecure_skip_verify
         }
-        header_up Host {host}
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Forwarded-Host {host}
     }
+}
+
+admin.mail.heptapusgroup.com {
+    encode gzip
+    basic_auth {
+        admin $2a$14$EHDBtQRyBaJEGvUToCI63eg/rKhzBcRMCdMsrP.IWoFXTKUxR963e
+    }
+    reverse_proxy mailcowdockerized-nginx-mailcow-1:8445 {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+
+heptabot.heptapusgroup.com {
+    encode gzip
+    reverse_proxy 127.0.0.1:5173
+}
+
+api.heptabot.heptapusgroup.com {
+    encode gzip
+    reverse_proxy 127.0.0.1:8000
+}
+
+net.heptapusgroup.com,
+flux.heptapusgroup.com,
+dynamics.heptapusgroup.com,
+sense.heptapusgroup.com,
+shield.heptapusgroup.com,
+ware.heptapusgroup.com,
+core.heptapusgroup.com {
+    encode gzip
+    reverse_proxy heptapus_web:3000
 }

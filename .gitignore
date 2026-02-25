@@ -55,3 +55,13 @@ ERROR
 =
 [backend
 [frontend
+
+# local backups
+Caddyfile.bak.*
+docker-compose.yml.bak.*
+
+# local/accidental folders
+exporting/
+vite/
+[backend
+[frontend
