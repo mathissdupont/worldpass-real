@@ -57,6 +57,7 @@ dynamics.heptapusgroup.com,
 sense.heptapusgroup.com,
 shield.heptapusgroup.com,
 ware.heptapusgroup.com,
+certificates.heptapusgroup.com,
 core.heptapusgroup.com {
     encode gzip
     reverse_proxy heptapus_web:3000

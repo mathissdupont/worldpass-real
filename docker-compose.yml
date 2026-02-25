@@ -38,6 +38,7 @@ services:
     networks:
       - default
       - mailcow
+      - heptapusgroup
     restart: unless-stopped
 
 
@@ -59,3 +60,6 @@ networks:
   mailcow:
     external: true
     name: mailcowdockerized_mailcow-network
+  heptapusgroup:
+    external: true
+    name: heptapusgroup_default
