@@ -17,7 +17,7 @@ ipfs.worldpass-beta.heptapusgroup.com {
 
 heptapusgroup.com www.heptapusgroup.com {
     encode gzip
-    reverse_proxy heptapus_web:3000
+    reverse_proxy heptapusgroup-web-1:3000
 }
 
 mail.heptapusgroup.com {
