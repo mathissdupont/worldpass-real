@@ -43,12 +43,12 @@ admin.mail.heptapusgroup.com {
 
 heptabot.heptapusgroup.com {
     encode gzip
-    reverse_proxy 127.0.0.1:5173
+    reverse_proxy sponsorbot-frontend-1:5173
 }
 
 api.heptabot.heptapusgroup.com {
     encode gzip
-    reverse_proxy 127.0.0.1:8000
+    reverse_proxy sponsorbot-backend-1:8000
 }
 
 net.heptapusgroup.com,
