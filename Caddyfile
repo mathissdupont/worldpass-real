@@ -53,7 +53,7 @@ api.heptabot.heptapusgroup.com {
 
 certificates.heptapusgroup.com {
     encode gzip
-    reverse_proxy localhost:3000
+    reverse_proxy heptapusgroup-web-1:3000
 }
 
 net.heptapusgroup.com,
@@ -64,5 +64,5 @@ shield.heptapusgroup.com,
 ware.heptapusgroup.com,
 core.heptapusgroup.com {
     encode gzip
-    reverse_proxy heptapus_web:3000
+    reverse_proxy heptapusgroup-web-1:3000
 }
