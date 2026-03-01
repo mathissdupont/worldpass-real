@@ -51,9 +51,17 @@ api.heptabot.heptapusgroup.com {
     reverse_proxy 127.0.0.1:8000
 }
 
-certificates.heptapusgroup.com {
+cert.heptapusgroup.com {
     encode gzip
-    reverse_proxy heptapusgroup-web-1:3000
+
+    @api path /api/* /docs* /redoc*
+    handle @api {
+        reverse_proxy heptacert-backend-1:8000
+    }
+
+    handle {
+        reverse_proxy heptacert-frontend-1:3000
+    }
 }
 
 net.heptapusgroup.com,
