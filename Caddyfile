@@ -1,3 +1,8 @@
+{
+  email contact@heptapusgroup.com
+}
+
+
 worldpass-beta.heptapusgroup.com {
     encode gzip
 
@@ -11,10 +16,6 @@ worldpass-beta.heptapusgroup.com {
     }
 }
 
-
-{
-  email contact@heptapusgroup.com
-}
 
 :443 {
   tls {
