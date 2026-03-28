@@ -11,6 +11,28 @@ worldpass-beta.heptapusgroup.com {
     }
 }
 
+
+{
+  email contact@heptapusgroup.com
+}
+
+:443 {
+  tls {
+    on_demand {
+      ask http://heptacert-backend:8000/.internal/caddy/authorize
+    }
+  }
+
+  @api path /api/* /docs* /redoc*
+  handle @api {
+    reverse_proxy heptacert-backend:8000
+  }
+
+  handle {
+    reverse_proxy heptacert-frontend:3000
+  }
+}
+
 ipfs.worldpass-beta.heptapusgroup.com {
     reverse_proxy ipfs:8080
 }
