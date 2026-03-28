@@ -26,7 +26,7 @@ worldpass-beta.heptapusgroup.com {
 
     @api path /api/* /docs* /redoc*
     handle @api {
-        reverse_proxy heptacert-backend:8000
+        reverse_proxy heptacert-backend-1:8000
     }
 
     handle {
