@@ -1,7 +1,10 @@
 {
   email contact@heptapusgroup.com
-}
 
+  on_demand_tls {
+    ask http://heptacert-backend:8000/.internal/caddy/authorize
+  }
+}
 
 worldpass-beta.heptapusgroup.com {
     encode gzip
@@ -16,10 +19,9 @@ worldpass-beta.heptapusgroup.com {
     }
 }
 
-
 :443 {
     tls {
-        on_demand ask http://heptacert-backend:8000/.internal/caddy/authorize
+        on_demand
     }
 
     @api path /api/* /docs* /redoc*
@@ -36,7 +38,7 @@ ipfs.worldpass-beta.heptapusgroup.com {
     reverse_proxy ipfs:8080
 }
 
-heptapusgroup.com www.heptapusgroup.com {
+heptapusgroup.com, www.heptapusgroup.com {
     encode gzip
     reverse_proxy heptapusgroup-web-1:3000
 }
