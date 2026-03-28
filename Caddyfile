@@ -30,7 +30,7 @@ worldpass-beta.heptapusgroup.com {
     }
 
     handle {
-        reverse_proxy heptacert-frontend:3000
+        reverse_proxy heptacert-frontend-1:3000
     }
 }
 
