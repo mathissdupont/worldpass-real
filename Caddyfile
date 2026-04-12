@@ -99,10 +99,5 @@ core.heptapusgroup.com {
 }
 
 api.hittheblaze.com {
-    reverse_proxy directus_app:8055 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+    reverse_proxy 172.18.0.11:8055
 }
