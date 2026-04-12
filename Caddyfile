@@ -97,3 +97,7 @@ core.heptapusgroup.com {
     encode gzip
     reverse_proxy heptapusgroup-web-1:3000
 }
+
+api.hittheblaze.com {
+    reverse_proxy directus_app:8055
+}
