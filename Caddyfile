@@ -99,5 +99,5 @@ core.heptapusgroup.com {
 }
 
 api.hittheblaze.com {
-    reverse_proxy directus_app:8055
+    reverse_proxy 172.18.0.11:8055
 }
