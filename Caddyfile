@@ -1,9 +1,9 @@
 {
-  email contact@heptapusgroup.com
+	email contact@heptapusgroup.com
 
-  on_demand_tls {
-    ask http://heptacert-backend-1:8000/.internal/caddy/authorize
-  }
+	on_demand_tls {
+		ask http://heptacert-backend:8000/.internal/caddy/authorize
+	}
 }
 
 worldpass-beta.heptapusgroup.com {
@@ -20,18 +20,18 @@ worldpass-beta.heptapusgroup.com {
 }
 
 :443 {
-    tls {
-        on_demand
-    }
+	tls {
+		on_demand
+	}
 
-    @api path /api/* /docs* /redoc*
-    handle @api {
-        reverse_proxy heptacert-backend-1:8000
-    }
+	@api path /api/* /docs* /redoc*
+	handle @api {
+		reverse_proxy heptacert-backend:8000
+	}
 
-    handle {
-        reverse_proxy heptacert-frontend-1:3000
-    }
+	handle {
+		reverse_proxy heptacert-frontend:3000
+	}
 }
 
 ipfs.worldpass-beta.heptapusgroup.com {
