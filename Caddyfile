@@ -112,3 +112,8 @@ hittheblaze.com, www.hittheblaze.com {
     encode gzip
     reverse_proxy blazer-frontend-web-1:3000
 }
+
+docs.heptacert.com {
+    encode gzip
+    reverse_proxy heptacert-docs:3001
+}
