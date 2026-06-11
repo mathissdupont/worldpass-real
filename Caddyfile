@@ -74,7 +74,7 @@ api.heptabot.heptapusgroup.com {
     reverse_proxy sponsorbot-backend-1:8000
 }
 
-cert.heptapusgroup.com {
+heptacert.com, www.heptacert.com {
     encode gzip
 
     @api path /api/* /docs* /redoc*
@@ -85,6 +85,10 @@ cert.heptapusgroup.com {
     handle {
         reverse_proxy heptacert-frontend-1:3000
     }
+}
+
+cert.heptapusgroup.com {
+    redir https://heptacert.com{uri} 301
 }
 
 net.heptapusgroup.com,
